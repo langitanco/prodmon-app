@@ -5,8 +5,9 @@ import {
   Camera, Upload, CheckCircle, Package, Truck, 
   ClipboardList, LogOut, Calendar, ChevronRight, Loader2,
   Phone, AlertTriangle, BarChart3, Clock, ShieldCheck, Filter,
-  RefreshCw, Pencil, Save, X, Eye, FileText, Search, Trash2,
-  LayoutDashboard, Users, Settings, Menu, MessageSquare, TrendingUp
+  RefreshCw, Pencil, Save, X, Eye, EyeOff, FileText, Search, Trash2,
+  LayoutDashboard, Users, Settings, Menu, MessageSquare, TrendingUp,
+  Info, AlertCircle
 } from 'lucide-react';
 
 // ============================================================================
@@ -169,8 +170,30 @@ export default function ProductionApp() {
   // Sidebar default false (closed) on mobile
   const [sidebarOpen, setSidebarOpen] = useState(false);
   
+  // CUSTOM ALERT STATE
+  const [alertState, setAlertState] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    type: 'success' | 'error' | 'confirm';
+    onConfirm?: () => void;
+  }>({ isOpen: false, title: '', message: '', type: 'success' });
+
   const fileInputRef = useRef<HTMLInputElement>(null);
   const uploadTargetRef = useRef<{ type: string, stepId?: string, kendalaId?: string } | null>(null);
+
+  // --- CUSTOM ALERT HANDLERS ---
+  const showAlert = (title: string, message: string, type: 'success' | 'error' = 'success') => {
+    setAlertState({ isOpen: true, title, message, type, onConfirm: undefined });
+  };
+
+  const showConfirm = (title: string, message: string, onConfirm: () => void) => {
+    setAlertState({ isOpen: true, title, message, type: 'confirm', onConfirm });
+  };
+
+  const closeAlert = () => {
+    setAlertState(prev => ({ ...prev, isOpen: false }));
+  };
 
   // Load user session from localStorage on mount
   useEffect(() => {
@@ -217,7 +240,6 @@ export default function ProductionApp() {
           isResolved: k.isResolved || false
         }))
       }));
-      // Filter berdasarkan role - non-supervisor tidak bisa lihat yang terhapus
       const filteredOrders = currentUser?.role === 'supervisor' 
         ? ordersWithKendala 
         : ordersWithKendala.filter((o: Order) => !o.deleted_at);
@@ -239,7 +261,6 @@ export default function ProductionApp() {
     // @ts-ignore
     const { data, error } = await supabase.from('production_types').select('*').order('name');
     if (error || !data || data.length === 0) {
-      // Silently use defaults, jangan error
       if(productionTypes.length === 0) setProductionTypes(DEFAULT_PRODUCTION_TYPES);
     } else {
       setProductionTypes(data);
@@ -264,7 +285,7 @@ export default function ProductionApp() {
     if (!currentUser || currentUser.role !== 'supervisor') return;
     if (!userData.id) {
        const exists = usersList.find(u => u.username === userData.username);
-       if(exists) { alert('Username sudah dipakai!'); return; }
+       if(exists) { showAlert('Gagal', 'Username sudah dipakai!', 'error'); return; }
     }
     const payload = {
       username: userData.username,
@@ -279,9 +300,9 @@ export default function ProductionApp() {
       error = res.error;
       if(!error) {
         await fetchUsers();
-        alert('Data user berhasil diperbarui!');
+        showAlert('Sukses', 'Data user berhasil diperbarui!');
       } else {
-        alert('Gagal update user: ' + error.message);
+        showAlert('Error', 'Gagal update user: ' + error.message, 'error');
       }
     } else {
       // @ts-ignore
@@ -289,32 +310,32 @@ export default function ProductionApp() {
       error = res.error;
       if(!error) {
         await fetchUsers();
-        alert('User baru berhasil ditambahkan!');
+        showAlert('Sukses', 'User baru berhasil ditambahkan!');
       } else {
-        alert('Gagal tambah user: ' + error.message);
+        showAlert('Error', 'Gagal tambah user: ' + error.message, 'error');
       }
     }
   };
 
   const handleDeleteUser = async (id: string) => {
     if (!currentUser || currentUser.role !== 'supervisor') return;
-    if (confirm('Hapus pengguna ini?')) {
+    showConfirm('Hapus Pengguna?', 'Yakin ingin menghapus pengguna ini?', async () => {
       // @ts-ignore
       const { error } = await supabase.from('users').delete().eq('id', id);
       if(!error) {
         await fetchUsers();
-        alert('User berhasil dihapus!');
+        showAlert('Sukses', 'User berhasil dihapus!');
       } else {
-        alert('Gagal hapus user: ' + error.message);
+        showAlert('Error', 'Gagal hapus user: ' + error.message, 'error');
       }
-    }
+    });
   };
 
   const handleSaveProductionType = async (prodTypeData: any) => {
     if (!currentUser || currentUser.role !== 'supervisor') return;
     if (!prodTypeData.id) {
        const exists = productionTypes.find(pt => pt.value === prodTypeData.value);
-       if(exists) { alert('Jenis produksi sudah ada!'); return; }
+       if(exists) { showAlert('Gagal', 'Jenis produksi sudah ada!', 'error'); return; }
     }
     const payload = {
       name: prodTypeData.name,
@@ -327,12 +348,10 @@ export default function ProductionApp() {
       error = res.error;
       if(!error) {
         await fetchProductionTypes();
-        alert('Jenis produksi berhasil diperbarui!');
+        showAlert('Sukses', 'Jenis produksi berhasil diperbarui!');
       } else {
-        console.warn('Gagal update, tapi lanjut menggunakan data lokal:', error.message);
-        // Update local state sebagai fallback
         setProductionTypes(prev => prev.map(pt => pt.id === prodTypeData.id ? prodTypeData : pt));
-        alert('Data diupdate secara lokal (DB error)');
+        showAlert('Info', 'Data diupdate secara lokal (DB error)', 'error');
       }
     } else {
       // @ts-ignore
@@ -340,79 +359,72 @@ export default function ProductionApp() {
       error = res.error;
       if(!error) {
         await fetchProductionTypes();
-        alert('Jenis produksi baru berhasil ditambahkan!');
+        showAlert('Sukses', 'Jenis produksi baru berhasil ditambahkan!');
       } else {
-        console.warn('Gagal insert, tapi lanjut menggunakan data lokal:', error.message);
-        // Add to local state sebagai fallback
         setProductionTypes(prev => [...prev, { ...prodTypeData, id: Date.now().toString() }]);
-        alert('Data ditambahkan secara lokal (DB error)');
+        showAlert('Info', 'Data ditambahkan secara lokal (DB error)', 'error');
       }
     }
   };
 
   const handleDeleteProductionType = async (id: string) => {
     if (!currentUser || currentUser.role !== 'supervisor') return;
-    if (confirm('Hapus jenis produksi ini?')) {
+    showConfirm('Hapus Jenis Produksi?', 'Data yang dihapus tidak bisa dikembalikan.', async () => {
       // @ts-ignore
       const { error } = await supabase.from('production_types').delete().eq('id', id);
       if(!error) {
         await fetchProductionTypes();
-        alert('Jenis produksi berhasil dihapus!');
+        showAlert('Sukses', 'Jenis produksi berhasil dihapus!');
       } else {
-        alert('Gagal hapus jenis produksi: ' + error.message);
+        showAlert('Error', 'Gagal hapus jenis produksi: ' + error.message, 'error');
       }
-    }
+    });
   };
 
   const handleDeleteOrder = async (id: string) => {
     if (!currentUser || currentUser.role !== 'supervisor') return;
-    if (confirm('Pindahkan pesanan ini ke sampah?')) {
-      // Soft delete - set deleted_at
-      const updatePayload = {
-        deleted_at: new Date().toISOString()
-      };
+    showConfirm('Pindahkan ke Sampah?', 'Pesanan ini akan dipindahkan ke folder sampah.', async () => {
+      const updatePayload = { deleted_at: new Date().toISOString() };
       // @ts-ignore
       const { error } = await supabase.from('orders').update(updatePayload).eq('id', id);
       if(!error) {
         await fetchOrders();
-        alert('Pesanan berhasil dipindahkan ke sampah!');
+        showAlert('Sukses', 'Pesanan berhasil dipindahkan ke sampah!');
         setSelectedOrderId(null);
         setView('list');
       } else {
-        alert('Gagal hapus pesanan: ' + error.message);
+        showAlert('Error', 'Gagal hapus pesanan: ' + error.message, 'error');
       }
-    }
+    });
   };
 
   const handleRestoreOrder = async (id: string) => {
     if (!currentUser || currentUser.role !== 'supervisor') return;
-    if (confirm('Pulihkan pesanan ini?')) {
-      const updatePayload = {
-        deleted_at: null
-      };
+    showConfirm('Pulihkan Pesanan?', 'Pesanan akan kembali ke daftar aktif.', async () => {
+      const updatePayload = { deleted_at: null };
       // @ts-ignore
       const { error } = await supabase.from('orders').update(updatePayload).eq('id', id);
       if(!error) {
         await fetchOrders();
-        alert('Pesanan berhasil dipulihkan!');
+        showAlert('Sukses', 'Pesanan berhasil dipulihkan!');
       } else {
-        alert('Gagal pulihkan pesanan: ' + error.message);
+        showAlert('Error', 'Gagal pulihkan pesanan: ' + error.message, 'error');
       }
-    }
+    });
   };
 
   const handlePermanentDeleteOrder = async (id: string) => {
     if (!currentUser || currentUser.role !== 'supervisor') return;
-    if (confirm('HAPUS PERMANEN pesanan ini? Data tidak bisa dikembalikan!')) {
+    showConfirm('HAPUS PERMANEN?', 'PERINGATAN: Data akan hilang selamanya dan tidak bisa dikembalikan!', async () => {
       // @ts-ignore
       const { error } = await supabase.from('orders').delete().eq('id', id);
       if(!error) {
         await fetchOrders();
-        alert('Pesanan berhasil dihapus permanen!');
+        showAlert('Sukses', 'Pesanan berhasil dihapus permanen!');
       } else {
-        alert('Gagal hapus permanen: ' + error.message);
+        showAlert('Error', 'Gagal hapus permanen: ' + error.message, 'error');
       }
-    }
+    });
   };
 
   const triggerUpload = (targetType: string, stepId?: string, kendalaId?: string) => {
@@ -467,7 +479,7 @@ export default function ProductionApp() {
       }
       await saveOrderUpdate(updatedOrder);
     } catch (error: any) {
-      alert('Gagal upload: ' + error.message);
+      showAlert('Error', 'Gagal upload: ' + error.message, 'error');
     } finally {
       setUploading(false);
       if (fileInputRef.current) fileInputRef.current.value = '';
@@ -477,16 +489,40 @@ export default function ProductionApp() {
   const checkAutoStatus = (order: Order): Order => {
     let updated = { ...order };
     
-    // Jangan auto-update jika sedang revisi atau ada kendala
-    if (updated.status === 'Revisi' || updated.status === 'Ada Kendala') return updated;
-    
-    if (updated.status === 'Pesanan Masuk' && updated.link_approval) updated.status = 'On Process';
-    if (updated.status === 'On Process') {
-      const steps = updated.jenis_produksi === 'manual' ? updated.steps_manual : updated.steps_dtf;
-      if (steps.every(s => s.isCompleted)) updated.status = 'Finishing';
+    const hasUnresolvedKendala = updated.kendala && updated.kendala.some(k => !k.isResolved);
+    if (hasUnresolvedKendala) {
+      updated.status = 'Ada Kendala';
+      return updated;
     }
-    if (updated.status === 'Finishing' && updated.finishing_qc.isPassed && updated.finishing_packing.isPacked) updated.status = 'Kirim';
-    if (updated.status === 'Kirim' && updated.shipping.bukti_kirim && updated.shipping.bukti_terima) updated.status = 'Selesai';
+
+    const hasApproval = !!updated.link_approval;
+    const steps = updated.jenis_produksi === 'manual' ? updated.steps_manual : updated.steps_dtf;
+    const isProductionDone = steps.every(s => s.isCompleted);
+    const isQCPassed = updated.finishing_qc.isPassed;
+    const isQCRevisi = !isQCPassed && updated.finishing_qc.notes;
+    const isPacked = updated.finishing_packing.isPacked;
+    const hasResi = !!updated.shipping.bukti_kirim;
+    const hasTerima = !!updated.shipping.bukti_terima;
+
+    if (!hasApproval) {
+      updated.status = 'Pesanan Masuk';
+    } else {
+      if (!isProductionDone) {
+        updated.status = 'On Process';
+      } else {
+        if (isQCRevisi) {
+          updated.status = 'Revisi';
+        } else if (!isQCPassed || !isPacked) {
+          updated.status = 'Finishing';
+        } else {
+          if (!hasResi || !hasTerima) {
+            updated.status = 'Kirim';
+          } else {
+            updated.status = 'Selesai';
+          }
+        }
+      }
+    }
     return updated;
   };
 
@@ -518,37 +554,29 @@ export default function ProductionApp() {
     if (error) {
       console.error('DB Error:', error);
       if (!error.message.includes('kendala')) {
-        alert('Gagal update DB: ' + error.message);
+        showAlert('Error', 'Gagal update DB: ' + error.message, 'error');
       }
     }
   };
 
-  // Fungsi untuk membuat Kode Produksi Otomatis: LCO-MM/YY-XXXX
   const generateProductionCode = () => {
     const now = new Date();
     const month = String(now.getMonth() + 1).padStart(2, '0');
     const year = String(now.getFullYear()).slice(-2);
-    const prefix = `LCO-${month}/${year}-`; // Contoh: LCO-11/25-
-
-    // Cari urutan terakhir dari pesanan yang ada dengan prefix bulan & tahun yang sama
+    const prefix = `LCO-${month}/${year}-`;
     const existingCodes = orders
       .filter(o => o.kode_produksi && o.kode_produksi.startsWith(prefix))
       .map(o => {
         const parts = o.kode_produksi.split('-');
         return parseInt(parts[parts.length - 1]) || 0;
       });
-
-    // Ambil angka terbesar, lalu tambah 1
     const maxSequence = existingCodes.length > 0 ? Math.max(...existingCodes) : 0;
     const nextSequence = maxSequence + 1;
-
-    // Format 4 digit (0001)
     return `${prefix}${String(nextSequence).padStart(4, '0')}`;
   };
 
   const handleCreateOrder = async (newOrderData: any) => {
     const newProductionCode = generateProductionCode();
-
     const payload: any = {
       kode_produksi: newProductionCode,
       nama_pemesan: newOrderData.nama,
@@ -564,20 +592,20 @@ export default function ProductionApp() {
       finishing_packing: { isPacked: false },
       shipping: {}
     };
-    
     payload.kendala = [];
     
     // @ts-ignore
     const { error } = await supabase.from('orders').insert([payload]);
     if (error) {
-      if (error.code === '23505') { // Error Duplicate Key
-         alert('Gagal: Kode produksi duplikat. Silakan coba simpan lagi.');
+      if (error.code === '23505') {
+         showAlert('Gagal', 'Kode produksi duplikat. Silakan coba simpan lagi.', 'error');
       } else if (!error.message.includes('kendala')) {
-         alert('Gagal: ' + error.message);
+         showAlert('Error', 'Gagal: ' + error.message, 'error');
       }
     } else {
       await fetchOrders();
       setView('list');
+      showAlert('Sukses', 'Pesanan baru berhasil dibuat!');
     }
   };
 
@@ -597,6 +625,7 @@ export default function ProductionApp() {
     
     await saveOrderUpdate(updatedOrder);
     setView('detail');
+    showAlert('Sukses', 'Data pesanan berhasil diupdate!');
   };
 
   if (!currentUser) return <LoginScreen usersList={usersList} onLogin={handleLogin} />;
@@ -607,21 +636,59 @@ export default function ProductionApp() {
     setSidebarOpen(false);
   };
 
-  // Filter orders berdasarkan tab aktif
   const activeOrders = orders.filter(o => !o.deleted_at);
   const deletedOrders = orders.filter(o => o.deleted_at);
 
   return (
     <div className="min-h-screen bg-gray-100 font-sans flex flex-col md:flex-row">
-      <input type="file" hidden ref={fileInputRef} accept="image/*,application/pdf" onChange={handleFileChange} />
-      {uploading && (
-        <div className="fixed inset-0 bg-black/50 z-[70] flex items-center justify-center text-white flex-col">
-          <Loader2 className="w-10 h-10 animate-spin mb-2" />
-          <p>Upload...</p>
+      {/* --- CUSTOM ALERT MODAL --- */}
+      {alertState.isOpen && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden transform scale-100 animate-in zoom-in-95 duration-200">
+             <div className={`p-4 flex items-center gap-3 ${alertState.type === 'error' ? 'bg-red-50' : alertState.type === 'confirm' ? 'bg-blue-50' : 'bg-green-50'}`}>
+                {alertState.type === 'error' ? <AlertCircle className="w-6 h-6 text-red-600"/> : 
+                 alertState.type === 'confirm' ? <AlertTriangle className="w-6 h-6 text-blue-600"/> : 
+                 <CheckCircle className="w-6 h-6 text-green-600"/>}
+                <h3 className={`font-bold text-lg ${alertState.type === 'error' ? 'text-red-800' : alertState.type === 'confirm' ? 'text-blue-800' : 'text-green-800'}`}>
+                  {alertState.title}
+                </h3>
+             </div>
+             <div className="p-6">
+                <p className="text-slate-600 font-medium">{alertState.message}</p>
+             </div>
+             <div className="p-4 border-t bg-slate-50 flex justify-end gap-3">
+                {alertState.type === 'confirm' && (
+                  <button 
+                    onClick={closeAlert}
+                    className="px-4 py-2 rounded-lg border-2 border-slate-200 text-slate-600 font-bold text-sm hover:bg-slate-100 transition"
+                  >
+                    Batal
+                  </button>
+                )}
+                <button 
+                  onClick={() => {
+                    if (alertState.type === 'confirm' && alertState.onConfirm) {
+                      alertState.onConfirm();
+                    }
+                    closeAlert();
+                  }}
+                  className={`px-6 py-2 rounded-lg text-white font-bold text-sm shadow-lg transition transform active:scale-95 ${alertState.type === 'error' ? 'bg-red-600 hover:bg-red-700' : 'bg-blue-600 hover:bg-blue-700'}`}
+                >
+                  {alertState.type === 'confirm' ? 'Ya, Lanjutkan' : 'OK'}
+                </button>
+             </div>
+          </div>
         </div>
       )}
 
-      {/* BACKDROP - Z-Index ditingkatkan ke z-[55] agar di atas header (z-50) */}
+      <input type="file" hidden ref={fileInputRef} accept="image/*,application/pdf" onChange={handleFileChange} />
+      {uploading && (
+        <div className="fixed inset-0 bg-black/50 z-[70] flex items-center justify-center text-white flex-col backdrop-blur-sm">
+          <Loader2 className="w-12 h-12 animate-spin mb-3 text-blue-400" />
+          <p className="font-bold text-lg">Mengupload...</p>
+        </div>
+      )}
+
       {sidebarOpen && (
         <div 
           className="fixed inset-0 bg-black/60 z-[55] md:hidden backdrop-blur-sm transition-opacity"
@@ -629,7 +696,6 @@ export default function ProductionApp() {
         />
       )}
 
-      {/* SIDEBAR - Z-Index ditingkatkan ke z-[60] agar di atas backdrop & header */}
       <aside className={`
         fixed md:sticky top-0 left-0 h-screen w-72 bg-slate-900 text-white z-[60] 
         transition-transform duration-300 ease-in-out shadow-2xl
@@ -640,7 +706,7 @@ export default function ProductionApp() {
             <div className="bg-blue-600 p-2 rounded-lg"><ClipboardList className="w-6 h-6 text-white"/></div>
             <div>
               <h1 className="font-bold text-xl tracking-wide">ProdMon</h1>
-              <div className="text-xs text-slate-400">Production System</div>
+              <div className="text-xs text-slate-400">Monitoring Produksi</div>
             </div>
             <button onClick={() => setSidebarOpen(false)} className="md:hidden ml-auto text-slate-400 hover:text-white">
               <X className="w-6 h-6"/>
@@ -695,8 +761,6 @@ export default function ProductionApp() {
       </aside>
 
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
-        
-        {/* HEADER MOBILE - Tetap Sticky, Z-index 50 (di bawah sidebar) */}
         <header className="md:hidden bg-white px-4 py-3 shadow-md flex items-center justify-between sticky top-0 z-50 border-b">
             <div className="flex items-center gap-3">
               <button onClick={() => setSidebarOpen(true)} className="p-2 bg-slate-100 rounded-lg text-slate-700 hover:bg-slate-200 transition">
@@ -707,7 +771,7 @@ export default function ProductionApp() {
             <div className="text-[10px] font-bold bg-blue-600 text-white px-2 py-1 rounded uppercase tracking-wide">{currentUser.role}</div>
         </header>
 
-        <main className="flex-1 overflow-y-auto p-4 md:p-8 pb-24">
+        <main className="flex-1 overflow-y-auto p-2 md:p-8 pb-24">
           <div className="max-w-6xl mx-auto">
             {activeTab === 'dashboard' && (
                <Dashboard role={currentUser.role} orders={activeOrders} onSelectOrder={(id: string) => { setSelectedOrderId(id); setView('detail'); setActiveTab('orders'); }} />
@@ -743,6 +807,7 @@ export default function ProductionApp() {
                       onTriggerUpload={triggerUpload}
                       onUpdateOrder={saveOrderUpdate}
                       onDelete={handleDeleteOrder}
+                      onConfirm={showConfirm} // Passing custom confirm handler
                     />
                  )}
                </>
@@ -778,6 +843,7 @@ export default function ProductionApp() {
 function LoginScreen({ usersList, onLogin }: { usersList: UserData[], onLogin: (u: UserData) => void }) {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -798,7 +864,7 @@ function LoginScreen({ usersList, onLogin }: { usersList: UserData[], onLogin: (
               <div className="bg-blue-600 w-14 h-14 rounded-xl flex items-center justify-center mx-auto mb-4 shadow-lg shadow-blue-500/30">
                 <ClipboardList className="w-8 h-8 text-white"/>
               </div>
-              <h2 className="text-2xl font-extrabold text-slate-800">Selamat Datang</h2>
+              <h2 className="text-2xl font-extrabold text-slate-800">Monitoring Produksi</h2>
               <p className="text-slate-600 text-sm mt-1 font-medium">Silakan login untuk melanjutkan</p>
             </div>
 
@@ -807,6 +873,9 @@ function LoginScreen({ usersList, onLogin }: { usersList: UserData[], onLogin: (
                 <label className="block text-xs font-bold text-slate-700 uppercase mb-2 tracking-wide">Username</label>
                 <input 
                   type="text" 
+                  autoCapitalize="none"
+                  autoComplete="off"
+                  autoCorrect="off"
                   className="w-full p-3.5 border-2 border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition font-medium text-slate-800 placeholder-slate-400"
                   placeholder="Masukkan username"
                   value={username}
@@ -815,25 +884,34 @@ function LoginScreen({ usersList, onLogin }: { usersList: UserData[], onLogin: (
               </div>
               <div>
                 <label className="block text-xs font-bold text-slate-700 uppercase mb-2 tracking-wide">Password</label>
-                <input 
-                  type="password" 
-                  className="w-full p-3.5 border-2 border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition font-medium text-slate-800 placeholder-slate-400"
-                  placeholder="Masukkan password"
-                  value={password}
-                  onChange={e => setPassword(e.target.value)}
-                />
+                <div className="relative">
+                  <input 
+                    type={showPassword ? "text" : "password"}
+                    className="w-full p-3.5 border-2 border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition font-medium text-slate-800 placeholder-slate-400 pr-12"
+                    placeholder="Masukkan password"
+                    value={password}
+                    onChange={e => setPassword(e.target.value)}
+                  />
+                  <button 
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-1"
+                  >
+                    {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                  </button>
+                </div>
               </div>
               
               {error && <div className="text-red-600 text-sm text-center font-bold bg-red-50 p-3 rounded-xl border border-red-100">{error}</div>}
 
               <button type="submit" className="w-full bg-slate-900 text-white py-3.5 rounded-xl font-bold text-lg hover:bg-blue-700 transition shadow-lg active:scale-[0.98] transform">
-                Login System
+                Login
               </button>
             </form>
             
             <div className="mt-8 text-center text-xs text-slate-500 bg-slate-50 p-3 rounded-lg border border-slate-100">
-              <strong>Default Login:</strong><br/>
-              supervisor/123, admin/123, prod/123, qc/123, manager/123
+              <strong>Perhatian:</strong><br/>
+              Pastikan huruf besar kecilnya sesuai dengan data Anda
             </div>
         </div>
       </div>
@@ -863,67 +941,60 @@ function Dashboard({ role, orders, onSelectOrder }: any) {
   };
 
   return (
-    <div className="space-y-6">
-      <h2 className="text-2xl font-bold text-slate-800 mb-6">Dashboard Overview</h2>
+    <div className="space-y-4 md:space-y-6">
+      <h2 className="text-xl md:text-2xl font-bold text-slate-800 mb-2 md:mb-6">Dashboard Overview</h2>
       
-      <div className="grid grid-cols-3 lg:grid-cols-6 gap-3 md:gap-4">
-        <div className="bg-white p-3 md:p-5 rounded-xl shadow-sm border border-slate-200">
-          <div className="text-slate-500 text-[10px] md:text-xs font-bold uppercase whitespace-nowrap truncate">Total Order</div>
-          <div className="text-2xl md:text-3xl font-extrabold text-slate-800 mt-1">{stats.total}</div>
-        </div>
-        <div className="bg-indigo-50 p-3 md:p-5 rounded-xl border border-indigo-100">
-          <div className="text-indigo-700 text-[10px] md:text-xs font-bold uppercase whitespace-nowrap truncate">PCS Bulan Ini</div>
-          <div className="text-2xl md:text-3xl font-extrabold text-indigo-800 mt-1">{stats.pcsThisMonth}</div>
-        </div>
-        <div className="bg-blue-50 p-3 md:p-5 rounded-xl border border-blue-100">
-          <div className="text-blue-700 text-[10px] md:text-xs font-bold uppercase whitespace-nowrap truncate">Sedang Proses</div>
-          <div className="text-2xl md:text-3xl font-extrabold text-blue-800 mt-1">{stats.process}</div>
-        </div>
-        <div className="bg-red-50 p-3 md:p-5 rounded-xl border border-red-100">
-          <div className="text-red-700 text-[10px] md:text-xs font-bold uppercase whitespace-nowrap truncate">Telat Deadline</div>
-          <div className="text-2xl md:text-3xl font-extrabold text-red-800 mt-1">{stats.overdue}</div>
-        </div>
-        <div className="bg-green-50 p-3 md:p-5 rounded-xl border border-green-100">
-          <div className="text-green-700 text-[10px] md:text-xs font-bold uppercase whitespace-nowrap truncate">Selesai</div>
-          <div className="text-2xl md:text-3xl font-extrabold text-green-800 mt-1">{stats.completed}</div>
-        </div>
-        <div className="bg-purple-50 p-3 md:p-5 rounded-xl border border-purple-100">
-          <div className="text-purple-700 text-[10px] md:text-xs font-bold uppercase whitespace-nowrap truncate">Total PCS</div>
-          <div className="text-2xl md:text-3xl font-extrabold text-purple-800 mt-1">{stats.totalPcs}</div>
-        </div>
+      <div className="grid grid-cols-3 lg:grid-cols-6 gap-2 md:gap-4">
+        {[
+          { label: 'Total Order', val: stats.total, bg: 'bg-white', text: 'text-slate-800', border: 'border-slate-200' },
+          { label: 'PCS Bulan Ini', val: stats.pcsThisMonth, bg: 'bg-indigo-50', text: 'text-indigo-800', border: 'border-indigo-100' },
+          { label: 'Sedang Proses', val: stats.process, bg: 'bg-blue-50', text: 'text-blue-800', border: 'border-blue-100' },
+          { label: 'Telat Deadline', val: stats.overdue, bg: 'bg-red-50', text: 'text-red-800', border: 'border-red-100' },
+          { label: 'Selesai', val: stats.completed, bg: 'bg-green-50', text: 'text-green-800', border: 'border-green-100' },
+          { label: 'Total PCS', val: stats.totalPcs, bg: 'bg-purple-50', text: 'text-purple-800', border: 'border-purple-100' },
+        ].map((s, i) => (
+          <div key={i} className={`${s.bg} p-2 md:p-5 rounded-xl shadow-sm border ${s.border}`}>
+            <div className={`${s.text} opacity-70 text-[9px] md:text-xs font-bold uppercase whitespace-nowrap truncate`}>{s.label}</div>
+            <div className={`text-xl md:text-3xl font-extrabold ${s.text} mt-0.5 md:mt-1`}>{s.val}</div>
+          </div>
+        ))}
       </div>
 
       <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-        <div className="p-5 border-b border-slate-100 flex justify-between items-center">
-            <h3 className="font-bold text-lg text-slate-800">Pesanan Terbaru</h3>
+        <div className="p-3 md:p-5 border-b border-slate-100 flex justify-between items-center">
+            <h3 className="font-bold text-md md:text-lg text-slate-800">Pesanan Terbaru</h3>
         </div>
         <div className="overflow-x-auto">
-          <table className="w-full text-sm text-left text-slate-600 min-w-[600px]">
-            <thead className="bg-slate-50 text-xs uppercase font-bold text-slate-600">
+          <table className="w-full text-left text-slate-600 min-w-full md:min-w-[600px]">
+            <thead className="bg-slate-50 text-[10px] md:text-xs uppercase font-bold text-slate-600">
               <tr>
-                <th className="px-6 py-4 whitespace-nowrap">Kode</th>
-                <th className="px-6 py-4 whitespace-nowrap">Pemesan</th>
-                <th className="px-6 py-4 whitespace-nowrap">Status</th>
-                <th className="px-6 py-4 whitespace-nowrap">Deadline</th>
-                <th className="px-6 py-4 whitespace-nowrap">Aksi</th>
+                <th className="px-2 py-2 md:px-6 md:py-4 whitespace-nowrap">Kode</th>
+                <th className="px-2 py-2 md:px-6 md:py-4 whitespace-nowrap">Pemesan</th>
+                <th className="px-2 py-2 md:px-6 md:py-4 whitespace-nowrap">Status</th>
+                <th className="px-2 py-2 md:px-6 md:py-4 whitespace-nowrap">Deadline</th>
+                <th className="px-2 py-2 md:px-6 md:py-4 whitespace-nowrap text-right">Aksi</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
               {orders.slice(0, 5).map((o: any) => {
                 const deadlineStatus = getDeadlineStatus(o.deadline, o.status);
                 return (
-                  <tr key={o.id} className="hover:bg-slate-50 transition">
-                    <td className="px-6 py-4 font-mono font-medium text-slate-500 whitespace-nowrap">{o.kode_produksi}</td>
-                    <td className="px-6 py-4 font-bold text-slate-800 whitespace-nowrap">{o.nama_pemesan}</td>
-                    <td className="px-6 py-4 whitespace-nowrap"><span className={`px-3 py-1 rounded-full text-[10px] font-extrabold uppercase tracking-wide border whitespace-nowrap ${getStatusColor(o.status)}`}>{o.status}</span></td>
-                    <td className={`px-6 py-4 font-medium whitespace-nowrap ${deadlineStatus === 'overdue' ? 'text-red-600 font-bold' : 'text-slate-700'}`}>{formatDate(o.deadline)}</td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <button onClick={() => onSelectOrder(o.id)} className="text-blue-600 hover:text-blue-800 text-xs font-bold bg-blue-50 px-3 py-1.5 rounded border border-blue-100">Detail</button>
+                  <tr key={o.id} className="hover:bg-slate-50 transition text-[10px] md:text-sm">
+                    <td className="px-2 py-2 md:px-6 md:py-4 font-mono font-medium text-slate-500 whitespace-nowrap">{o.kode_produksi}</td>
+                    <td className="px-2 py-2 md:px-6 md:py-4 font-bold text-slate-800 whitespace-nowrap max-w-[100px] md:max-w-none truncate">{o.nama_pemesan}</td>
+                    <td className="px-2 py-2 md:px-6 md:py-4 whitespace-nowrap">
+                      <span className={`px-2 py-0.5 md:px-3 md:py-1 rounded-full text-[8px] md:text-[10px] font-extrabold uppercase tracking-wide border whitespace-nowrap ${getStatusColor(o.status)}`}>
+                        {o.status}
+                      </span>
+                    </td>
+                    <td className={`px-2 py-2 md:px-6 md:py-4 font-medium whitespace-nowrap ${deadlineStatus === 'overdue' ? 'text-red-600 font-bold' : 'text-slate-700'}`}>{formatDate(o.deadline)}</td>
+                    <td className="px-2 py-2 md:px-6 md:py-4 whitespace-nowrap text-right">
+                      <button onClick={() => onSelectOrder(o.id)} className="text-blue-600 hover:text-blue-800 text-[9px] md:text-xs font-bold bg-blue-50 px-2 py-1 md:px-3 md:py-1.5 rounded border border-blue-100">Detail</button>
                     </td>
                   </tr>
                 );
               })}
-              {orders.length === 0 && <tr><td colSpan={5} className="px-4 py-8 text-center text-slate-400">Belum ada pesanan</td></tr>}
+              {orders.length === 0 && <tr><td colSpan={5} className="px-4 py-8 text-center text-slate-400 text-xs">Belum ada pesanan</td></tr>}
             </tbody>
           </table>
         </div>
@@ -934,11 +1005,11 @@ function Dashboard({ role, orders, onSelectOrder }: any) {
 
 function TrashView({ orders, onRestore, onPermanentDelete }: any) {
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 md:space-y-6">
       <div className="flex justify-between items-center">
         <div>
-          <h2 className="text-2xl font-bold text-slate-800">Sampah</h2>
-          <p className="text-sm text-slate-500 mt-1 font-medium">{orders.length} pesanan terhapus</p>
+          <h2 className="text-xl md:text-2xl font-bold text-slate-800">Sampah</h2>
+          <p className="text-xs md:text-sm text-slate-500 mt-1 font-medium">{orders.length} pesanan terhapus</p>
         </div>
       </div>
 
@@ -948,43 +1019,32 @@ function TrashView({ orders, onRestore, onPermanentDelete }: any) {
           <p className="text-slate-400 font-medium">Sampah kosong</p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 md:gap-4">
           {orders.map((order: Order) => (
-            <div key={order.id} className="bg-white rounded-2xl shadow-sm border border-slate-300 p-5 relative overflow-hidden opacity-75">
+            <div key={order.id} className="bg-white rounded-2xl shadow-sm border border-slate-300 p-4 md:p-5 relative overflow-hidden opacity-75">
               <div className="absolute top-0 right-0 bg-slate-500 text-white text-[10px] px-2 py-0.5 font-bold rounded-bl-lg">DIHAPUS</div>
               
-              <div className="flex justify-between items-start mb-4 mt-1">
-                <span className="text-xs font-mono font-bold text-slate-500 bg-slate-100 px-2 py-1 rounded-md">#{order.kode_produksi}</span>
-                <span className={`text-[10px] font-extrabold px-2.5 py-1 rounded-full border uppercase tracking-wide whitespace-nowrap ${getStatusColor(order.status)}`}>{order.status}</span>
+              <div className="flex justify-between items-start mb-2 md:mb-4 mt-1">
+                <span className="text-[10px] md:text-xs font-mono font-bold text-slate-500 bg-slate-100 px-1.5 py-0.5 md:px-2 md:py-1 rounded-md">#{order.kode_produksi}</span>
+                <span className={`text-[9px] md:text-[10px] font-extrabold px-2 py-0.5 md:px-2.5 md:py-1 rounded-full border uppercase tracking-wide whitespace-nowrap ${getStatusColor(order.status)}`}>{order.status}</span>
               </div>
-              <h3 className="font-bold text-lg text-slate-800 line-clamp-1 mb-1 leading-tight">{order.nama_pemesan}</h3>
-              <div className="text-xs text-slate-500 mb-4 font-medium">
+              <h3 className="font-bold text-sm md:text-lg text-slate-800 line-clamp-1 mb-0.5 leading-tight">{order.nama_pemesan}</h3>
+              <div className="text-[10px] md:text-xs text-slate-500 mb-2 md:mb-4 font-medium">
                 Dihapus: {order.deleted_at ? formatDate(order.deleted_at) : '-'}
               </div>
               
-              <div className="space-y-2 pt-3 border-t border-slate-100">
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-slate-500 flex items-center gap-1.5 font-medium"><FileText className="w-4 h-4"/> Jumlah</span>
-                  <span className="font-bold text-slate-800">{order.jumlah} Pcs</span>
-                </div>
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-slate-500 flex items-center gap-1.5 font-medium"><BarChart3 className="w-4 h-4"/> Tipe</span>
-                  <span className="font-bold text-slate-800 uppercase bg-slate-50 px-2 rounded">{order.jenis_produksi}</span>
-                </div>
-              </div>
-
-              <div className="mt-4 flex gap-2">
+              <div className="mt-2 flex gap-2">
                 <button 
                   onClick={() => onRestore(order.id)}
-                  className="flex-1 bg-green-600 text-white px-3 py-2 rounded-lg text-xs font-bold hover:bg-green-700 transition border border-green-700 flex items-center justify-center gap-2"
+                  className="flex-1 bg-green-600 text-white px-3 py-1.5 md:py-2 rounded-lg text-[10px] md:text-xs font-bold hover:bg-green-700 transition border border-green-700 flex items-center justify-center gap-2"
                 >
-                  <RefreshCw className="w-3.5 h-3.5"/> Pulihkan
+                  <RefreshCw className="w-3 h-3 md:w-3.5 md:h-3.5"/> Pulihkan
                 </button>
                 <button 
                   onClick={() => onPermanentDelete(order.id)}
-                  className="flex-1 bg-red-600 text-white px-3 py-2 rounded-lg text-xs font-bold hover:bg-red-700 transition border border-red-700 flex items-center justify-center gap-2"
+                  className="flex-1 bg-red-600 text-white px-3 py-1.5 md:py-2 rounded-lg text-[10px] md:text-xs font-bold hover:bg-red-700 transition border border-red-700 flex items-center justify-center gap-2"
                 >
-                  <Trash2 className="w-3.5 h-3.5"/> Hapus Permanen
+                  <Trash2 className="w-3 h-3 md:w-3.5 md:h-3.5"/> Hapus
                 </button>
               </div>
             </div>
@@ -1022,16 +1082,16 @@ function OrderList({ role, orders, productionTypes, onSelectOrder, onNewOrder, o
   });
 
   return (
-    <div className="space-y-6">
-       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+    <div className="space-y-4 md:space-y-6">
+       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-3 md:gap-4">
         <div>
-          <h2 className="text-2xl font-bold text-slate-800">Daftar Pesanan</h2>
-          <p className="text-sm text-slate-500 mt-1 font-medium">Kelola {filteredOrders.length} pesanan masuk</p>
+          <h2 className="text-xl md:text-2xl font-bold text-slate-800">Daftar Pesanan</h2>
+          <p className="text-xs md:text-sm text-slate-500 mt-0.5 md:mt-1 font-medium">Kelola {filteredOrders.length} pesanan masuk</p>
         </div>
 
-        <div className="flex flex-col sm:flex-row w-full md:w-auto items-stretch sm:items-center gap-3">
+        <div className="flex flex-row w-full md:w-auto items-center gap-2 md:gap-3 overflow-x-auto pb-1">
           <select 
-            className="bg-white border border-slate-300 text-slate-700 text-sm rounded-lg p-2.5 focus:ring-blue-500 focus:border-blue-500 font-medium"
+            className="bg-white border border-slate-300 text-slate-700 text-[10px] md:text-sm rounded-lg p-2 focus:ring-blue-500 focus:border-blue-500 font-medium"
             value={monthFilter}
             onChange={(e) => setMonthFilter(e.target.value)}
           >
@@ -1042,7 +1102,7 @@ function OrderList({ role, orders, productionTypes, onSelectOrder, onNewOrder, o
           </select>
 
           <select 
-            className="bg-white border border-slate-300 text-slate-700 text-sm rounded-lg p-2.5 focus:ring-blue-500 focus:border-blue-500 font-medium"
+            className="bg-white border border-slate-300 text-slate-700 text-[10px] md:text-sm rounded-lg p-2 focus:ring-blue-500 focus:border-blue-500 font-medium"
             value={typeFilter}
             onChange={(e) => setTypeFilter(e.target.value)}
           >
@@ -1053,59 +1113,62 @@ function OrderList({ role, orders, productionTypes, onSelectOrder, onNewOrder, o
           </select>
 
           {(role === 'admin' || role === 'supervisor') && (
-            <button onClick={onNewOrder} className="bg-blue-600 text-white px-4 py-2.5 rounded-lg text-sm font-bold flex items-center justify-center gap-2 hover:bg-blue-700 transition shadow-sm active:scale-95">
-              <ClipboardList className="w-4 h-4"/> Tambah Baru
+            <button onClick={onNewOrder} className="bg-blue-600 text-white px-3 py-2 md:px-4 md:py-2.5 rounded-lg text-[10px] md:text-sm font-bold flex items-center justify-center gap-2 hover:bg-blue-700 transition shadow-sm active:scale-95 whitespace-nowrap ml-auto md:ml-0">
+              <ClipboardList className="w-3 h-3 md:w-4 md:h-4"/> Tambah
             </button>
           )}
         </div>
       </div>
 
-      <div className="flex gap-2 overflow-x-auto pb-2 -mx-4 px-4 md:mx-0 md:px-0 scrollbar-hide">
+      <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
         {[
           { id: null, label: 'Semua' },
-          { id: 'process', label: 'Sedang Proses' },
-          { id: 'overdue', label: 'Telat Deadline' },
+          { id: 'process', label: 'Proses' },
+          { id: 'overdue', label: 'Telat' },
           { id: 'completed', label: 'Selesai' }
         ].map((f) => (
           <button 
             key={f.id || 'all'}
             onClick={() => setStatusFilter(f.id)}
-            className={`px-5 py-2 rounded-full text-sm font-bold whitespace-nowrap transition border ${statusFilter === f.id ? 'bg-slate-800 text-white border-slate-800 shadow-md' : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'}`}
+            className={`px-3 py-1.5 md:px-5 md:py-2 rounded-full text-[10px] md:text-sm font-bold whitespace-nowrap transition border ${statusFilter === f.id ? 'bg-slate-800 text-white border-slate-800 shadow-md' : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'}`}
           >
             {f.label}
           </button>
         ))}
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 md:gap-4">
           {filteredOrders.map((order: Order) => {
              const deadlineStatus = getDeadlineStatus(order.deadline, order.status);
              const hasUnresolvedKendala = order.kendala && order.kendala.some(k => !k.isResolved);
              return (
-              <div key={order.id} onClick={() => onSelectOrder(order.id)} className={`bg-white rounded-2xl shadow-sm border p-5 cursor-pointer hover:shadow-md transition relative overflow-hidden active:scale-[0.98] ${deadlineStatus === 'overdue' ? 'border-red-300 ring-1 ring-red-100' : 'border-slate-200'}`}>
-                {deadlineStatus === 'overdue' && <div className="absolute top-0 right-0 bg-red-500 text-white text-[10px] px-2 py-0.5 font-bold rounded-bl-lg z-10">TELAT</div>}
-                {hasUnresolvedKendala && <div className="absolute top-0 left-0 bg-orange-500 text-white text-[10px] px-2 py-0.5 font-bold rounded-br-lg z-10 flex items-center gap-1"><AlertTriangle className="w-3 h-3"/>KENDALA</div>}
+              <div key={order.id} onClick={() => onSelectOrder(order.id)} className={`bg-white rounded-2xl shadow-sm border p-3 md:p-5 cursor-pointer hover:shadow-md transition relative overflow-hidden active:scale-[0.98] ${deadlineStatus === 'overdue' ? 'border-red-300 ring-1 ring-red-100' : 'border-slate-200'}`}>
+                {deadlineStatus === 'overdue' && <div className="absolute top-0 right-0 bg-red-500 text-white text-[8px] md:text-[10px] px-2 py-0.5 font-bold rounded-bl-lg z-10">TELAT</div>}
+                {hasUnresolvedKendala && <div className="absolute top-0 left-0 bg-orange-500 text-white text-[8px] md:text-[10px] px-2 py-0.5 font-bold rounded-br-lg z-10 flex items-center gap-1"><AlertTriangle className="w-3 h-3"/>KENDALA</div>}
                 
-                <div className="flex justify-between items-start mb-4 mt-1">
-                  <span className="text-xs font-mono font-bold text-slate-500 bg-slate-100 px-2 py-1 rounded-md">#{order.kode_produksi}</span>
-                  <span className={`text-[10px] font-extrabold px-2.5 py-1 rounded-full border uppercase tracking-wide whitespace-nowrap ${getStatusColor(order.status)}`}>{order.status}</span>
+                <div className="flex justify-between items-start mb-1 md:mb-4 mt-1">
+                  <span className="text-[10px] md:text-xs font-mono font-bold text-slate-500 bg-slate-100 px-1.5 py-0.5 md:px-2 md:py-1 rounded-md">#{order.kode_produksi}</span>
+                  <span className={`text-[9px] md:text-[10px] font-extrabold px-2 py-0.5 md:px-2.5 md:py-1 rounded-full border uppercase tracking-wide whitespace-nowrap ${getStatusColor(order.status)}`}>{order.status}</span>
                 </div>
-                <h3 className="font-bold text-lg text-slate-800 line-clamp-1 mb-1 leading-tight">{order.nama_pemesan}</h3>
-                <div className="text-xs text-slate-500 mb-4 font-medium flex items-center gap-1">
-                   <Calendar className="w-3 h-3"/> Masuk: {formatDate(order.tanggal_masuk)}
+                <h3 className="font-bold text-sm md:text-lg text-slate-800 line-clamp-1 mb-0.5 md:mb-1 leading-tight">{order.nama_pemesan}</h3>
+                <div className="text-[10px] md:text-xs text-slate-500 mb-2 md:mb-4 font-medium flex items-center gap-1">
+                   <Calendar className="w-3 h-3"/> {formatDate(order.tanggal_masuk)}
                 </div>
                 
-                <div className="space-y-2 pt-3 border-t border-slate-100">
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="text-slate-500 flex items-center gap-1.5 font-medium"><FileText className="w-4 h-4"/> Jumlah</span>
+                <div className="pt-2 border-t border-slate-100 grid grid-cols-3 md:grid-cols-1 gap-1 md:gap-2">
+                  <div className="flex flex-col md:flex-row md:items-center md:justify-between text-[10px] md:text-sm">
+                    <span className="text-slate-500 flex items-center gap-1.5 font-medium hidden md:flex"><FileText className="w-4 h-4"/> Jumlah</span>
+                    <span className="text-slate-500 text-[8px] md:hidden uppercase font-bold">Jml</span>
                     <span className="font-bold text-slate-800">{order.jumlah} Pcs</span>
                   </div>
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="text-slate-500 flex items-center gap-1.5 font-medium"><BarChart3 className="w-4 h-4"/> Tipe</span>
-                    <span className="font-bold text-slate-800 uppercase bg-slate-50 px-2 rounded">{order.jenis_produksi}</span>
+                  <div className="flex flex-col md:flex-row md:items-center md:justify-between text-[10px] md:text-sm border-l md:border-l-0 border-slate-100 pl-2 md:pl-0">
+                    <span className="text-slate-500 flex items-center gap-1.5 font-medium hidden md:flex"><BarChart3 className="w-4 h-4"/> Tipe</span>
+                    <span className="text-slate-500 text-[8px] md:hidden uppercase font-bold">Tipe</span>
+                    <span className="font-bold text-slate-800 uppercase bg-slate-50 md:px-2 rounded">{order.jenis_produksi}</span>
                   </div>
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="text-slate-500 flex items-center gap-1.5 font-medium"><Clock className="w-4 h-4"/> Deadline</span>
+                  <div className="flex flex-col md:flex-row md:items-center md:justify-between text-[10px] md:text-sm border-l md:border-l-0 border-slate-100 pl-2 md:pl-0">
+                    <span className="text-slate-500 flex items-center gap-1.5 font-medium hidden md:flex"><Clock className="w-4 h-4"/> Deadline</span>
+                    <span className="text-slate-500 text-[8px] md:hidden uppercase font-bold">Deadline</span>
                     <span className={`font-bold ${deadlineStatus === 'overdue' ? 'text-red-600' : 'text-slate-800'}`}>{formatDate(order.deadline)}</span>
                   </div>
                 </div>
@@ -1113,15 +1176,15 @@ function OrderList({ role, orders, productionTypes, onSelectOrder, onNewOrder, o
                 {role === 'supervisor' && (
                   <button 
                     onClick={(e) => { e.stopPropagation(); onDeleteOrder(order.id); }}
-                    className="mt-4 w-full bg-red-50 text-red-600 px-3 py-2 rounded-lg text-xs font-bold hover:bg-red-100 transition border border-red-200 flex items-center justify-center gap-2"
+                    className="mt-3 w-full bg-red-50 text-red-600 px-3 py-1.5 md:py-2 rounded-lg text-[10px] md:text-xs font-bold hover:bg-red-100 transition border border-red-200 flex items-center justify-center gap-2"
                   >
-                    <Trash2 className="w-3.5 h-3.5"/> Hapus Pesanan
+                    <Trash2 className="w-3 h-3 md:w-3.5 md:h-3.5"/> Hapus
                   </button>
                 )}
               </div>
              );
           })}
-          {filteredOrders.length === 0 && <div className="col-span-full text-center text-slate-400 py-12 border-2 border-dashed border-slate-200 rounded-xl bg-slate-50">Tidak ada pesanan sesuai filter</div>}
+          {filteredOrders.length === 0 && <div className="col-span-full text-center text-slate-400 py-12 border-2 border-dashed border-slate-200 rounded-xl bg-slate-50 text-xs">Tidak ada pesanan sesuai filter</div>}
       </div>
     </div>
   );
@@ -1161,36 +1224,34 @@ function SettingsPage({ users, productionTypes, onSaveUser, onDeleteUser, onSave
       <div className="space-y-6">
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
            <div>
-              <h2 className="text-2xl font-bold text-slate-800">Pengaturan Pengguna</h2>
-              <p className="text-sm text-slate-500 mt-1">Kelola akses dan akun aplikasi</p>
+              <h2 className="text-xl md:text-2xl font-bold text-slate-800">Pengaturan Pengguna</h2>
+              <p className="text-xs md:text-sm text-slate-500 mt-1">Kelola akses dan akun aplikasi</p>
            </div>
-           <button onClick={() => openUserModal()} className="w-full sm:w-auto bg-blue-600 text-white px-5 py-2.5 rounded-lg text-sm font-bold flex items-center justify-center gap-2 hover:bg-blue-700 shadow-sm transition">
+           <button onClick={() => openUserModal()} className="w-full sm:w-auto bg-blue-600 text-white px-4 py-2 rounded-lg text-xs md:text-sm font-bold flex items-center justify-center gap-2 hover:bg-blue-700 shadow-sm transition">
              <Users className="w-4 h-4"/> Tambah User
            </button>
         </div>
 
         <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
           <div className="overflow-x-auto">
-            <table className="w-full text-sm text-left text-slate-600 min-w-[600px]">
-              <thead className="bg-slate-50 text-xs uppercase font-bold text-slate-600">
+            <table className="w-full text-[10px] md:text-sm text-left text-slate-600 min-w-[500px]">
+              <thead className="bg-slate-50 text-[10px] md:text-xs uppercase font-bold text-slate-600">
                 <tr>
-                  <th className="px-6 py-4">Nama Lengkap</th>
-                  <th className="px-6 py-4">Username</th>
-                  <th className="px-6 py-4">Password</th>
-                  <th className="px-6 py-4">Role (Akses)</th>
-                  <th className="px-6 py-4 text-right">Aksi</th>
+                  <th className="px-4 py-3 md:px-6 md:py-4">Nama</th>
+                  <th className="px-4 py-3 md:px-6 md:py-4">Username</th>
+                  <th className="px-4 py-3 md:px-6 md:py-4">Role</th>
+                  <th className="px-4 py-3 md:px-6 md:py-4 text-right">Aksi</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {users.map((u: UserData) => (
                   <tr key={u.id} className="hover:bg-slate-50 transition">
-                    <td className="px-6 py-4 font-bold text-slate-800">{u.name}</td>
-                    <td className="px-6 py-4 font-mono text-slate-600">{u.username}</td>
-                    <td className="px-6 py-4 font-mono text-slate-400">••••••</td>
-                    <td className="px-6 py-4"><span className="bg-slate-100 text-slate-700 px-2 py-1 rounded text-[10px] font-extrabold uppercase border border-slate-200">{u.role}</span></td>
-                    <td className="px-6 py-4 text-right space-x-2">
-                      <button onClick={() => openUserModal(u)} className="text-blue-600 hover:bg-blue-50 p-2 rounded-lg transition"><Pencil className="w-4 h-4"/></button>
-                      <button onClick={() => onDeleteUser(u.id)} className="text-red-600 hover:bg-red-50 p-2 rounded-lg transition"><Trash2 className="w-4 h-4"/></button>
+                    <td className="px-4 py-3 md:px-6 md:py-4 font-bold text-slate-800">{u.name}</td>
+                    <td className="px-4 py-3 md:px-6 md:py-4 font-mono text-slate-600">{u.username}</td>
+                    <td className="px-4 py-3 md:px-6 md:py-4"><span className="bg-slate-100 text-slate-700 px-2 py-1 rounded text-[9px] md:text-[10px] font-extrabold uppercase border border-slate-200">{u.role}</span></td>
+                    <td className="px-4 py-3 md:px-6 md:py-4 text-right space-x-2">
+                      <button onClick={() => openUserModal(u)} className="text-blue-600 hover:bg-blue-50 p-1.5 rounded-lg transition"><Pencil className="w-3.5 h-3.5 md:w-4 md:h-4"/></button>
+                      <button onClick={() => onDeleteUser(u.id)} className="text-red-600 hover:bg-red-50 p-1.5 rounded-lg transition"><Trash2 className="w-3.5 h-3.5 md:w-4 md:h-4"/></button>
                     </td>
                   </tr>
                 ))}
@@ -1205,32 +1266,32 @@ function SettingsPage({ users, productionTypes, onSaveUser, onDeleteUser, onSave
       <div className="space-y-6">
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
            <div>
-              <h2 className="text-2xl font-bold text-slate-800">Jenis Produksi</h2>
-              <p className="text-sm text-slate-500 mt-1">Kelola jenis produksi untuk sistem</p>
+              <h2 className="text-xl md:text-2xl font-bold text-slate-800">Jenis Produksi</h2>
+              <p className="text-xs md:text-sm text-slate-500 mt-1">Kelola jenis produksi</p>
            </div>
-           <button onClick={() => openTypeModal()} className="w-full sm:w-auto bg-green-600 text-white px-5 py-2.5 rounded-lg text-sm font-bold flex items-center justify-center gap-2 hover:bg-green-700 shadow-sm transition">
+           <button onClick={() => openTypeModal()} className="w-full sm:w-auto bg-green-600 text-white px-4 py-2 rounded-lg text-xs md:text-sm font-bold flex items-center justify-center gap-2 hover:bg-green-700 shadow-sm transition">
              <Package className="w-4 h-4"/> Tambah Jenis
            </button>
         </div>
 
         <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
           <div className="overflow-x-auto">
-            <table className="w-full text-sm text-left text-slate-600 min-w-[600px]">
-              <thead className="bg-slate-50 text-xs uppercase font-bold text-slate-600">
+            <table className="w-full text-[10px] md:text-sm text-left text-slate-600 min-w-[500px]">
+              <thead className="bg-slate-50 text-[10px] md:text-xs uppercase font-bold text-slate-600">
                 <tr>
-                  <th className="px-6 py-4">Nama Jenis</th>
-                  <th className="px-6 py-4">Value/Kode</th>
-                  <th className="px-6 py-4 text-right">Aksi</th>
+                  <th className="px-4 py-3 md:px-6 md:py-4">Nama Jenis</th>
+                  <th className="px-4 py-3 md:px-6 md:py-4">Value/Kode</th>
+                  <th className="px-4 py-3 md:px-6 md:py-4 text-right">Aksi</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {productionTypes.map((pt: ProductionTypeData) => (
                   <tr key={pt.id} className="hover:bg-slate-50 transition">
-                    <td className="px-6 py-4 font-bold text-slate-800">{pt.name}</td>
-                    <td className="px-6 py-4 font-mono text-slate-600">{pt.value}</td>
-                    <td className="px-6 py-4 text-right space-x-2">
-                      <button onClick={() => openTypeModal(pt)} className="text-blue-600 hover:bg-blue-50 p-2 rounded-lg transition"><Pencil className="w-4 h-4"/></button>
-                      <button onClick={() => onDeleteProductionType(pt.id)} className="text-red-600 hover:bg-red-50 p-2 rounded-lg transition"><Trash2 className="w-4 h-4"/></button>
+                    <td className="px-4 py-3 md:px-6 md:py-4 font-bold text-slate-800">{pt.name}</td>
+                    <td className="px-4 py-3 md:px-6 md:py-4 font-mono text-slate-600">{pt.value}</td>
+                    <td className="px-4 py-3 md:px-6 md:py-4 text-right space-x-2">
+                      <button onClick={() => openTypeModal(pt)} className="text-blue-600 hover:bg-blue-50 p-1.5 rounded-lg transition"><Pencil className="w-3.5 h-3.5 md:w-4 md:h-4"/></button>
+                      <button onClick={() => onDeleteProductionType(pt.id)} className="text-red-600 hover:bg-red-50 p-1.5 rounded-lg transition"><Trash2 className="w-3.5 h-3.5 md:w-4 md:h-4"/></button>
                     </td>
                   </tr>
                 ))}
@@ -1245,36 +1306,36 @@ function SettingsPage({ users, productionTypes, onSaveUser, onDeleteUser, onSave
       {isUserModalOpen && editingUser && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[70] flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl w-full max-w-md shadow-2xl overflow-hidden transform transition-all scale-100">
-            <div className="p-5 border-b bg-slate-50 flex justify-between items-center">
-               <h3 className="font-bold text-lg text-slate-800">{editingUser.id ? 'Edit User' : 'Tambah User Baru'}</h3>
-               <button onClick={() => setIsUserModalOpen(false)} className="p-2 bg-slate-200 rounded-full hover:bg-slate-300 transition"><X className="w-4 h-4 text-slate-600"/></button>
+            <div className="p-4 border-b bg-slate-50 flex justify-between items-center">
+               <h3 className="font-bold text-lg text-slate-800">{editingUser.id ? 'Edit User' : 'Tambah User'}</h3>
+               <button onClick={() => setIsUserModalOpen(false)} className="p-1.5 bg-slate-200 rounded-full hover:bg-slate-300 transition"><X className="w-4 h-4 text-slate-600"/></button>
             </div>
-            <form onSubmit={handleUserFormSubmit} className="p-6 space-y-4">
+            <form onSubmit={handleUserFormSubmit} className="p-4 space-y-3">
                <div>
-                 <label className="block text-xs font-bold text-slate-700 uppercase mb-2">Nama Lengkap</label>
-                 <input required className="w-full border-2 border-slate-200 p-3 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none font-medium text-slate-800" value={editingUser.name} onChange={e=>setEditingUser({...editingUser, name: e.target.value})} />
+                 <label className="block text-[10px] md:text-xs font-bold text-slate-700 uppercase mb-1">Nama Lengkap</label>
+                 <input required className="w-full border-2 border-slate-200 p-2 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none font-medium text-slate-800 text-sm" value={editingUser.name} onChange={e=>setEditingUser({...editingUser, name: e.target.value})} />
                </div>
                <div>
-                 <label className="block text-xs font-bold text-slate-700 uppercase mb-2">Username</label>
-                 <input required className="w-full border-2 border-slate-200 p-3 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none font-medium text-slate-800" value={editingUser.username} onChange={e=>setEditingUser({...editingUser, username: e.target.value})} />
+                 <label className="block text-[10px] md:text-xs font-bold text-slate-700 uppercase mb-1">Username</label>
+                 <input required className="w-full border-2 border-slate-200 p-2 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none font-medium text-slate-800 text-sm" value={editingUser.username} onChange={e=>setEditingUser({...editingUser, username: e.target.value})} />
                </div>
                <div>
-                 <label className="block text-xs font-bold text-slate-700 uppercase mb-2">Password</label>
-                 <input required className="w-full border-2 border-slate-200 p-3 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none font-medium text-slate-800" value={editingUser.password} onChange={e=>setEditingUser({...editingUser, password: e.target.value})} />
+                 <label className="block text-[10px] md:text-xs font-bold text-slate-700 uppercase mb-1">Password</label>
+                 <input required className="w-full border-2 border-slate-200 p-2 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none font-medium text-slate-800 text-sm" value={editingUser.password} onChange={e=>setEditingUser({...editingUser, password: e.target.value})} />
                </div>
                <div>
-                 <label className="block text-xs font-bold text-slate-700 uppercase mb-2">Role / Hak Akses</label>
-                 <select className="w-full border-2 border-slate-200 p-3 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none font-medium bg-white text-slate-800" value={editingUser.role} onChange={e=>setEditingUser({...editingUser, role: e.target.value})}>
-                   <option value="supervisor">Supervisor (Akses Penuh + Settings)</option>
-                   <option value="admin">Admin (Akses Penuh)</option>
-                   <option value="produksi">Produksi (Update Progress)</option>
-                   <option value="qc">QC (Quality Control)</option>
-                   <option value="manager">Manager/CEO (View Only)</option>
+                 <label className="block text-[10px] md:text-xs font-bold text-slate-700 uppercase mb-1">Role</label>
+                 <select className="w-full border-2 border-slate-200 p-2 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none font-medium bg-white text-slate-800 text-sm" value={editingUser.role} onChange={e=>setEditingUser({...editingUser, role: e.target.value})}>
+                   <option value="supervisor">Supervisor</option>
+                   <option value="admin">Admin</option>
+                   <option value="produksi">Produksi</option>
+                   <option value="qc">QC</option>
+                   <option value="manager">Manager</option>
                  </select>
                </div>
-               <div className="pt-4 flex gap-3">
-                 <button type="button" onClick={() => setIsUserModalOpen(false)} className="flex-1 py-3 border-2 border-slate-200 rounded-xl hover:bg-slate-50 font-bold text-slate-600 transition">Batal</button>
-                 <button type="submit" className="flex-1 py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 font-bold transition shadow-lg">Simpan</button>
+               <div className="pt-3 flex gap-2">
+                 <button type="button" onClick={() => setIsUserModalOpen(false)} className="flex-1 py-2 border-2 border-slate-200 rounded-xl hover:bg-slate-50 font-bold text-slate-600 transition text-sm">Batal</button>
+                 <button type="submit" className="flex-1 py-2 bg-blue-600 text-white rounded-xl hover:bg-blue-700 font-bold transition shadow-lg text-sm">Simpan</button>
                </div>
             </form>
           </div>
@@ -1285,22 +1346,22 @@ function SettingsPage({ users, productionTypes, onSaveUser, onDeleteUser, onSave
       {isTypeModalOpen && editingType && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[70] flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl w-full max-w-md shadow-2xl overflow-hidden transform transition-all scale-100">
-            <div className="p-5 border-b bg-slate-50 flex justify-between items-center">
-               <h3 className="font-bold text-lg text-slate-800">{editingType.id ? 'Edit Jenis Produksi' : 'Tambah Jenis Produksi'}</h3>
-               <button onClick={() => setIsTypeModalOpen(false)} className="p-2 bg-slate-200 rounded-full hover:bg-slate-300 transition"><X className="w-4 h-4 text-slate-600"/></button>
+            <div className="p-4 border-b bg-slate-50 flex justify-between items-center">
+               <h3 className="font-bold text-lg text-slate-800">{editingType.id ? 'Edit Jenis' : 'Tambah Jenis'}</h3>
+               <button onClick={() => setIsTypeModalOpen(false)} className="p-1.5 bg-slate-200 rounded-full hover:bg-slate-300 transition"><X className="w-4 h-4 text-slate-600"/></button>
             </div>
-            <form onSubmit={handleTypeFormSubmit} className="p-6 space-y-4">
+            <form onSubmit={handleTypeFormSubmit} className="p-4 space-y-3">
                <div>
-                 <label className="block text-xs font-bold text-slate-700 uppercase mb-2">Nama Jenis (untuk ditampilkan)</label>
-                 <input required className="w-full border-2 border-slate-200 p-3 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none font-medium text-slate-800" placeholder="contoh: DTF" value={editingType.name} onChange={e=>setEditingType({...editingType, name: e.target.value})} />
+                 <label className="block text-[10px] md:text-xs font-bold text-slate-700 uppercase mb-1">Nama Jenis</label>
+                 <input required className="w-full border-2 border-slate-200 p-2 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none font-medium text-slate-800 text-sm" placeholder="contoh: DTF" value={editingType.name} onChange={e=>setEditingType({...editingType, name: e.target.value})} />
                </div>
                <div>
-                 <label className="block text-xs font-bold text-slate-700 uppercase mb-2">Value/Kode (lowercase, tanpa spasi)</label>
-                 <input required className="w-full border-2 border-slate-200 p-3 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none font-medium text-slate-800 font-mono" placeholder="contoh: dtf" value={editingType.value} onChange={e=>setEditingType({...editingType, value: e.target.value.toLowerCase().replace(/\s/g, '')})} />
+                 <label className="block text-[10px] md:text-xs font-bold text-slate-700 uppercase mb-1">Value/Kode</label>
+                 <input required className="w-full border-2 border-slate-200 p-2 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none font-medium text-slate-800 font-mono text-sm" placeholder="contoh: dtf" value={editingType.value} onChange={e=>setEditingType({...editingType, value: e.target.value.toLowerCase().replace(/\s/g, '')})} />
                </div>
-               <div className="pt-4 flex gap-3">
-                 <button type="button" onClick={() => setIsTypeModalOpen(false)} className="flex-1 py-3 border-2 border-slate-200 rounded-xl hover:bg-slate-50 font-bold text-slate-600 transition">Batal</button>
-                 <button type="submit" className="flex-1 py-3 bg-green-600 text-white rounded-xl hover:bg-green-700 font-bold transition shadow-lg">Simpan</button>
+               <div className="pt-3 flex gap-2">
+                 <button type="button" onClick={() => setIsTypeModalOpen(false)} className="flex-1 py-2 border-2 border-slate-200 rounded-xl hover:bg-slate-50 font-bold text-slate-600 transition text-sm">Batal</button>
+                 <button type="submit" className="flex-1 py-2 bg-green-600 text-white rounded-xl hover:bg-green-700 font-bold transition shadow-lg text-sm">Simpan</button>
                </div>
             </form>
           </div>
@@ -1316,40 +1377,40 @@ function CreateOrder({ productionTypes, onCancel, onSubmit }: any) {
   const isDisabled = !form.nama || !form.hp || !form.deadline || !form.jumlah;
 
   return (
-    <div className="bg-white p-6 md:p-8 rounded-2xl border shadow-sm max-w-2xl mx-auto">
-      <h2 className="font-bold text-xl mb-6 text-slate-800">Buat Pesanan Baru</h2>
-      <div className="space-y-5">
+    <div className="bg-white p-4 md:p-8 rounded-2xl border shadow-sm max-w-2xl mx-auto">
+      <h2 className="font-bold text-lg md:text-xl mb-4 md:mb-6 text-slate-800">Buat Pesanan Baru</h2>
+      <div className="space-y-3 md:space-y-5">
         <div>
-            <label className="block text-xs font-bold text-slate-700 uppercase mb-2">Nama Pemesan</label>
-            <input className="w-full border-2 border-slate-200 p-3 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none font-medium text-slate-800 placeholder-slate-400" placeholder="Masukkan nama pemesan" value={form.nama} onChange={e=>setForm({...form, nama: e.target.value})} />
+            <label className="block text-[10px] md:text-xs font-bold text-slate-700 uppercase mb-1 md:mb-2">Nama Pemesan</label>
+            <input className="w-full border-2 border-slate-200 p-2 md:p-3 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none font-medium text-slate-800 text-sm placeholder-slate-400" placeholder="Masukkan nama pemesan" value={form.nama} onChange={e=>setForm({...form, nama: e.target.value})} />
         </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 md:gap-5">
           <div>
-            <label className="block text-xs font-bold text-slate-700 uppercase mb-2">No HP</label>
-            <input className="w-full border-2 border-slate-200 p-3 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none font-medium text-slate-800 placeholder-slate-400" placeholder="08xxxxxxxxxx" value={form.hp} onChange={e=>setForm({...form, hp: e.target.value})} />
+            <label className="block text-[10px] md:text-xs font-bold text-slate-700 uppercase mb-1 md:mb-2">No HP</label>
+            <input className="w-full border-2 border-slate-200 p-2 md:p-3 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none font-medium text-slate-800 text-sm placeholder-slate-400" placeholder="08xxxxxxxxxx" value={form.hp} onChange={e=>setForm({...form, hp: e.target.value})} />
           </div>
           <div>
-            <label className="block text-xs font-bold text-slate-700 uppercase mb-2">Jumlah</label>
-            <input type="number" className="w-full border-2 border-slate-200 p-3 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none font-medium text-slate-800 placeholder-slate-400" placeholder="0" value={form.jumlah} onChange={e=>setForm({...form, jumlah: e.target.value})} />
+            <label className="block text-[10px] md:text-xs font-bold text-slate-700 uppercase mb-1 md:mb-2">Jumlah</label>
+            <input type="number" className="w-full border-2 border-slate-200 p-2 md:p-3 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none font-medium text-slate-800 text-sm placeholder-slate-400" placeholder="0" value={form.jumlah} onChange={e=>setForm({...form, jumlah: e.target.value})} />
           </div>
         </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 md:gap-5">
           <div>
-            <label className="block text-xs font-bold text-slate-700 uppercase mb-2">Deadline</label>
-            <input type="date" className="w-full border-2 border-slate-200 p-3 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none font-medium text-slate-800" value={form.deadline} onChange={e=>setForm({...form, deadline: e.target.value})} />
+            <label className="block text-[10px] md:text-xs font-bold text-slate-700 uppercase mb-1 md:mb-2">Deadline</label>
+            <input type="date" className="w-full border-2 border-slate-200 p-2 md:p-3 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none font-medium text-slate-800 text-sm" value={form.deadline} onChange={e=>setForm({...form, deadline: e.target.value})} />
           </div>
           <div>
-            <label className="block text-xs font-bold text-slate-700 uppercase mb-2">Jenis</label>
-            <select className="w-full border-2 border-slate-200 p-3 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none font-medium bg-white text-slate-800" value={form.type} onChange={e=>setForm({...form, type: e.target.value})}>
+            <label className="block text-[10px] md:text-xs font-bold text-slate-700 uppercase mb-1 md:mb-2">Jenis</label>
+            <select className="w-full border-2 border-slate-200 p-2 md:p-3 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none font-medium bg-white text-slate-800 text-sm" value={form.type} onChange={e=>setForm({...form, type: e.target.value})}>
               {productionTypes.map((pt: ProductionTypeData) => (
                 <option key={pt.id} value={pt.value}>{pt.name}</option>
               ))}
             </select>
           </div>
         </div>
-        <div className="flex gap-3 pt-6">
-            <button onClick={onCancel} className="flex-1 border-2 border-slate-200 py-3 rounded-xl font-bold text-slate-600 hover:bg-slate-50 transition">Batal</button>
-            <button onClick={()=>onSubmit(form)} disabled={isDisabled} className="flex-1 bg-blue-600 text-white py-3 rounded-xl font-bold hover:bg-blue-700 shadow-lg disabled:opacity-50 disabled:cursor-not-allowed transition">Simpan</button>
+        <div className="flex gap-3 pt-4 md:pt-6">
+            <button onClick={onCancel} className="flex-1 border-2 border-slate-200 py-2 md:py-3 rounded-xl font-bold text-slate-600 hover:bg-slate-50 transition text-sm">Batal</button>
+            <button onClick={()=>onSubmit(form)} disabled={isDisabled} className="flex-1 bg-blue-600 text-white py-2 md:py-3 rounded-xl font-bold hover:bg-blue-700 shadow-lg disabled:opacity-50 disabled:cursor-not-allowed transition text-sm">Simpan</button>
         </div>
       </div>
     </div>
@@ -1368,47 +1429,47 @@ function EditOrder({ order, productionTypes, onCancel, onSubmit }: any) {
   const isDisabled = !form.nama || !form.hp || !form.deadline || !form.jumlah;
 
   return (
-    <div className="bg-white p-6 md:p-8 rounded-2xl border shadow-sm max-w-2xl mx-auto">
-      <h2 className="font-bold text-xl mb-6 text-slate-800">Edit Pesanan</h2>
-      <div className="space-y-5">
+    <div className="bg-white p-4 md:p-8 rounded-2xl border shadow-sm max-w-2xl mx-auto">
+      <h2 className="font-bold text-lg md:text-xl mb-4 md:mb-6 text-slate-800">Edit Pesanan</h2>
+      <div className="space-y-3 md:space-y-5">
         <div>
-            <label className="block text-xs font-bold text-slate-700 uppercase mb-2">Nama Pemesan</label>
-            <input className="w-full border-2 border-slate-200 p-3 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none font-medium text-slate-800 placeholder-slate-400" placeholder="Masukkan nama pemesan" value={form.nama} onChange={e=>setForm({...form, nama: e.target.value})} />
+            <label className="block text-[10px] md:text-xs font-bold text-slate-700 uppercase mb-1 md:mb-2">Nama Pemesan</label>
+            <input className="w-full border-2 border-slate-200 p-2 md:p-3 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none font-medium text-slate-800 text-sm placeholder-slate-400" placeholder="Masukkan nama pemesan" value={form.nama} onChange={e=>setForm({...form, nama: e.target.value})} />
         </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 md:gap-5">
           <div>
-            <label className="block text-xs font-bold text-slate-700 uppercase mb-2">No HP</label>
-            <input className="w-full border-2 border-slate-200 p-3 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none font-medium text-slate-800 placeholder-slate-400" placeholder="08xxxxxxxxxx" value={form.hp} onChange={e=>setForm({...form, hp: e.target.value})} />
+            <label className="block text-[10px] md:text-xs font-bold text-slate-700 uppercase mb-1 md:mb-2">No HP</label>
+            <input className="w-full border-2 border-slate-200 p-2 md:p-3 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none font-medium text-slate-800 text-sm placeholder-slate-400" placeholder="08xxxxxxxxxx" value={form.hp} onChange={e=>setForm({...form, hp: e.target.value})} />
           </div>
           <div>
-            <label className="block text-xs font-bold text-slate-700 uppercase mb-2">Jumlah</label>
-            <input type="number" className="w-full border-2 border-slate-200 p-3 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none font-medium text-slate-800 placeholder-slate-400" placeholder="0" value={form.jumlah} onChange={e=>setForm({...form, jumlah: e.target.value})} />
+            <label className="block text-[10px] md:text-xs font-bold text-slate-700 uppercase mb-1 md:mb-2">Jumlah</label>
+            <input type="number" className="w-full border-2 border-slate-200 p-2 md:p-3 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none font-medium text-slate-800 text-sm placeholder-slate-400" placeholder="0" value={form.jumlah} onChange={e=>setForm({...form, jumlah: e.target.value})} />
           </div>
         </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 md:gap-5">
           <div>
-            <label className="block text-xs font-bold text-slate-700 uppercase mb-2">Deadline</label>
-            <input type="date" className="w-full border-2 border-slate-200 p-3 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none font-medium text-slate-800" value={form.deadline} onChange={e=>setForm({...form, deadline: e.target.value})} />
+            <label className="block text-[10px] md:text-xs font-bold text-slate-700 uppercase mb-1 md:mb-2">Deadline</label>
+            <input type="date" className="w-full border-2 border-slate-200 p-2 md:p-3 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none font-medium text-slate-800 text-sm" value={form.deadline} onChange={e=>setForm({...form, deadline: e.target.value})} />
           </div>
           <div>
-            <label className="block text-xs font-bold text-slate-700 uppercase mb-2">Jenis</label>
-            <select className="w-full border-2 border-slate-200 p-3 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none font-medium bg-white text-slate-800" value={form.type} onChange={e=>setForm({...form, type: e.target.value})}>
+            <label className="block text-[10px] md:text-xs font-bold text-slate-700 uppercase mb-1 md:mb-2">Jenis</label>
+            <select className="w-full border-2 border-slate-200 p-2 md:p-3 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none font-medium bg-white text-slate-800 text-sm" value={form.type} onChange={e=>setForm({...form, type: e.target.value})}>
               {productionTypes.map((pt: ProductionTypeData) => (
                 <option key={pt.id} value={pt.value}>{pt.name}</option>
               ))}
             </select>
           </div>
         </div>
-        <div className="flex gap-3 pt-6">
-            <button onClick={onCancel} className="flex-1 border-2 border-slate-200 py-3 rounded-xl font-bold text-slate-600 hover:bg-slate-50 transition">Batal</button>
-            <button onClick={()=>onSubmit(form)} disabled={isDisabled} className="flex-1 bg-blue-600 text-white py-3 rounded-xl font-bold hover:bg-blue-700 shadow-lg disabled:opacity-50 disabled:cursor-not-allowed transition">Update</button>
+        <div className="flex gap-3 pt-4 md:pt-6">
+            <button onClick={onCancel} className="flex-1 border-2 border-slate-200 py-2 md:py-3 rounded-xl font-bold text-slate-600 hover:bg-slate-50 transition text-sm">Batal</button>
+            <button onClick={()=>onSubmit(form)} disabled={isDisabled} className="flex-1 bg-blue-600 text-white py-2 md:py-3 rounded-xl font-bold hover:bg-blue-700 shadow-lg disabled:opacity-50 disabled:cursor-not-allowed transition text-sm">Update</button>
         </div>
       </div>
     </div>
   )
 }
 
-function OrderDetail({ role, order, onBack, onEdit, onTriggerUpload, onUpdateOrder, onDelete }: any) {
+function OrderDetail({ role, order, onBack, onEdit, onTriggerUpload, onUpdateOrder, onDelete, onConfirm }: any) {
   const [qcNote, setQcNote] = useState(order.finishing_qc.notes || '');
   const [kendalaNote, setKendalaNote] = useState('');
   const [showKendalaForm, setShowKendalaForm] = useState(false);
@@ -1482,135 +1543,139 @@ function OrderDetail({ role, order, onBack, onEdit, onTriggerUpload, onUpdateOrd
   };
 
   const handleDeleteKendala = (kendalaId: string) => {
-    if (!confirm('Hapus catatan kendala ini?')) return;
-    const updated = JSON.parse(JSON.stringify(order));
-    updated.kendala = updated.kendala.filter((k: KendalaNote) => k.id !== kendalaId);
-    const allResolved = updated.kendala.every((k: KendalaNote) => k.isResolved);
-    if ((allResolved || updated.kendala.length === 0) && updated.status === 'Ada Kendala') {
-      updated.status = 'On Process';
-    }
-    onUpdateOrder(updated);
+    if (!onConfirm) return;
+    onConfirm('Hapus Kendala?', 'Yakin ingin menghapus catatan kendala ini?', () => {
+      const updated = JSON.parse(JSON.stringify(order));
+      updated.kendala = updated.kendala.filter((k: KendalaNote) => k.id !== kendalaId);
+      const allResolved = updated.kendala.every((k: KendalaNote) => k.isResolved);
+      if ((allResolved || updated.kendala.length === 0) && updated.status === 'Ada Kendala') {
+        updated.status = 'On Process';
+      }
+      onUpdateOrder(updated);
+    });
   };
 
   const handleFileDelete = (field: string, isStep = false, stepId?: string) => {
-      if (!confirm('Yakin hapus?')) return;
-      const updated = JSON.parse(JSON.stringify(order));
-      if (isStep && stepId) {
-        const steps = updated.jenis_produksi === 'manual' ? updated.steps_manual : updated.steps_dtf;
-        const idx = steps.findIndex((s: any) => s.id === stepId);
-        if(idx>=0) { steps[idx].isCompleted=false; steps[idx].fileUrl=null; }
-      } else if (field === 'approval') updated.link_approval = null;
-      else if (field === 'packing') { updated.finishing_packing.isPacked=false; }
-      else if (field.includes('shipping')) { if(field.includes('kirim')) updated.shipping.bukti_kirim=null; else updated.shipping.bukti_terima=null; }
-      onUpdateOrder(updated);
+      if (!onConfirm) return;
+      onConfirm('Hapus File/Bukti?', 'File yang sudah dihapus tidak bisa dikembalikan.', () => {
+        const updated = JSON.parse(JSON.stringify(order));
+        if (isStep && stepId) {
+          const steps = updated.jenis_produksi === 'manual' ? updated.steps_manual : updated.steps_dtf;
+          const idx = steps.findIndex((s: any) => s.id === stepId);
+          if(idx>=0) { steps[idx].isCompleted=false; steps[idx].fileUrl=null; }
+        } else if (field === 'approval') updated.link_approval = null;
+        else if (field === 'packing') { updated.finishing_packing.isPacked=false; }
+        else if (field.includes('shipping')) { if(field.includes('kirim')) updated.shipping.bukti_kirim=null; else updated.shipping.bukti_terima=null; }
+        onUpdateOrder(updated);
+      });
   }
 
   return (
-    <div className="space-y-6 pb-24">
+    <div className="space-y-4 md:space-y-6 pb-24">
       <div className="flex items-center justify-between flex-wrap gap-3">
-        <button onClick={onBack} className="text-sm text-slate-500 hover:text-blue-600 flex items-center gap-2 font-bold transition p-2 -ml-2 rounded-lg hover:bg-slate-100 w-fit">
-          <ChevronRight className="w-5 h-5 rotate-180"/> Kembali
+        <button onClick={onBack} className="text-xs md:text-sm text-slate-500 hover:text-blue-600 flex items-center gap-2 font-bold transition p-2 -ml-2 rounded-lg hover:bg-slate-100 w-fit">
+          <ChevronRight className="w-4 h-4 md:w-5 md:h-5 rotate-180"/> Kembali
         </button>
         <div className="flex gap-2">
           {(canEditApproval || role === 'admin') && !isManager && (
-            <button onClick={onEdit} className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-2 hover:bg-blue-700 transition shadow-sm">
-              <Pencil className="w-4 h-4"/> Edit
+            <button onClick={onEdit} className="bg-blue-600 text-white px-3 py-1.5 md:px-4 md:py-2 rounded-lg text-xs md:text-sm font-bold flex items-center gap-2 hover:bg-blue-700 transition shadow-sm">
+              <Pencil className="w-3 h-3 md:w-4 md:h-4"/> Edit
             </button>
           )}
           {role === 'supervisor' && (
-            <button onClick={() => onDelete(order.id)} className="bg-red-600 text-white px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-2 hover:bg-red-700 transition shadow-sm">
-              <Trash2 className="w-4 h-4"/> Hapus
+            <button onClick={() => onDelete(order.id)} className="bg-red-600 text-white px-3 py-1.5 md:px-4 md:py-2 rounded-lg text-xs md:text-sm font-bold flex items-center gap-2 hover:bg-red-700 transition shadow-sm">
+              <Trash2 className="w-3 h-3 md:w-4 md:h-4"/> Hapus
             </button>
           )}
         </div>
       </div>
       
-      <div className="bg-white p-6 rounded-2xl border shadow-sm flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+      <div className="bg-white p-3 md:p-6 rounded-2xl border shadow-sm flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 md:gap-4">
         <div className="flex-1">
-            <h1 className="text-2xl font-extrabold text-slate-800 mb-2">{order.nama_pemesan}</h1>
-            <div className="text-sm text-slate-500 font-medium flex flex-wrap gap-3 items-center">
+            <h1 className="text-lg md:text-2xl font-extrabold text-slate-800 mb-1 md:mb-2">{order.nama_pemesan}</h1>
+            <div className="text-xs md:text-sm text-slate-500 font-medium flex flex-wrap gap-2 md:gap-3 items-center">
               <span className="bg-slate-100 px-2 py-0.5 rounded">#{order.kode_produksi}</span>
               <span>{order.jumlah} Pcs</span>
               <span>{formatDate(order.deadline)}</span>
-              <button onClick={() => openWA(order.no_hp)} className="bg-green-600 hover:bg-green-700 text-white px-3 py-1 rounded-lg text-xs font-bold flex items-center gap-1.5 transition shadow-sm">
-                <Phone className="w-3 h-3"/> Hubungi WA
+              <button onClick={() => openWA(order.no_hp)} className="bg-green-600 hover:bg-green-700 text-white px-2 py-1 rounded-lg text-[10px] md:text-xs font-bold flex items-center gap-1.5 transition shadow-sm">
+                <Phone className="w-3 h-3"/> WA
               </button>
             </div>
         </div>
-        <div className={`px-4 py-2 rounded-lg font-extrabold text-sm border uppercase tracking-wide whitespace-nowrap ${getStatusColor(order.status)}`}>{order.status}</div>
+        <div className={`px-2 py-1 md:px-4 md:py-2 rounded-lg font-extrabold text-[10px] md:text-sm border uppercase tracking-wide whitespace-nowrap ${getStatusColor(order.status)}`}>{order.status}</div>
       </div>
 
       {order.status === 'Revisi' && order.finishing_qc.notes && (
-        <div className="bg-yellow-50 border-2 border-yellow-300 p-5 rounded-2xl">
+        <div className="bg-yellow-50 border-2 border-yellow-300 p-3 md:p-5 rounded-2xl">
           <div className="flex items-start justify-between gap-4">
             <div className="flex-1">
               <div className="flex items-center gap-2 mb-2">
-                <AlertTriangle className="w-5 h-5 text-yellow-700"/>
-                <h3 className="font-bold text-yellow-900">Catatan Revisi dari QC</h3>
+                <AlertTriangle className="w-4 h-4 md:w-5 md:h-5 text-yellow-700"/>
+                <h3 className="font-bold text-yellow-900 text-sm md:text-base">Catatan Revisi dari QC</h3>
               </div>
-              <p className="text-sm text-yellow-800 bg-white p-3 rounded-lg border border-yellow-200 font-medium">{order.finishing_qc.notes}</p>
-              <div className="text-xs text-yellow-700 mt-2">Dicek oleh: {order.finishing_qc.checkedBy} | {order.finishing_qc.timestamp}</div>
+              <p className="text-xs md:text-sm text-yellow-800 bg-white p-2 md:p-3 rounded-lg border border-yellow-200 font-medium">{order.finishing_qc.notes}</p>
+              <div className="text-[10px] md:text-xs text-yellow-700 mt-2">Dicek oleh: {order.finishing_qc.checkedBy} | {order.finishing_qc.timestamp}</div>
             </div>
           </div>
           {canEditProduction && (
-            <button onClick={handleRevisiSelesai} className="mt-4 bg-blue-600 text-white px-4 py-2.5 rounded-lg text-sm font-bold hover:bg-blue-700 transition shadow-lg w-full sm:w-auto">
+            <button onClick={handleRevisiSelesai} className="mt-3 md:mt-4 bg-blue-600 text-white px-3 py-2 md:px-4 md:py-2.5 rounded-lg text-xs md:text-sm font-bold hover:bg-blue-700 transition shadow-lg w-full sm:w-auto">
               Revisi Selesai - Lanjut Produksi
             </button>
           )}
         </div>
       )}
 
-      <div className="bg-white p-6 rounded-2xl border shadow-sm">
-          <h3 className="font-bold text-slate-800 mb-4 flex items-center gap-2 text-lg"><div className="bg-slate-100 w-8 h-8 rounded-full flex items-center justify-center text-sm">1</div> Approval Desain</h3>
+      <div className="bg-white p-3 md:p-6 rounded-2xl border shadow-sm">
+          <h3 className="font-bold text-slate-800 mb-3 md:mb-4 flex items-center gap-2 text-sm md:text-lg"><div className="bg-slate-100 w-6 h-6 md:w-8 md:h-8 rounded-full flex items-center justify-center text-xs md:text-sm">1</div> Approval Desain</h3>
           {order.link_approval ? (
-            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between bg-green-50 p-4 rounded-xl border border-green-200 gap-3">
-              <div className="flex items-center gap-3 text-green-800 font-medium">
-                <Eye className="w-5 h-5"/> <a href={order.link_approval} target="_blank" className="underline hover:text-green-900">Lihat File Approval</a>
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between bg-green-50 p-3 md:p-4 rounded-xl border border-green-200 gap-2 md:gap-3">
+              <div className="flex items-center gap-2 md:gap-3 text-green-800 font-medium text-xs md:text-sm">
+                <Eye className="w-4 h-4 md:w-5 md:h-5"/> <a href={order.link_approval} target="_blank" className="underline hover:text-green-900">Lihat File Approval</a>
               </div>
-              {canEditApproval && !isManager && <button onClick={() => handleFileDelete('approval')} className="text-red-500 bg-white border border-red-200 px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-red-50">Hapus</button>}
+              {canEditApproval && !isManager && <button onClick={() => handleFileDelete('approval')} className="text-red-500 bg-white border border-red-200 px-2 py-1 md:px-3 md:py-1.5 rounded-lg text-[10px] md:text-xs font-bold hover:bg-red-50">Hapus</button>}
             </div>
           ) : (
-            (canEditApproval && !isManager) ? <button onClick={() => onTriggerUpload('approval')} className="w-full border-2 border-dashed border-blue-200 p-6 text-sm text-blue-600 rounded-xl bg-blue-50 hover:bg-blue-100 transition font-bold flex flex-col items-center gap-2"><Upload className="w-6 h-6"/> Upload File Approval</button> : <div className="text-sm italic text-slate-400 text-center py-4 bg-slate-50 rounded-xl">Menunggu Admin upload approval...</div>
+            (canEditApproval && !isManager) ? <button onClick={() => onTriggerUpload('approval')} className="w-full border-2 border-dashed border-blue-200 p-4 md:p-6 text-xs md:text-sm text-blue-600 rounded-xl bg-blue-50 hover:bg-blue-100 transition font-bold flex flex-col items-center gap-2"><Upload className="w-5 h-5 md:w-6 md:h-6"/> Upload File Approval</button> : <div className="text-xs md:text-sm italic text-slate-400 text-center py-4 bg-slate-50 rounded-xl">Menunggu Admin upload approval...</div>
           )}
       </div>
 
-      <div className="bg-white p-6 rounded-2xl border shadow-sm">
-          <div className="flex justify-between items-center mb-4">
-            <h3 className="font-bold text-slate-800 flex items-center gap-2 text-lg">
-              <div className="bg-slate-100 w-8 h-8 rounded-full flex items-center justify-center text-sm">2</div> 
+      <div className="bg-white p-3 md:p-6 rounded-2xl border shadow-sm">
+          <div className="flex justify-between items-center mb-3 md:mb-4">
+            <h3 className="font-bold text-slate-800 flex items-center gap-2 text-sm md:text-lg">
+              <div className="bg-slate-100 w-6 h-6 md:w-8 md:h-8 rounded-full flex items-center justify-center text-xs md:text-sm">2</div> 
               Produksi ({order.jenis_produksi})
             </h3>
             {canEditProduction && (order.status === 'On Process' || order.status === 'Revisi' || order.status === 'Ada Kendala') && (
               <button 
                 onClick={() => setShowKendalaForm(!showKendalaForm)}
-                className="text-xs bg-orange-600 text-white px-3 py-1.5 rounded-lg font-bold hover:bg-orange-700 transition flex items-center gap-1.5 shadow-sm"
+                className="text-[10px] md:text-xs bg-orange-600 text-white px-2 py-1 md:px-3 md:py-1.5 rounded-lg font-bold hover:bg-orange-700 transition flex items-center gap-1.5 shadow-sm"
               >
-                <MessageSquare className="w-3.5 h-3.5"/> Lapor Kendala
+                <MessageSquare className="w-3 h-3 md:w-3.5 md:h-3.5"/> Lapor Kendala
               </button>
             )}
           </div>
 
           {showKendalaForm && (
-            <div className="mb-4 p-4 bg-orange-50 border-2 border-orange-300 rounded-xl">
-              <label className="block text-xs font-bold text-orange-800 uppercase mb-2">Catatan Kendala</label>
+            <div className="mb-4 p-3 md:p-4 bg-orange-50 border-2 border-orange-300 rounded-xl">
+              <label className="block text-[10px] md:text-xs font-bold text-orange-800 uppercase mb-1 md:mb-2">Catatan Kendala</label>
               <textarea 
                 placeholder="Jelaskan kendala yang sedang dialami..."
-                className="w-full text-sm p-3 border-2 border-orange-200 rounded-lg focus:ring-2 focus:ring-orange-500 outline-none text-slate-800 placeholder-slate-400"
+                className="w-full text-xs md:text-sm p-2 md:p-3 border-2 border-orange-200 rounded-lg focus:ring-2 focus:ring-orange-500 outline-none text-slate-800 placeholder-slate-400"
                 value={kendalaNote}
                 onChange={e => setKendalaNote(e.target.value)}
                 rows={3}
               />
-              <div className="flex gap-2 mt-3">
+              <div className="flex gap-2 mt-2 md:mt-3">
                 <button 
                   onClick={handleAddKendala}
                   disabled={!kendalaNote.trim()}
-                  className="bg-orange-600 text-white text-xs px-4 py-2 rounded-lg font-bold hover:bg-orange-700 disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
+                  className="bg-orange-600 text-white text-[10px] md:text-xs px-3 py-1.5 md:px-4 md:py-2 rounded-lg font-bold hover:bg-orange-700 disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
                 >
                   Kirim Laporan
                 </button>
                 <button 
                   onClick={() => { setShowKendalaForm(false); setKendalaNote(''); }}
-                  className="border-2 border-slate-200 text-slate-600 text-xs px-4 py-2 rounded-lg font-bold hover:bg-slate-50"
+                  className="border-2 border-slate-200 text-slate-600 text-[10px] md:text-xs px-3 py-1.5 md:px-4 md:py-2 rounded-lg font-bold hover:bg-slate-50"
                 >
                   Batal
                 </button>
@@ -1619,29 +1684,29 @@ function OrderDetail({ role, order, onBack, onEdit, onTriggerUpload, onUpdateOrd
           )}
 
           {order.kendala && order.kendala.length > 0 && (
-            <div className="mb-5 space-y-2">
-              <div className="text-xs font-bold uppercase text-slate-500 mb-3 flex items-center gap-2">
-                <AlertTriangle className="w-4 h-4 text-orange-600"/> 
+            <div className="mb-4 md:mb-5 space-y-2">
+              <div className="text-[10px] md:text-xs font-bold uppercase text-slate-500 mb-2 md:mb-3 flex items-center gap-2">
+                <AlertTriangle className="w-3 h-3 md:w-4 md:h-4 text-orange-600"/> 
                 Catatan Kendala ({order.kendala.filter((k: KendalaNote) => !k.isResolved).length} belum selesai / {order.kendala.length} total)
               </div>
               {order.kendala.map((k: KendalaNote) => (
-                <div key={k.id} className={`border-2 p-4 rounded-xl ${k.isResolved ? 'bg-gray-50 border-gray-200' : 'bg-orange-50 border-orange-300'}`}>
+                <div key={k.id} className={`border-2 p-3 md:p-4 rounded-xl ${k.isResolved ? 'bg-gray-50 border-gray-200' : 'bg-orange-50 border-orange-300'}`}>
                   <div className="flex justify-between items-start gap-2 mb-2">
                     <div className="flex-1">
                       <div className="flex items-center gap-2 mb-1">
-                        <p className={`text-sm font-medium ${k.isResolved ? 'text-gray-600 line-through' : 'text-orange-900'}`}>{k.notes}</p>
-                        {k.isResolved && <span className="bg-green-100 text-green-700 text-[10px] px-2 py-0.5 rounded-full font-bold">SELESAI</span>}
+                        <p className={`text-xs md:text-sm font-medium ${k.isResolved ? 'text-gray-600 line-through' : 'text-orange-900'}`}>{k.notes}</p>
+                        {k.isResolved && <span className="bg-green-100 text-green-700 text-[8px] md:text-[10px] px-2 py-0.5 rounded-full font-bold">SELESAI</span>}
                       </div>
-                      <div className="text-xs text-orange-700">
+                      <div className="text-[10px] md:text-xs text-orange-700">
                         Dilaporkan: <span className="font-bold">{k.reportedBy}</span> | {k.timestamp}
                       </div>
                       {k.isResolved && k.resolvedBy && (
-                        <div className="text-xs text-green-700 mt-1">
+                        <div className="text-[10px] md:text-xs text-green-700 mt-1">
                           Diselesaikan: <span className="font-bold">{k.resolvedBy}</span> | {k.resolvedTimestamp}
                         </div>
                       )}
                       {k.buktiFile && (
-                        <a href={k.buktiFile} target="_blank" className="text-xs text-blue-600 font-bold hover:underline flex items-center gap-1 mt-1">
+                        <a href={k.buktiFile} target="_blank" className="text-[10px] md:text-xs text-blue-600 font-bold hover:underline flex items-center gap-1 mt-1">
                           <Eye className="w-3 h-3"/> Lihat Bukti Penanganan
                         </a>
                       )}
@@ -1654,14 +1719,14 @@ function OrderDetail({ role, order, onBack, onEdit, onTriggerUpload, onUpdateOrd
                             className="text-blue-600 hover:bg-blue-50 p-1.5 rounded-lg transition"
                             title="Upload Bukti"
                           >
-                            <Upload className="w-4 h-4"/>
+                            <Upload className="w-3 h-3 md:w-4 md:h-4"/>
                           </button>
                           <button 
                             onClick={() => handleResolveKendala(k.id)}
                             className="text-green-600 hover:bg-green-50 p-1.5 rounded-lg transition"
                             title="Tandai Selesai"
                           >
-                            <CheckCircle className="w-4 h-4"/>
+                            <CheckCircle className="w-3 h-3 md:w-4 md:h-4"/>
                           </button>
                         </>
                       )}
@@ -1671,7 +1736,7 @@ function OrderDetail({ role, order, onBack, onEdit, onTriggerUpload, onUpdateOrd
                           className="text-red-500 hover:bg-red-50 p-1.5 rounded-lg transition"
                           title="Hapus"
                         >
-                          <Trash2 className="w-4 h-4"/>
+                          <Trash2 className="w-3 h-3 md:w-4 md:h-4"/>
                         </button>
                       )}
                     </div>
@@ -1681,24 +1746,24 @@ function OrderDetail({ role, order, onBack, onEdit, onTriggerUpload, onUpdateOrd
             </div>
           )}
 
-          <div className="space-y-4">
+          <div className="space-y-3 md:space-y-4">
             {currentSteps.map((step: any) => (
-              <div key={step.id} className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-slate-100 pb-4 last:border-0 gap-3">
+              <div key={step.id} className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-slate-100 pb-2 md:pb-4 last:border-0 gap-2 md:gap-3">
                  <div>
-                   <div className={`font-bold ${step.isCompleted ? 'text-slate-800' : 'text-slate-400'}`}>{step.name}</div>
-                   {step.fileUrl && <a href={step.fileUrl} target="_blank" className="text-xs text-blue-600 font-bold hover:underline flex items-center gap-1 mt-1"><Eye className="w-3 h-3"/> Lihat Bukti</a>}
+                   <div className={`font-bold text-xs md:text-base ${step.isCompleted ? 'text-slate-800' : 'text-slate-400'}`}>{step.name}</div>
+                   {step.fileUrl && <a href={step.fileUrl} target="_blank" className="text-[10px] md:text-xs text-blue-600 font-bold hover:underline flex items-center gap-1 mt-0.5"><Eye className="w-3 h-3"/> Lihat Bukti</a>}
                  </div>
                  {step.isCompleted ? (
-                   <div className="flex items-center gap-3 bg-green-50 px-3 py-1.5 rounded-lg border border-green-100 self-start sm:self-auto">
-                      <CheckCircle className="w-5 h-5 text-green-600"/>
-                      <span className="text-xs font-bold text-green-700">Selesai</span>
-                      {canEditProduction && !isManager && <button onClick={() => handleFileDelete('step', true, step.id)} className="text-red-400 hover:text-red-600 ml-2"><Trash2 className="w-4 h-4"/></button>}
+                   <div className="flex items-center gap-2 md:gap-3 bg-green-50 px-2 py-1 md:px-3 md:py-1.5 rounded-lg border border-green-100 self-start sm:self-auto">
+                      <CheckCircle className="w-4 h-4 md:w-5 md:h-5 text-green-600"/>
+                      <span className="text-[10px] md:text-xs font-bold text-green-700">Selesai</span>
+                      {canEditProduction && !isManager && <button onClick={() => handleFileDelete('step', true, step.id)} className="text-red-400 hover:text-red-600 ml-1 md:ml-2"><Trash2 className="w-3 h-3 md:w-4 md:h-4"/></button>}
                    </div>
                  ) : (
                    (canEditProduction && !isManager && (order.status === 'On Process' || order.status === 'Revisi' || order.status === 'Ada Kendala')) && (
                      step.type === 'status_update' 
-                     ? <button onClick={() => handleStatusStep(step.id)} className="bg-blue-600 text-white text-xs px-4 py-2 rounded-lg font-bold hover:bg-blue-700 transition w-full sm:w-auto">Tandai Selesai</button>
-                     : <button onClick={() => onTriggerUpload('step', step.id)} className="border-2 border-slate-200 px-4 py-2 rounded-lg text-xs font-bold text-slate-600 hover:bg-slate-50 transition w-full sm:w-auto flex items-center justify-center gap-2"><Camera className="w-4 h-4"/> Upload Bukti</button>
+                     ? <button onClick={() => handleStatusStep(step.id)} className="bg-blue-600 text-white text-[10px] md:text-xs px-3 py-1.5 md:px-4 md:py-2 rounded-lg font-bold hover:bg-blue-700 transition w-full sm:w-auto">Tandai Selesai</button>
+                     : <button onClick={() => onTriggerUpload('step', step.id)} className="border-2 border-slate-200 px-3 py-1.5 md:px-4 md:py-2 rounded-lg text-[10px] md:text-xs font-bold text-slate-600 hover:bg-slate-50 transition w-full sm:w-auto flex items-center justify-center gap-2"><Camera className="w-3 h-3 md:w-4 md:h-4"/> Upload Bukti</button>
                    )
                  )}
               </div>
@@ -1706,42 +1771,42 @@ function OrderDetail({ role, order, onBack, onEdit, onTriggerUpload, onUpdateOrd
           </div>
       </div>
 
-       <div className="bg-white p-6 rounded-2xl border shadow-sm">
-         <h3 className="font-bold text-slate-800 mb-4 flex items-center gap-2 text-lg"><div className="bg-slate-100 w-8 h-8 rounded-full flex items-center justify-center text-sm">3</div> QC & Packing</h3>
-         <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-            <div className="border border-slate-200 p-4 rounded-xl bg-slate-50/50">
-              <div className="text-xs font-bold mb-3 uppercase text-slate-500 tracking-wide">Quality Control</div>
-              {order.finishing_qc.isPassed ? <div className="text-green-700 text-sm font-bold flex items-center gap-2 bg-green-100 p-3 rounded-lg border border-green-200"><CheckCircle className="w-5 h-5"/> Lolos QC</div> : 
+       <div className="bg-white p-3 md:p-6 rounded-2xl border shadow-sm">
+         <h3 className="font-bold text-slate-800 mb-3 md:mb-4 flex items-center gap-2 text-sm md:text-lg"><div className="bg-slate-100 w-6 h-6 md:w-8 md:h-8 rounded-full flex items-center justify-center text-xs md:text-sm">3</div> QC & Packing</h3>
+         <div className="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-5">
+            <div className="border border-slate-200 p-3 md:p-4 rounded-xl bg-slate-50/50">
+              <div className="text-[10px] md:text-xs font-bold mb-2 md:mb-3 uppercase text-slate-500 tracking-wide">Quality Control</div>
+              {order.finishing_qc.isPassed ? <div className="text-green-700 text-xs md:text-sm font-bold flex items-center gap-2 bg-green-100 p-2 md:p-3 rounded-lg border border-green-200"><CheckCircle className="w-4 h-4 md:w-5 md:h-5"/> Lolos QC</div> : 
                 (canEditQC && !isManager && order.status === 'Finishing' ? (
-                  <div className="space-y-3">
-                    <textarea placeholder="Catatan revisi (wajib diisi jika revisi)..." className="w-full text-sm p-3 border-2 border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none text-slate-800 placeholder-slate-400" value={qcNote} onChange={e=>setQcNote(e.target.value)} rows={3}/>
+                  <div className="space-y-2 md:space-y-3">
+                    <textarea placeholder="Catatan revisi (wajib diisi jika revisi)..." className="w-full text-xs md:text-sm p-2 md:p-3 border-2 border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none text-slate-800 placeholder-slate-400" value={qcNote} onChange={e=>setQcNote(e.target.value)} rows={3}/>
                     <div className="flex gap-2">
-                       <button onClick={()=>handleQC(true)} className="bg-green-600 text-white text-xs px-4 py-2.5 rounded-lg flex-1 font-bold hover:bg-green-700 shadow-sm">Lolos</button>
-                       <button onClick={()=>handleQC(false)} disabled={!qcNote.trim()} className="bg-red-600 text-white text-xs px-4 py-2.5 rounded-lg flex-1 font-bold hover:bg-red-700 shadow-sm disabled:opacity-50 disabled:cursor-not-allowed">Revisi</button>
+                       <button onClick={()=>handleQC(true)} className="bg-green-600 text-white text-[10px] md:text-xs px-3 py-2 md:px-4 md:py-2.5 rounded-lg flex-1 font-bold hover:bg-green-700 shadow-sm">Lolos</button>
+                       <button onClick={()=>handleQC(false)} disabled={!qcNote.trim()} className="bg-red-600 text-white text-[10px] md:text-xs px-3 py-2 md:px-4 md:py-2.5 rounded-lg flex-1 font-bold hover:bg-red-700 shadow-sm disabled:opacity-50 disabled:cursor-not-allowed">Revisi</button>
                     </div>
                   </div>
-                ) : <div className="text-xs text-slate-400 italic py-2">Menunggu proses sebelumnya...</div>)
+                ) : <div className="text-[10px] md:text-xs text-slate-400 italic py-2">Menunggu proses sebelumnya...</div>)
               }
             </div>
-            <div className="border border-slate-200 p-4 rounded-xl bg-slate-50/50">
-              <div className="text-xs font-bold mb-3 uppercase text-slate-500 tracking-wide">Packing</div>
-              {order.finishing_packing.isPacked ? <div className="text-green-700 text-sm font-bold flex items-center gap-2 bg-green-100 p-3 rounded-lg border border-green-200"><Package className="w-5 h-5"/> Sudah Dipacking</div> : 
-                (canEditQC && !isManager && order.status === 'Finishing' && order.finishing_qc.isPassed ? <button onClick={()=>onTriggerUpload('packing')} className="bg-purple-600 text-white text-sm w-full py-3 rounded-xl font-bold hover:bg-purple-700 flex items-center justify-center gap-2 shadow-lg"><Camera className="w-4 h-4"/> Foto Packing</button> : <div className="text-xs text-slate-400 italic py-2">Menunggu QC Lolos...</div>)
+            <div className="border border-slate-200 p-3 md:p-4 rounded-xl bg-slate-50/50">
+              <div className="text-[10px] md:text-xs font-bold mb-2 md:mb-3 uppercase text-slate-500 tracking-wide">Packing</div>
+              {order.finishing_packing.isPacked ? <div className="text-green-700 text-xs md:text-sm font-bold flex items-center gap-2 bg-green-100 p-2 md:p-3 rounded-lg border border-green-200"><Package className="w-4 h-4 md:w-5 md:h-5"/> Sudah Dipacking</div> : 
+                (canEditQC && !isManager && order.status === 'Finishing' && order.finishing_qc.isPassed ? <button onClick={()=>onTriggerUpload('packing')} className="bg-purple-600 text-white text-xs md:text-sm w-full py-2 md:py-3 rounded-xl font-bold hover:bg-purple-700 flex items-center justify-center gap-2 shadow-lg"><Camera className="w-3 h-3 md:w-4 md:h-4"/> Foto Packing</button> : <div className="text-[10px] md:text-xs text-slate-400 italic py-2">Menunggu QC Lolos...</div>)
               }
             </div>
          </div>
        </div>
 
-       <div className="bg-white p-6 rounded-2xl border shadow-sm">
-         <h3 className="font-bold text-slate-800 mb-4 flex items-center gap-2 text-lg"><div className="bg-slate-100 w-8 h-8 rounded-full flex items-center justify-center text-sm">4</div> Pengiriman</h3>
-         <div className="space-y-3">
-           <div className="flex justify-between items-center text-sm border border-slate-200 p-4 rounded-xl bg-slate-50/50">
+       <div className="bg-white p-3 md:p-6 rounded-2xl border shadow-sm">
+         <h3 className="font-bold text-slate-800 mb-3 md:mb-4 flex items-center gap-2 text-sm md:text-lg"><div className="bg-slate-100 w-6 h-6 md:w-8 md:h-8 rounded-full flex items-center justify-center text-xs md:text-sm">4</div> Pengiriman</h3>
+         <div className="space-y-2 md:space-y-3">
+           <div className="flex justify-between items-center text-xs md:text-sm border border-slate-200 p-3 md:p-4 rounded-xl bg-slate-50/50">
              <span className="font-bold text-slate-700">Resi Kirim</span>
-             {order.shipping.bukti_kirim ? <a href={order.shipping.bukti_kirim} target="_blank" className="text-green-600 font-bold underline hover:text-green-800">Lihat Bukti</a> : (canEditShipping && !isManager && order.status === 'Kirim' ? <button onClick={()=>onTriggerUpload('shipping_kirim')} className="text-xs bg-blue-600 text-white px-3 py-1.5 rounded-lg font-bold hover:bg-blue-700 shadow-sm">Upload</button> : <span className="text-slate-300 font-bold">-</span>)}
+             {order.shipping.bukti_kirim ? <a href={order.shipping.bukti_kirim} target="_blank" className="text-green-600 font-bold underline hover:text-green-800">Lihat Bukti</a> : (canEditShipping && !isManager && order.status === 'Kirim' ? <button onClick={()=>onTriggerUpload('shipping_kirim')} className="text-[10px] md:text-xs bg-blue-600 text-white px-3 py-1.5 rounded-lg font-bold hover:bg-blue-700 shadow-sm">Upload</button> : <span className="text-slate-300 font-bold">-</span>)}
            </div>
-           <div className="flex justify-between items-center text-sm border border-slate-200 p-4 rounded-xl bg-slate-50/50">
+           <div className="flex justify-between items-center text-xs md:text-sm border border-slate-200 p-3 md:p-4 rounded-xl bg-slate-50/50">
              <span className="font-bold text-slate-700">Bukti Terima</span>
-             {order.shipping.bukti_terima ? <a href={order.shipping.bukti_terima} target="_blank" className="text-green-600 font-bold underline hover:text-green-800">Lihat Bukti</a> : (canEditShipping && !isManager && order.status === 'Kirim' ? <button onClick={()=>onTriggerUpload('shipping_terima')} className="text-xs bg-orange-600 text-white px-3 py-1.5 rounded-lg font-bold hover:bg-orange-700 shadow-sm">Upload</button> : <span className="text-slate-300 font-bold">-</span>)}
+             {order.shipping.bukti_terima ? <a href={order.shipping.bukti_terima} target="_blank" className="text-green-600 font-bold underline hover:text-green-800">Lihat Bukti</a> : (canEditShipping && !isManager && order.status === 'Kirim' ? <button onClick={()=>onTriggerUpload('shipping_terima')} className="text-[10px] md:text-xs bg-orange-600 text-white px-3 py-1.5 rounded-lg font-bold hover:bg-orange-700 shadow-sm">Upload</button> : <span className="text-slate-300 font-bold">-</span>)}
            </div>
          </div>
        </div>
