@@ -706,7 +706,7 @@ export default function ProductionApp() {
             <div className="bg-blue-600 p-2 rounded-lg"><ClipboardList className="w-6 h-6 text-white"/></div>
             <div>
               <h1 className="font-bold text-xl tracking-wide">ProdMon</h1>
-              <div className="text-xs text-slate-400">Monitoring Produksi</div>
+              <div className="text-xs text-slate-400">Production System</div>
             </div>
             <button onClick={() => setSidebarOpen(false)} className="md:hidden ml-auto text-slate-400 hover:text-white">
               <X className="w-6 h-6"/>
@@ -771,7 +771,12 @@ export default function ProductionApp() {
             <div className="text-[10px] font-bold bg-blue-600 text-white px-2 py-1 rounded uppercase tracking-wide">{currentUser.role}</div>
         </header>
 
-        <main className="flex-1 overflow-y-auto p-2 md:p-8 pb-24">
+        {/* UPDATE MARGIN & PADDING FOR MOBILE 
+          - px-4 (16px) for horizontal margin on mobile
+          - py-6 (24px) for vertical spacing between header and content titles
+          - md:p-8 retains the spacious layout on desktop
+        */}
+        <main className="flex-1 overflow-y-auto px-4 py-6 md:p-8 pb-24">
           <div className="max-w-6xl mx-auto">
             {activeTab === 'dashboard' && (
                <Dashboard role={currentUser.role} orders={activeOrders} onSelectOrder={(id: string) => { setSelectedOrderId(id); setView('detail'); setActiveTab('orders'); }} />
@@ -864,7 +869,7 @@ function LoginScreen({ usersList, onLogin }: { usersList: UserData[], onLogin: (
               <div className="bg-blue-600 w-14 h-14 rounded-xl flex items-center justify-center mx-auto mb-4 shadow-lg shadow-blue-500/30">
                 <ClipboardList className="w-8 h-8 text-white"/>
               </div>
-              <h2 className="text-2xl font-extrabold text-slate-800">Monitoring Produksi</h2>
+              <h2 className="text-2xl font-extrabold text-slate-800">Selamat Datang</h2>
               <p className="text-slate-600 text-sm mt-1 font-medium">Silakan login untuk melanjutkan</p>
             </div>
 
@@ -905,13 +910,13 @@ function LoginScreen({ usersList, onLogin }: { usersList: UserData[], onLogin: (
               {error && <div className="text-red-600 text-sm text-center font-bold bg-red-50 p-3 rounded-xl border border-red-100">{error}</div>}
 
               <button type="submit" className="w-full bg-slate-900 text-white py-3.5 rounded-xl font-bold text-lg hover:bg-blue-700 transition shadow-lg active:scale-[0.98] transform">
-                Login
+                Login System
               </button>
             </form>
             
             <div className="mt-8 text-center text-xs text-slate-500 bg-slate-50 p-3 rounded-lg border border-slate-100">
-              <strong>Perhatian:</strong><br/>
-              Pastikan huruf besar kecilnya sesuai dengan data Anda
+              <strong>Default Login:</strong><br/>
+              supervisor/123, admin/123, prod/123, qc/123, manager/123
             </div>
         </div>
       </div>
