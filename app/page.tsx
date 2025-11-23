@@ -74,14 +74,28 @@ interface Order {
   deadline: string;
   jenis_produksi: string;
   status: OrderStatus;
-  link_approval?: string;
+  
+  link_approval?: { link: string; by?: string; timestamp?: string; } | null;
+
   steps_manual: ProductionStep[];
   steps_dtf: ProductionStep[];
   finishing_qc: { isPassed: boolean; notes: string; checkedBy?: string; timestamp?: string; };
-  finishing_packing: { isPacked: boolean; timestamp?: string; };
-  shipping: { bukti_kirim?: string; bukti_terima?: string; timestamp_kirim?: string; timestamp_terima?: string; };
+  
+  // UPDATE: Tambahkan packedBy
+  finishing_packing: { isPacked: boolean; timestamp?: string; fileUrl?: string; packedBy?: string; };
+  
+  // UPDATE: Tambahkan info uploader shipping
+  shipping: { 
+    bukti_kirim?: string; 
+    bukti_terima?: string; 
+    timestamp_kirim?: string; 
+    timestamp_terima?: string;
+    uploaded_by_kirim?: string;  // BARU
+    uploaded_by_terima?: string; // BARU
+  };
+  
   kendala: KendalaNote[];
-  deleted_at?: string | null; // Untuk soft delete
+  deleted_at?: string | null; 
 }
 
 // --- CONSTANTS ---
@@ -194,6 +208,11 @@ export default function ProductionApp() {
   const closeAlert = () => {
     setAlertState(prev => ({ ...prev, isOpen: false }));
   };
+
+  // Set Document Title
+  useEffect(() => {
+    document.title = "ProdMon - Sistem Produksi";
+  }, []);
 
   // Load user session from localStorage on mount
   useEffect(() => {
@@ -432,6 +451,9 @@ export default function ProductionApp() {
     fileInputRef.current?.click();
   };
 
+ 
+  // Cari fungsi handleFileChange dan ganti isinya dengan ini:
+
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file || !selectedOrderId || !uploadTargetRef.current) return;
@@ -446,11 +468,23 @@ export default function ProductionApp() {
       const { data: urlData } = supabase.storage.from('production-proofs').getPublicUrl(fileName);
       const publicUrl = urlData.publicUrl;
       const timestamp = new Date().toLocaleString();
+      // Ambil nama user yang sedang login
+      const uploaderName = currentUser?.name || currentUser?.role || 'unknown';
+
       const order = orders.find(o => o.id === selectedOrderId);
       if (!order) return;
       let updatedOrder = { ...order };
       const target = uploadTargetRef.current;
-      if (target.type === 'approval') updatedOrder.link_approval = publicUrl;
+      
+      // LOGIKA UPDATE DATA + NAMA UPLOADER
+      if (target.type === 'approval') {
+          // UPDATE: Simpan sebagai Object JSON
+          updatedOrder.link_approval = {
+            link: publicUrl,
+            by: uploaderName,
+            timestamp: timestamp
+          };
+      }
       else if (target.type === 'step' && target.stepId) {
         const steps = updatedOrder.jenis_produksi === 'manual' ? updatedOrder.steps_manual : updatedOrder.steps_dtf;
         const idx = steps.findIndex(s => s.id === target.stepId);
@@ -458,7 +492,7 @@ export default function ProductionApp() {
           steps[idx].isCompleted = true;
           steps[idx].fileUrl = publicUrl;
           steps[idx].timestamp = timestamp;
-          steps[idx].uploadedBy = currentUser?.role || 'unknown';
+          steps[idx].uploadedBy = uploaderName; // Simpan Nama
         }
       }
       else if (target.type === 'kendala_bukti' && target.kendalaId) {
@@ -470,12 +504,16 @@ export default function ProductionApp() {
       else if (target.type === 'packing') {
           updatedOrder.finishing_packing.isPacked = true;
           updatedOrder.finishing_packing.timestamp = timestamp;
+          updatedOrder.finishing_packing.fileUrl = publicUrl;
+          updatedOrder.finishing_packing.packedBy = uploaderName; // Simpan Nama
       } else if (target.type === 'shipping_kirim') {
           updatedOrder.shipping.bukti_kirim = publicUrl;
           updatedOrder.shipping.timestamp_kirim = timestamp;
+          updatedOrder.shipping.uploaded_by_kirim = uploaderName; // Simpan Nama
       } else if (target.type === 'shipping_terima') {
           updatedOrder.shipping.bukti_terima = publicUrl;
           updatedOrder.shipping.timestamp_terima = timestamp;
+          updatedOrder.shipping.uploaded_by_terima = uploaderName; // Simpan Nama
       }
       await saveOrderUpdate(updatedOrder);
     } catch (error: any) {
@@ -489,17 +527,19 @@ export default function ProductionApp() {
   const checkAutoStatus = (order: Order): Order => {
     let updated = { ...order };
     
+    // Cek Kendala
     const hasUnresolvedKendala = updated.kendala && updated.kendala.some(k => !k.isResolved);
     if (hasUnresolvedKendala) {
       updated.status = 'Ada Kendala';
       return updated;
     }
 
-    const hasApproval = !!updated.link_approval;
+    const hasApproval = !!(updated.link_approval && updated.link_approval.link);
     const steps = updated.jenis_produksi === 'manual' ? updated.steps_manual : updated.steps_dtf;
     const isProductionDone = steps.every(s => s.isCompleted);
     const isQCPassed = updated.finishing_qc.isPassed;
-    const isQCRevisi = !isQCPassed && updated.finishing_qc.notes;
+    // Logika Revisi: Tidak lolos QC DAN ada catatannya
+    const isQCRevisi = !isQCPassed && updated.finishing_qc.notes && updated.finishing_qc.notes !== 'Lolos QC'; 
     const isPacked = updated.finishing_packing.isPacked;
     const hasResi = !!updated.shipping.bukti_kirim;
     const hasTerima = !!updated.shipping.bukti_terima;
@@ -513,6 +553,7 @@ export default function ProductionApp() {
         if (isQCRevisi) {
           updated.status = 'Revisi';
         } else if (!isQCPassed || !isPacked) {
+          // Jika QC di-reset (hapus), dia akan masuk ke sini (Finishing)
           updated.status = 'Finishing';
         } else {
           if (!hasResi || !hasTerima) {
@@ -537,12 +578,15 @@ export default function ProductionApp() {
         deadline: finalOrder.deadline,
         jenis_produksi: finalOrder.jenis_produksi,
         status: finalOrder.status,
+        
+        // --- FIELD LAMA ---
         link_approval: finalOrder.link_approval,
+        
         steps_manual: finalOrder.steps_manual,
         steps_dtf: finalOrder.steps_dtf,
         finishing_qc: finalOrder.finishing_qc,
-        finishing_packing: finalOrder.finishing_packing,
-        shipping: finalOrder.shipping
+        finishing_packing: finalOrder.finishing_packing, // packedBy tersimpan otomatis karena ini JSON
+        shipping: finalOrder.shipping // uploaded_by tersimpan otomatis karena ini JSON
     };
     
     if (finalOrder.kendala !== undefined) {
@@ -551,11 +595,10 @@ export default function ProductionApp() {
     
     // @ts-ignore
     const { error } = await supabase.from('orders').update(updatePayload).eq('id', finalOrder.id);
+    
     if (error) {
       console.error('DB Error:', error);
-      if (!error.message.includes('kendala')) {
-        showAlert('Error', 'Gagal update DB: ' + error.message, 'error');
-      }
+      // ... error handling
     }
   };
 
@@ -706,7 +749,8 @@ export default function ProductionApp() {
             <div className="bg-blue-600 p-2 rounded-lg"><ClipboardList className="w-6 h-6 text-white"/></div>
             <div>
               <h1 className="font-bold text-xl tracking-wide">ProdMon</h1>
-              <div className="text-xs text-slate-400">Production System</div>
+              <div className="text-xs text-slate-400 font-medium">Monitoring Produksi</div>
+              <div className="text-[10px] text-slate-500 font-mono mt-0.5">V.3.0</div>
             </div>
             <button onClick={() => setSidebarOpen(false)} className="md:hidden ml-auto text-slate-400 hover:text-white">
               <X className="w-6 h-6"/>
@@ -805,16 +849,16 @@ export default function ProductionApp() {
                  )}
                  {view === 'detail' && selectedOrderId && (
                     <OrderDetail 
-                      role={currentUser.role}
+                      currentUser={currentUser} // UPDATE: Pass full user object
                       order={orders.find(o => o.id === selectedOrderId)!}
                       onBack={() => { setSelectedOrderId(null); setView('list'); }}
                       onEdit={() => setView('edit')}
                       onTriggerUpload={triggerUpload}
                       onUpdateOrder={saveOrderUpdate}
                       onDelete={handleDeleteOrder}
-                      onConfirm={showConfirm} // Passing custom confirm handler
+                      onConfirm={showConfirm}
                     />
-                 )}
+                  )}
                </>
             )}
 
@@ -1474,11 +1518,14 @@ function EditOrder({ order, productionTypes, onCancel, onSubmit }: any) {
   )
 }
 
-function OrderDetail({ role, order, onBack, onEdit, onTriggerUpload, onUpdateOrder, onDelete, onConfirm }: any) {
+function OrderDetail({ currentUser, order, onBack, onEdit, onTriggerUpload, onUpdateOrder, onDelete, onConfirm }: any) {
   const [qcNote, setQcNote] = useState(order.finishing_qc.notes || '');
   const [kendalaNote, setKendalaNote] = useState('');
   const [showKendalaForm, setShowKendalaForm] = useState(false);
   
+  const role = currentUser.role;
+  const userName = currentUser.name; 
+
   const canEditApproval = role === 'admin' || role === 'supervisor';
   const canEditProduction = role === 'produksi' || role === 'admin' || role === 'supervisor';
   const canEditQC = role === 'qc' || role === 'admin' || role === 'supervisor';
@@ -1490,7 +1537,11 @@ function OrderDetail({ role, order, onBack, onEdit, onTriggerUpload, onUpdateOrd
     const updated = JSON.parse(JSON.stringify(order));
     const steps = updated.jenis_produksi === 'manual' ? updated.steps_manual : updated.steps_dtf;
     const idx = steps.findIndex((s: any) => s.id === stepId);
-    if (idx >= 0) { steps[idx].isCompleted = true; steps[idx].uploadedBy = role; steps[idx].timestamp = new Date().toLocaleString(); }
+    if (idx >= 0) { 
+      steps[idx].isCompleted = true; 
+      steps[idx].uploadedBy = userName; 
+      steps[idx].timestamp = new Date().toLocaleString(); 
+    }
     onUpdateOrder(updated);
   };
 
@@ -1499,13 +1550,20 @@ function OrderDetail({ role, order, onBack, onEdit, onTriggerUpload, onUpdateOrd
     updated.finishing_qc = { 
       isPassed: pass, 
       notes: pass ? 'Lolos QC' : qcNote, 
-      checkedBy: role, 
+      checkedBy: userName, 
       timestamp: new Date().toLocaleString() 
     };
-    if (!pass) {
-      updated.status = 'Revisi';
-    }
+    if (!pass) updated.status = 'Revisi';
     onUpdateOrder(updated); 
+  };
+
+  const handleDeleteQC = () => {
+    if (!onConfirm) return;
+    onConfirm('Reset Status QC?', 'Status QC akan dikembalikan ke belum dicek.', () => {
+      const updated = JSON.parse(JSON.stringify(order));
+      updated.finishing_qc = { isPassed: false, notes: '', checkedBy: '', timestamp: '' };
+      onUpdateOrder(updated);
+    });
   };
 
   const handleRevisiSelesai = () => {
@@ -1522,7 +1580,7 @@ function OrderDetail({ role, order, onBack, onEdit, onTriggerUpload, onUpdateOrd
     updated.kendala.push({
       id: Date.now().toString(),
       notes: kendalaNote,
-      reportedBy: role,
+      reportedBy: userName,
       timestamp: new Date().toLocaleString(),
       isResolved: false
     });
@@ -1537,12 +1595,8 @@ function OrderDetail({ role, order, onBack, onEdit, onTriggerUpload, onUpdateOrd
     const idx = updated.kendala.findIndex((k: KendalaNote) => k.id === kendalaId);
     if (idx >= 0) {
       updated.kendala[idx].isResolved = true;
-      updated.kendala[idx].resolvedBy = role;
+      updated.kendala[idx].resolvedBy = userName;
       updated.kendala[idx].resolvedTimestamp = new Date().toLocaleString();
-    }
-    const allResolved = updated.kendala.every((k: KendalaNote) => k.isResolved);
-    if (allResolved && updated.status === 'Ada Kendala') {
-      updated.status = 'On Process';
     }
     onUpdateOrder(updated);
   };
@@ -1552,10 +1606,6 @@ function OrderDetail({ role, order, onBack, onEdit, onTriggerUpload, onUpdateOrd
     onConfirm('Hapus Kendala?', 'Yakin ingin menghapus catatan kendala ini?', () => {
       const updated = JSON.parse(JSON.stringify(order));
       updated.kendala = updated.kendala.filter((k: KendalaNote) => k.id !== kendalaId);
-      const allResolved = updated.kendala.every((k: KendalaNote) => k.isResolved);
-      if ((allResolved || updated.kendala.length === 0) && updated.status === 'Ada Kendala') {
-        updated.status = 'On Process';
-      }
       onUpdateOrder(updated);
     });
   };
@@ -1568,9 +1618,28 @@ function OrderDetail({ role, order, onBack, onEdit, onTriggerUpload, onUpdateOrd
           const steps = updated.jenis_produksi === 'manual' ? updated.steps_manual : updated.steps_dtf;
           const idx = steps.findIndex((s: any) => s.id === stepId);
           if(idx>=0) { steps[idx].isCompleted=false; steps[idx].fileUrl=null; }
-        } else if (field === 'approval') updated.link_approval = null;
-        else if (field === 'packing') { updated.finishing_packing.isPacked=false; }
-        else if (field.includes('shipping')) { if(field.includes('kirim')) updated.shipping.bukti_kirim=null; else updated.shipping.bukti_terima=null; }
+        } 
+        else if (field === 'approval') {
+            updated.link_approval = null;
+            updated.approval_by = null;
+            updated.approval_timestamp = null;
+        }
+        else if (field === 'packing') { 
+          updated.finishing_packing.isPacked=false; 
+          updated.finishing_packing.fileUrl=null;
+          updated.finishing_packing.packedBy=null;
+          updated.finishing_packing.timestamp=null;
+        }
+        else if (field === 'shipping_kirim') { 
+            updated.shipping.bukti_kirim=null; 
+            updated.shipping.uploaded_by_kirim=null;
+            updated.shipping.timestamp_kirim=null;
+        }
+        else if (field === 'shipping_terima') { 
+            updated.shipping.bukti_terima=null;
+            updated.shipping.uploaded_by_terima=null;
+            updated.shipping.timestamp_terima=null;
+        }
         onUpdateOrder(updated);
       });
   }
@@ -1630,20 +1699,33 @@ function OrderDetail({ role, order, onBack, onEdit, onTriggerUpload, onUpdateOrd
         </div>
       )}
 
+      {/* STEP 1: APPROVAL (VERSI JSON) */}
       <div className="bg-white p-3 md:p-6 rounded-2xl border shadow-sm">
           <h3 className="font-bold text-slate-800 mb-3 md:mb-4 flex items-center gap-2 text-sm md:text-lg"><div className="bg-slate-100 w-6 h-6 md:w-8 md:h-8 rounded-full flex items-center justify-center text-xs md:text-sm">1</div> Approval Desain</h3>
-          {order.link_approval ? (
+          
+          {/* Cek apakah ada link_approval DAN link_approval.link */}
+          {order.link_approval && order.link_approval.link ? (
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between bg-green-50 p-3 md:p-4 rounded-xl border border-green-200 gap-2 md:gap-3">
-              <div className="flex items-center gap-2 md:gap-3 text-green-800 font-medium text-xs md:text-sm">
-                <Eye className="w-4 h-4 md:w-5 md:h-5"/> <a href={order.link_approval} target="_blank" className="underline hover:text-green-900">Lihat File Approval</a>
+              <div className="flex-1">
+                  <div className="flex items-center gap-2 md:gap-3 text-green-800 font-medium text-xs md:text-sm mb-1">
+                    {/* Akses URL lewat .link */}
+                    <Eye className="w-4 h-4 md:w-5 md:h-5"/> <a href={order.link_approval.link} target="_blank" className="underline hover:text-green-900">Lihat File Approval</a>
+                  </div>
+                  {/* Tampilkan Uploader lewat .by */}
+                  {order.link_approval.by ? (
+                      <div className="text-[10px] text-green-700">Oleh: <span className="font-bold">{order.link_approval.by}</span> | {order.link_approval.timestamp}</div>
+                  ) : (
+                      <div className="text-[10px] text-slate-400 italic">Data lama (tanpa nama)</div>
+                  )}
               </div>
-              {canEditApproval && !isManager && <button onClick={() => handleFileDelete('approval')} className="text-red-500 bg-white border border-red-200 px-2 py-1 md:px-3 md:py-1.5 rounded-lg text-[10px] md:text-xs font-bold hover:bg-red-50">Hapus</button>}
+              {canEditApproval && !isManager && <button onClick={() => handleFileDelete('approval')} className="text-red-500 bg-white border border-red-200 px-2 py-1 md:px-3 md:py-1.5 rounded-lg text-[10px] md:text-xs font-bold hover:bg-red-50 mt-2 sm:mt-0">Hapus</button>}
             </div>
           ) : (
             (canEditApproval && !isManager) ? <button onClick={() => onTriggerUpload('approval')} className="w-full border-2 border-dashed border-blue-200 p-4 md:p-6 text-xs md:text-sm text-blue-600 rounded-xl bg-blue-50 hover:bg-blue-100 transition font-bold flex flex-col items-center gap-2"><Upload className="w-5 h-5 md:w-6 md:h-6"/> Upload File Approval</button> : <div className="text-xs md:text-sm italic text-slate-400 text-center py-4 bg-slate-50 rounded-xl">Menunggu Admin upload approval...</div>
           )}
       </div>
 
+      {/* STEP 2: PRODUKSI */}
       <div className="bg-white p-3 md:p-6 rounded-2xl border shadow-sm">
           <div className="flex justify-between items-center mb-3 md:mb-4">
             <h3 className="font-bold text-slate-800 flex items-center gap-2 text-sm md:text-lg">
@@ -1651,10 +1733,7 @@ function OrderDetail({ role, order, onBack, onEdit, onTriggerUpload, onUpdateOrd
               Produksi ({order.jenis_produksi})
             </h3>
             {canEditProduction && (order.status === 'On Process' || order.status === 'Revisi' || order.status === 'Ada Kendala') && (
-              <button 
-                onClick={() => setShowKendalaForm(!showKendalaForm)}
-                className="text-[10px] md:text-xs bg-orange-600 text-white px-2 py-1 md:px-3 md:py-1.5 rounded-lg font-bold hover:bg-orange-700 transition flex items-center gap-1.5 shadow-sm"
-              >
+              <button onClick={() => setShowKendalaForm(!showKendalaForm)} className="text-[10px] md:text-xs bg-orange-600 text-white px-2 py-1 md:px-3 md:py-1.5 rounded-lg font-bold hover:bg-orange-700 transition flex items-center gap-1.5 shadow-sm">
                 <MessageSquare className="w-3 h-3 md:w-3.5 md:h-3.5"/> Lapor Kendala
               </button>
             )}
@@ -1663,27 +1742,10 @@ function OrderDetail({ role, order, onBack, onEdit, onTriggerUpload, onUpdateOrd
           {showKendalaForm && (
             <div className="mb-4 p-3 md:p-4 bg-orange-50 border-2 border-orange-300 rounded-xl">
               <label className="block text-[10px] md:text-xs font-bold text-orange-800 uppercase mb-1 md:mb-2">Catatan Kendala</label>
-              <textarea 
-                placeholder="Jelaskan kendala yang sedang dialami..."
-                className="w-full text-xs md:text-sm p-2 md:p-3 border-2 border-orange-200 rounded-lg focus:ring-2 focus:ring-orange-500 outline-none text-slate-800 placeholder-slate-400"
-                value={kendalaNote}
-                onChange={e => setKendalaNote(e.target.value)}
-                rows={3}
-              />
+              <textarea placeholder="Jelaskan kendala yang sedang dialami..." className="w-full text-xs md:text-sm p-2 md:p-3 border-2 border-orange-200 rounded-lg focus:ring-2 focus:ring-orange-500 outline-none text-slate-800 placeholder-slate-400" value={kendalaNote} onChange={e => setKendalaNote(e.target.value)} rows={3} />
               <div className="flex gap-2 mt-2 md:mt-3">
-                <button 
-                  onClick={handleAddKendala}
-                  disabled={!kendalaNote.trim()}
-                  className="bg-orange-600 text-white text-[10px] md:text-xs px-3 py-1.5 md:px-4 md:py-2 rounded-lg font-bold hover:bg-orange-700 disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
-                >
-                  Kirim Laporan
-                </button>
-                <button 
-                  onClick={() => { setShowKendalaForm(false); setKendalaNote(''); }}
-                  className="border-2 border-slate-200 text-slate-600 text-[10px] md:text-xs px-3 py-1.5 md:px-4 md:py-2 rounded-lg font-bold hover:bg-slate-50"
-                >
-                  Batal
-                </button>
+                <button onClick={handleAddKendala} disabled={!kendalaNote.trim()} className="bg-orange-600 text-white text-[10px] md:text-xs px-3 py-1.5 md:px-4 md:py-2 rounded-lg font-bold hover:bg-orange-700 disabled:opacity-50 disabled:cursor-not-allowed shadow-sm">Kirim Laporan</button>
+                <button onClick={() => { setShowKendalaForm(false); setKendalaNote(''); }} className="border-2 border-slate-200 text-slate-600 text-[10px] md:text-xs px-3 py-1.5 md:px-4 md:py-2 rounded-lg font-bold hover:bg-slate-50">Batal</button>
               </div>
             </div>
           )}
@@ -1691,8 +1753,7 @@ function OrderDetail({ role, order, onBack, onEdit, onTriggerUpload, onUpdateOrd
           {order.kendala && order.kendala.length > 0 && (
             <div className="mb-4 md:mb-5 space-y-2">
               <div className="text-[10px] md:text-xs font-bold uppercase text-slate-500 mb-2 md:mb-3 flex items-center gap-2">
-                <AlertTriangle className="w-3 h-3 md:w-4 md:h-4 text-orange-600"/> 
-                Catatan Kendala ({order.kendala.filter((k: KendalaNote) => !k.isResolved).length} belum selesai / {order.kendala.length} total)
+                <AlertTriangle className="w-3 h-3 md:w-4 md:h-4 text-orange-600"/> Catatan Kendala ({order.kendala.filter((k: KendalaNote) => !k.isResolved).length} belum selesai / {order.kendala.length} total)
               </div>
               {order.kendala.map((k: KendalaNote) => (
                 <div key={k.id} className={`border-2 p-3 md:p-4 rounded-xl ${k.isResolved ? 'bg-gray-50 border-gray-200' : 'bg-orange-50 border-orange-300'}`}>
@@ -1702,47 +1763,19 @@ function OrderDetail({ role, order, onBack, onEdit, onTriggerUpload, onUpdateOrd
                         <p className={`text-xs md:text-sm font-medium ${k.isResolved ? 'text-gray-600 line-through' : 'text-orange-900'}`}>{k.notes}</p>
                         {k.isResolved && <span className="bg-green-100 text-green-700 text-[8px] md:text-[10px] px-2 py-0.5 rounded-full font-bold">SELESAI</span>}
                       </div>
-                      <div className="text-[10px] md:text-xs text-orange-700">
-                        Dilaporkan: <span className="font-bold">{k.reportedBy}</span> | {k.timestamp}
-                      </div>
-                      {k.isResolved && k.resolvedBy && (
-                        <div className="text-[10px] md:text-xs text-green-700 mt-1">
-                          Diselesaikan: <span className="font-bold">{k.resolvedBy}</span> | {k.resolvedTimestamp}
-                        </div>
-                      )}
-                      {k.buktiFile && (
-                        <a href={k.buktiFile} target="_blank" className="text-[10px] md:text-xs text-blue-600 font-bold hover:underline flex items-center gap-1 mt-1">
-                          <Eye className="w-3 h-3"/> Lihat Bukti Penanganan
-                        </a>
-                      )}
+                      <div className="text-[10px] md:text-xs text-orange-700">Dilaporkan: <span className="font-bold">{k.reportedBy}</span> | {k.timestamp}</div>
+                      {k.isResolved && k.resolvedBy && <div className="text-[10px] md:text-xs text-green-700 mt-1">Diselesaikan: <span className="font-bold">{k.resolvedBy}</span> | {k.resolvedTimestamp}</div>}
+                      {k.buktiFile && <a href={k.buktiFile} target="_blank" className="text-[10px] md:text-xs text-blue-600 font-bold hover:underline flex items-center gap-1 mt-1"><Eye className="w-3 h-3"/> Lihat Bukti Penanganan</a>}
                     </div>
                     <div className="flex gap-1">
                       {!k.isResolved && (role === 'admin' || role === 'supervisor') && (
                         <>
-                          <button 
-                            onClick={() => onTriggerUpload('kendala_bukti', undefined, k.id)}
-                            className="text-blue-600 hover:bg-blue-50 p-1.5 rounded-lg transition"
-                            title="Upload Bukti"
-                          >
-                            <Upload className="w-3 h-3 md:w-4 md:h-4"/>
-                          </button>
-                          <button 
-                            onClick={() => handleResolveKendala(k.id)}
-                            className="text-green-600 hover:bg-green-50 p-1.5 rounded-lg transition"
-                            title="Tandai Selesai"
-                          >
-                            <CheckCircle className="w-3 h-3 md:w-4 md:h-4"/>
-                          </button>
+                          <button onClick={() => onTriggerUpload('kendala_bukti', undefined, k.id)} className="text-blue-600 hover:bg-blue-50 p-1.5 rounded-lg transition" title="Upload Bukti"><Upload className="w-3 h-3 md:w-4 md:h-4"/></button>
+                          <button onClick={() => handleResolveKendala(k.id)} className="text-green-600 hover:bg-green-50 p-1.5 rounded-lg transition" title="Tandai Selesai"><CheckCircle className="w-3 h-3 md:w-4 md:h-4"/></button>
                         </>
                       )}
-                      {((role === 'admin' || role === 'supervisor') || k.reportedBy === role) && (
-                        <button 
-                          onClick={() => handleDeleteKendala(k.id)}
-                          className="text-red-500 hover:bg-red-50 p-1.5 rounded-lg transition"
-                          title="Hapus"
-                        >
-                          <Trash2 className="w-3 h-3 md:w-4 md:h-4"/>
-                        </button>
+                      {((role === 'admin' || role === 'supervisor') || k.reportedBy === userName) && (
+                        <button onClick={() => handleDeleteKendala(k.id)} className="text-red-500 hover:bg-red-50 p-1.5 rounded-lg transition" title="Hapus"><Trash2 className="w-3 h-3 md:w-4 md:h-4"/></button>
                       )}
                     </div>
                   </div>
@@ -1754,34 +1787,53 @@ function OrderDetail({ role, order, onBack, onEdit, onTriggerUpload, onUpdateOrd
           <div className="space-y-3 md:space-y-4">
             {currentSteps.map((step: any) => (
               <div key={step.id} className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-slate-100 pb-2 md:pb-4 last:border-0 gap-2 md:gap-3">
-                 <div>
-                   <div className={`font-bold text-xs md:text-base ${step.isCompleted ? 'text-slate-800' : 'text-slate-400'}`}>{step.name}</div>
-                   {step.fileUrl && <a href={step.fileUrl} target="_blank" className="text-[10px] md:text-xs text-blue-600 font-bold hover:underline flex items-center gap-1 mt-0.5"><Eye className="w-3 h-3"/> Lihat Bukti</a>}
-                 </div>
-                 {step.isCompleted ? (
-                   <div className="flex items-center gap-2 md:gap-3 bg-green-50 px-2 py-1 md:px-3 md:py-1.5 rounded-lg border border-green-100 self-start sm:self-auto">
+                  <div>
+                    <div className={`font-bold text-xs md:text-base ${step.isCompleted ? 'text-slate-800' : 'text-slate-400'}`}>{step.name}</div>
+                    {step.isCompleted && <div className="text-[10px] text-slate-500">Oleh: <span className="font-bold">{step.uploadedBy}</span> | {step.timestamp}</div>}
+                    {step.fileUrl && <a href={step.fileUrl} target="_blank" className="text-[10px] md:text-xs text-blue-600 font-bold hover:underline flex items-center gap-1 mt-0.5"><Eye className="w-3 h-3"/> Lihat Bukti</a>}
+                  </div>
+                  {step.isCompleted ? (
+                    <div className="flex items-center gap-2 md:gap-3 bg-green-50 px-2 py-1 md:px-3 md:py-1.5 rounded-lg border border-green-100 self-start sm:self-auto">
                       <CheckCircle className="w-4 h-4 md:w-5 md:h-5 text-green-600"/>
                       <span className="text-[10px] md:text-xs font-bold text-green-700">Selesai</span>
                       {canEditProduction && !isManager && <button onClick={() => handleFileDelete('step', true, step.id)} className="text-red-400 hover:text-red-600 ml-1 md:ml-2"><Trash2 className="w-3 h-3 md:w-4 md:h-4"/></button>}
-                   </div>
-                 ) : (
-                   (canEditProduction && !isManager && (order.status === 'On Process' || order.status === 'Revisi' || order.status === 'Ada Kendala')) && (
-                     step.type === 'status_update' 
-                     ? <button onClick={() => handleStatusStep(step.id)} className="bg-blue-600 text-white text-[10px] md:text-xs px-3 py-1.5 md:px-4 md:py-2 rounded-lg font-bold hover:bg-blue-700 transition w-full sm:w-auto">Tandai Selesai</button>
-                     : <button onClick={() => onTriggerUpload('step', step.id)} className="border-2 border-slate-200 px-3 py-1.5 md:px-4 md:py-2 rounded-lg text-[10px] md:text-xs font-bold text-slate-600 hover:bg-slate-50 transition w-full sm:w-auto flex items-center justify-center gap-2"><Camera className="w-3 h-3 md:w-4 md:h-4"/> Upload Bukti</button>
-                   )
-                 )}
+                    </div>
+                  ) : (
+                    (canEditProduction && !isManager && (order.status === 'On Process' || order.status === 'Revisi' || order.status === 'Ada Kendala')) && (
+                      step.type === 'status_update' 
+                      ? <button onClick={() => handleStatusStep(step.id)} className="bg-blue-600 text-white text-[10px] md:text-xs px-3 py-1.5 md:px-4 md:py-2 rounded-lg font-bold hover:bg-blue-700 transition w-full sm:w-auto">Tandai Selesai</button>
+                      : <button onClick={() => onTriggerUpload('step', step.id)} className="border-2 border-slate-200 px-3 py-1.5 md:px-4 md:py-2 rounded-lg text-[10px] md:text-xs font-bold text-slate-600 hover:bg-slate-50 transition w-full sm:w-auto flex items-center justify-center gap-2"><Camera className="w-3 h-3 md:w-4 md:h-4"/> Upload Bukti</button>
+                    )
+                  )}
               </div>
             ))}
           </div>
       </div>
 
+       {/* STEP 3: QC & PACKING */}
        <div className="bg-white p-3 md:p-6 rounded-2xl border shadow-sm">
          <h3 className="font-bold text-slate-800 mb-3 md:mb-4 flex items-center gap-2 text-sm md:text-lg"><div className="bg-slate-100 w-6 h-6 md:w-8 md:h-8 rounded-full flex items-center justify-center text-xs md:text-sm">3</div> QC & Packing</h3>
          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-5">
+            {/* QC */}
             <div className="border border-slate-200 p-3 md:p-4 rounded-xl bg-slate-50/50">
               <div className="text-[10px] md:text-xs font-bold mb-2 md:mb-3 uppercase text-slate-500 tracking-wide">Quality Control</div>
-              {order.finishing_qc.isPassed ? <div className="text-green-700 text-xs md:text-sm font-bold flex items-center gap-2 bg-green-100 p-2 md:p-3 rounded-lg border border-green-200"><CheckCircle className="w-4 h-4 md:w-5 md:h-5"/> Lolos QC</div> : 
+              {order.finishing_qc.isPassed || (order.finishing_qc.notes && !order.finishing_qc.isPassed) ? (
+                  <div className={`text-xs md:text-sm font-bold flex flex-col gap-2 p-2 md:p-3 rounded-lg border ${order.finishing_qc.isPassed ? 'bg-green-100 border-green-200 text-green-700' : 'bg-red-100 border-red-200 text-red-700'}`}>
+                      <div className="flex justify-between items-start">
+                         <div className="flex items-center gap-2">
+                             {order.finishing_qc.isPassed ? <CheckCircle className="w-4 h-4 md:w-5 md:h-5"/> : <X className="w-4 h-4 md:w-5 md:h-5"/>}
+                             {order.finishing_qc.isPassed ? 'Lolos QC' : 'Revisi QC'}
+                         </div>
+                         {canEditQC && !isManager && (
+                           <button onClick={handleDeleteQC} className="bg-white/50 hover:bg-white p-1 rounded text-red-600 hover:text-red-800 transition"><Trash2 className="w-3 h-3 md:w-4 md:h-4"/></button>
+                         )}
+                      </div>
+                      <div className="text-[10px] font-normal opacity-80">
+                         Oleh: <span className="font-bold">{order.finishing_qc.checkedBy}</span> | {order.finishing_qc.timestamp}
+                      </div>
+                      {!order.finishing_qc.isPassed && <div className="text-[10px] italic">"{order.finishing_qc.notes}"</div>}
+                  </div>
+                ) : (
                 (canEditQC && !isManager && order.status === 'Finishing' ? (
                   <div className="space-y-2 md:space-y-3">
                     <textarea placeholder="Catatan revisi (wajib diisi jika revisi)..." className="w-full text-xs md:text-sm p-2 md:p-3 border-2 border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none text-slate-800 placeholder-slate-400" value={qcNote} onChange={e=>setQcNote(e.target.value)} rows={3}/>
@@ -1791,27 +1843,85 @@ function OrderDetail({ role, order, onBack, onEdit, onTriggerUpload, onUpdateOrd
                     </div>
                   </div>
                 ) : <div className="text-[10px] md:text-xs text-slate-400 italic py-2">Menunggu proses sebelumnya...</div>)
-              }
+              )}
             </div>
+            
+            {/* PACKING */}
             <div className="border border-slate-200 p-3 md:p-4 rounded-xl bg-slate-50/50">
               <div className="text-[10px] md:text-xs font-bold mb-2 md:mb-3 uppercase text-slate-500 tracking-wide">Packing</div>
-              {order.finishing_packing.isPacked ? <div className="text-green-700 text-xs md:text-sm font-bold flex items-center gap-2 bg-green-100 p-2 md:p-3 rounded-lg border border-green-200"><Package className="w-4 h-4 md:w-5 md:h-5"/> Sudah Dipacking</div> : 
+              {order.finishing_packing.isPacked ? (
+                <div className="text-green-700 text-xs md:text-sm font-bold flex flex-col gap-2 bg-green-100 p-2 md:p-3 rounded-lg border border-green-200">
+                    <div className="flex justify-between items-center">
+                        <div className="flex items-center gap-2">
+                           <Package className="w-4 h-4 md:w-5 md:h-5"/> Sudah Dipacking
+                        </div>
+                        {canEditQC && !isManager && (
+                            <button onClick={() => handleFileDelete('packing')} className="bg-white/50 hover:bg-white p-1 rounded text-red-600 hover:text-red-800 transition"><Trash2 className="w-3 h-3 md:w-4 md:h-4"/></button>
+                        )}
+                    </div>
+                    {/* UPDATE: Tampilkan Uploader Packing */}
+                    {order.finishing_packing.packedBy && (
+                        <div className="text-[10px] font-normal opacity-80 text-green-800">
+                            Oleh: <span className="font-bold">{order.finishing_packing.packedBy}</span> | {order.finishing_packing.timestamp}
+                        </div>
+                    )}
+                    {order.finishing_packing.fileUrl && (
+                        <a href={order.finishing_packing.fileUrl} target="_blank" className="text-[10px] text-green-800 hover:underline flex items-center gap-1"><Eye className="w-3 h-3"/> Lihat Foto Packing</a>
+                    )}
+                </div>
+               ) : (
                 (canEditQC && !isManager && order.status === 'Finishing' && order.finishing_qc.isPassed ? <button onClick={()=>onTriggerUpload('packing')} className="bg-purple-600 text-white text-xs md:text-sm w-full py-2 md:py-3 rounded-xl font-bold hover:bg-purple-700 flex items-center justify-center gap-2 shadow-lg"><Camera className="w-3 h-3 md:w-4 md:h-4"/> Foto Packing</button> : <div className="text-[10px] md:text-xs text-slate-400 italic py-2">Menunggu QC Lolos...</div>)
-              }
+              )}
             </div>
          </div>
        </div>
 
+       {/* STEP 4: PENGIRIMAN */}
        <div className="bg-white p-3 md:p-6 rounded-2xl border shadow-sm">
          <h3 className="font-bold text-slate-800 mb-3 md:mb-4 flex items-center gap-2 text-sm md:text-lg"><div className="bg-slate-100 w-6 h-6 md:w-8 md:h-8 rounded-full flex items-center justify-center text-xs md:text-sm">4</div> Pengiriman</h3>
          <div className="space-y-2 md:space-y-3">
-           <div className="flex justify-between items-center text-xs md:text-sm border border-slate-200 p-3 md:p-4 rounded-xl bg-slate-50/50">
-             <span className="font-bold text-slate-700">Resi Kirim</span>
-             {order.shipping.bukti_kirim ? <a href={order.shipping.bukti_kirim} target="_blank" className="text-green-600 font-bold underline hover:text-green-800">Lihat Bukti</a> : (canEditShipping && !isManager && order.status === 'Kirim' ? <button onClick={()=>onTriggerUpload('shipping_kirim')} className="text-[10px] md:text-xs bg-blue-600 text-white px-3 py-1.5 rounded-lg font-bold hover:bg-blue-700 shadow-sm">Upload</button> : <span className="text-slate-300 font-bold">-</span>)}
+           {/* Resi Kirim */}
+           <div className="flex flex-col gap-2 border border-slate-200 p-3 md:p-4 rounded-xl bg-slate-50/50">
+             <div className="flex justify-between items-center text-xs md:text-sm">
+                 <span className="font-bold text-slate-700">Resi Kirim</span>
+                 {order.shipping.bukti_kirim ? (
+                     <div className="flex items-center gap-2">
+                        <a href={order.shipping.bukti_kirim} target="_blank" className="text-green-600 font-bold underline hover:text-green-800">Lihat Bukti</a>
+                        {/* UPDATE: Tombol Hapus Bukti Kirim */}
+                        {canEditShipping && !isManager && (
+                            <button onClick={() => handleFileDelete('shipping_kirim')} className="bg-red-50 text-red-500 p-1 rounded hover:bg-red-100 border border-red-200 ml-2"><Trash2 className="w-3 h-3"/></button>
+                        )}
+                     </div>
+                 ) : (
+                     (canEditShipping && !isManager && order.status === 'Kirim' ? <button onClick={()=>onTriggerUpload('shipping_kirim')} className="text-[10px] md:text-xs bg-blue-600 text-white px-3 py-1.5 rounded-lg font-bold hover:bg-blue-700 shadow-sm">Upload</button> : <span className="text-slate-300 font-bold">-</span>)
+                 )}
+             </div>
+             {/* UPDATE: Tampilkan Uploader Resi */}
+             {order.shipping.uploaded_by_kirim && (
+                 <div className="text-[10px] text-slate-500">Oleh: <span className="font-bold">{order.shipping.uploaded_by_kirim}</span> | {order.shipping.timestamp_kirim}</div>
+             )}
            </div>
-           <div className="flex justify-between items-center text-xs md:text-sm border border-slate-200 p-3 md:p-4 rounded-xl bg-slate-50/50">
-             <span className="font-bold text-slate-700">Bukti Terima</span>
-             {order.shipping.bukti_terima ? <a href={order.shipping.bukti_terima} target="_blank" className="text-green-600 font-bold underline hover:text-green-800">Lihat Bukti</a> : (canEditShipping && !isManager && order.status === 'Kirim' ? <button onClick={()=>onTriggerUpload('shipping_terima')} className="text-[10px] md:text-xs bg-orange-600 text-white px-3 py-1.5 rounded-lg font-bold hover:bg-orange-700 shadow-sm">Upload</button> : <span className="text-slate-300 font-bold">-</span>)}
+           
+           {/* Bukti Terima */}
+           <div className="flex flex-col gap-2 border border-slate-200 p-3 md:p-4 rounded-xl bg-slate-50/50">
+             <div className="flex justify-between items-center text-xs md:text-sm">
+                 <span className="font-bold text-slate-700">Bukti Terima</span>
+                 {order.shipping.bukti_terima ? (
+                     <div className="flex items-center gap-2">
+                        <a href={order.shipping.bukti_terima} target="_blank" className="text-green-600 font-bold underline hover:text-green-800">Lihat Bukti</a>
+                        {/* UPDATE: Tombol Hapus Bukti Terima */}
+                        {canEditShipping && !isManager && (
+                            <button onClick={() => handleFileDelete('shipping_terima')} className="bg-red-50 text-red-500 p-1 rounded hover:bg-red-100 border border-red-200 ml-2"><Trash2 className="w-3 h-3"/></button>
+                        )}
+                     </div>
+                 ) : (
+                     (canEditShipping && !isManager && order.status === 'Kirim' ? <button onClick={()=>onTriggerUpload('shipping_terima')} className="text-[10px] md:text-xs bg-orange-600 text-white px-3 py-1.5 rounded-lg font-bold hover:bg-orange-700 shadow-sm">Upload</button> : <span className="text-slate-300 font-bold">-</span>)
+                 )}
+             </div>
+             {/* UPDATE: Tampilkan Uploader Terima */}
+             {order.shipping.uploaded_by_terima && (
+                 <div className="text-[10px] text-slate-500">Oleh: <span className="font-bold">{order.shipping.uploaded_by_terima}</span> | {order.shipping.timestamp_terima}</div>
+             )}
            </div>
          </div>
        </div>
