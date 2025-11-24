@@ -1,36 +1,21 @@
 'use client';
 
 import React, { useState } from 'react';
+import { createClient } from '@supabase/supabase-js';
 import { 
   Search, CheckCircle, Truck, Package, 
   AlertCircle, Loader2, Sparkles, Calendar, User,
   Clock, Box, Zap
 } from 'lucide-react';
 
-// --- MOCK DATA untuk demo ---
-const MOCK_ORDERS: Record<string, any> = {
-  'LCO-11/25-0001': {
-    kode_produksi: 'LCO-11/25-0001',
-    nama_pemesan: 'PT Maju Bersama',
-    tanggal_masuk: '2025-11-15',
-    deadline: '2025-12-01',
-    jenis_produksi: 'Digital Print',
-    status: 'On Process',
-    link_approval: { timestamp: '2025-11-16' },
-  },
-  'LCO-11/25-0002': {
-    kode_produksi: 'LCO-11/25-0002',
-    nama_pemesan: 'CV Sukses Jaya',
-    tanggal_masuk: '2025-11-10',
-    deadline: '2025-11-25',
-    jenis_produksi: 'Offset',
-    status: 'Selesai',
-    link_approval: { timestamp: '2025-11-11' },
-    finishing_qc: { timestamp: '2025-11-20', isPassed: true },
-    finishing_packing: { isPacked: true },
-    shipping: { timestamp_kirim: '2025-11-22', bukti_kirim: 'uploaded' }
-  },
-};
+// Pastikan file globals.css diimpor jika diperlukan (sesuai langkah sebelumnya)
+// import '../globals.css'; 
+
+// --- SETUP SUPABASE (Gunakan environment variables) ---
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
+const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
+const supabase = createClient(supabaseUrl, supabaseKey);
+
 
 // --- HELPER DATE ---
 const formatDate = (dateStr: string) => {
@@ -55,35 +40,8 @@ const smartFormatCode = (input: string): string => {
   return input.toUpperCase().trim();
 };
 
-export default function TrackingPage() {
-  const [searchCode, setSearchCode] = useState('');
-  const [result, setResult] = useState<any>(null);
-  const [loading, setLoading] = useState(false);
-  const [hasSearched, setHasSearched] = useState(false);
-
-  const handleSearch = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!searchCode.trim()) return;
-
-    setLoading(true);
-    setHasSearched(true);
-    setResult(null);
-
-    const formatted = smartFormatCode(searchCode);
-
-    // Simulasi loading
-    await new Promise(resolve => setTimeout(resolve, 800));
-
-    // Cari di mock data
-    const foundOrder = MOCK_ORDERS[formatted];
-    if (foundOrder) {
-      setResult(foundOrder);
-    }
-    
-    setLoading(false);
-  };
-
-  const TimelineItem = ({ 
+// --- KOMPONEN TIMELINE ITEM (TIDAK BERUBAH) ---
+const TimelineItem = ({ 
     title, 
     date, 
     isCompleted, 
@@ -171,6 +129,48 @@ export default function TrackingPage() {
     </div>
   );
 
+// --- KOMPONEN UTAMA (MODIFIKASI DI SINI) ---
+export default function TrackingPage() {
+  const [searchCode, setSearchCode] = useState('');
+  const [result, setResult] = useState<any>(null);
+  const [loading, setLoading] = useState(false);
+  const [hasSearched, setHasSearched] = useState(false);
+
+  const handleSearch = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!searchCode.trim()) return;
+
+    setLoading(true);
+    setHasSearched(true);
+    setResult(null);
+
+    const codeToSearch = smartFormatCode(searchCode);
+    
+    // --- KODE BARU: MENGGUNAKAN SUPABASE ---
+    if (supabaseUrl === '' || supabaseKey === '') {
+        // Ini adalah fallback jika kunci Supabase gagal dimuat saat build
+        console.error("Supabase keys are missing. Cannot connect to database.");
+        setLoading(false);
+        setHasSearched(true);
+        setResult(null);
+        return;
+    }
+    
+    const { data } = await supabase
+      .from('orders') // Ganti 'orders' jika nama tabel Anda berbeda
+      .select('*')
+      .or(`kode_produksi.ilike.${codeToSearch},kode_produksi.ilike.${searchCode.trim()}`)
+      .single();
+
+    if (data) {
+        setResult(data);
+    }
+    // --- AKHIR KODE BARU ---
+    
+    setLoading(false);
+  };
+
+  // --- KODE RENDER (SAMA SEPERTI SEBELUMNYA) ---
   return (
     <div 
       className="min-h-screen flex flex-col items-center p-3 sm:p-4 relative overflow-hidden"
@@ -481,7 +481,7 @@ export default function TrackingPage() {
                       title="Approval Desain" 
                       date={result.link_approval?.timestamp ? formatDate(result.link_approval.timestamp) : null} 
                       isCompleted={!!result.link_approval} 
-                      isActive={!result.link_approval}
+                      isActive={!result.link_approval && result.status !== 'Selesai'}
                     />
 
                     <TimelineItem 
