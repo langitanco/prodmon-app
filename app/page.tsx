@@ -957,7 +957,7 @@ function LoginScreen({ usersList, onLogin }: { usersList: UserData[], onLogin: (
                 Login System
               </button>
             </form>
-            
+
             <div className="mt-8 text-center text-xs text-slate-500 bg-slate-50 p-3 rounded-lg border border-slate-100">
               <strong>Default Login:</strong><br/>
               supervisor/123, admin/123, prod/123, qc/123, manager/123
