@@ -750,7 +750,7 @@ export default function ProductionApp() {
             <div>
               <h1 className="font-bold text-xl tracking-wide">ProdMon</h1>
               <div className="text-xs text-slate-400 font-medium">Monitoring Produksi</div>
-              <div className="text-[10px] text-slate-500 font-mono mt-0.5">V.3.0</div>
+              <div className="text-[10px] text-slate-500 font-mono mt-0.5">V.3.1</div>
             </div>
             <button onClick={() => setSidebarOpen(false)} className="md:hidden ml-auto text-slate-400 hover:text-white">
               <X className="w-6 h-6"/>
