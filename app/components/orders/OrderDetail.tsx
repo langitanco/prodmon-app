@@ -22,13 +22,15 @@ export default function OrderDetail({ currentUser, order, onBack, onEdit, onTrig
   const [kendalaNote, setKendalaNote] = useState('');
   const [showKendalaForm, setShowKendalaForm] = useState(false);
   
-  const role = currentUser.role;
+  // Ambil role, pastikan tipe datanya divalidasi
+  const role = currentUser.role as string;
   const userName = currentUser.name; 
 
-  const canEditApproval = role === 'admin' || role === 'supervisor';
-  const canEditProduction = role === 'produksi' || role === 'admin' || role === 'supervisor';
-  const canEditQC = role === 'qc' || role === 'admin' || role === 'supervisor';
-  const canEditShipping = role === 'admin' || role === 'supervisor'; 
+  // PERBAIKAN: Gunakan 'supervisor' sebagai peran akses penuh, bukan 'admin'
+  const canEditApproval = role === 'supervisor'; // HANYA SUPERVISOR YANG BISA
+  const canEditProduction = role === 'produksi' || role === 'supervisor';
+  const canEditQC = role === 'qc' || role === 'supervisor';
+  const canEditShipping = role === 'supervisor'; 
   const isManager = role === 'manager';
   const currentSteps = order.jenis_produksi === 'manual' ? order.steps_manual : order.steps_dtf;
 
@@ -148,7 +150,8 @@ export default function OrderDetail({ currentUser, order, onBack, onEdit, onTrig
           <ChevronRight className="w-4 h-4 md:w-5 md:h-5 rotate-180"/> Kembali
         </button>
         <div className="flex gap-2">
-          {(canEditApproval || role === 'admin') && !isManager && (
+          {/* BARIS YANG DIPERBAIKI: Ganti 'admin' jadi 'supervisor' */}
+          {(canEditApproval) && !isManager && (
             <button onClick={onEdit} className="bg-blue-600 text-white px-3 py-1.5 md:px-4 md:py-2 rounded-lg text-xs md:text-sm font-bold flex items-center gap-2 hover:bg-blue-700 transition shadow-sm">
               <Pencil className="w-3 h-3 md:w-4 md:h-4"/> Edit
             </button>
@@ -262,13 +265,13 @@ export default function OrderDetail({ currentUser, order, onBack, onEdit, onTrig
                       {k.buktiFile && <a href={k.buktiFile} target="_blank" className="text-[10px] md:text-xs text-blue-600 font-bold hover:underline flex items-center gap-1 mt-1"><Eye className="w-3 h-3"/> Lihat Bukti Penanganan</a>}
                     </div>
                     <div className="flex gap-1">
-                      {!k.isResolved && (role === 'admin' || role === 'supervisor') && (
+                      {!k.isResolved && (role === 'supervisor') && (
                         <>
                           <button onClick={() => onTriggerUpload('kendala_bukti', undefined, k.id)} className="text-blue-600 hover:bg-blue-50 p-1.5 rounded-lg transition" title="Upload Bukti"><Upload className="w-3 h-3 md:w-4 md:h-4"/></button>
                           <button onClick={() => handleResolveKendala(k.id)} className="text-green-600 hover:bg-green-50 p-1.5 rounded-lg transition" title="Tandai Selesai"><CheckCircle className="w-3 h-3 md:w-4 md:h-4"/></button>
                         </>
                       )}
-                      {((role === 'admin' || role === 'supervisor') || k.reportedBy === userName) && (
+                      {((role === 'supervisor') || k.reportedBy === userName) && (
                         <button onClick={() => handleDeleteKendala(k.id)} className="text-red-500 hover:bg-red-50 p-1.5 rounded-lg transition" title="Hapus"><Trash2 className="w-3 h-3 md:w-4 md:h-4"/></button>
                       )}
                     </div>
