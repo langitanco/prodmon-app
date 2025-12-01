@@ -57,11 +57,11 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen, currentUser, acti
             <h1 className="text-2xl font-extrabold tracking-tight text-white">
               Langitan<span className="text-blue-500">.co</span>
             </h1>
-            <p className="text-xs text-slate-300 mt-1 font-bold tracking-wide uppercase">
+            <p className="text-xs text-slate-300 mt-1 font-bold tracking-wide ">
               SuperApp
             </p>
             <div className="inline-block bg-slate-800 text-slate-400 text-[10px] px-1.5 py-0.5 rounded mt-1.5 font-mono border border-slate-700">
-              V.4.0
+              V.4.1
             </div>
           </div>
 
@@ -73,7 +73,7 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen, currentUser, acti
         {/* User Info Kecil */}
         <div className="px-6 py-4 bg-slate-800/50 border-b border-slate-800 flex-shrink-0">
            <div className="text-sm font-bold text-white truncate">{currentUser.name}</div>
-           <div className="text-xs text-blue-400 font-mono mt-0.5 uppercase tracking-wider">{currentUser.role}</div>
+           <div className="text-xs text-blue-400 font-mono mt-0.5 tracking-wider">{currentUser.role}</div>
         </div>
 
         {/* Menu Navigasi */}

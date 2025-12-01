@@ -24,17 +24,20 @@ export default function ConfigPriceView() {
 
   // 2. HELPER FORMATTING
   const getDisplayValue = (item: any) => {
-    if (!item.value_amount) return '';
+    if (item.value_amount === null || item.value_amount === undefined) return '';
+    const num = Number(item.value_amount);
     const isRupiah = item.unit && item.unit.toLowerCase().includes('rupiah');
+    
     if (isRupiah) {
-      return 'Rp ' + item.value_amount.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+      return 'Rp ' + num.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ".");
     }
-    return item.value_amount.toString();
+    // Hanya tampilkan angka jika bukan rupiah
+    return num.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ".");
   };
 
   // 3. HANDLE INPUT CHANGE
   const handleChange = (e: any, id: number) => {
-    const rawValue = e.target.value.replace(/\D/g, ''); 
+    const rawValue = e.target.value.replace(/[^0-9]/g, ''); // Hapus semua non-digit
     setConfigs((prev) =>
       prev.map((item) => (item.id === id ? { ...item, value_amount: Number(rawValue) } : item))
     );
@@ -45,20 +48,29 @@ export default function ConfigPriceView() {
     setSaving(true);
     try {
       for (const item of configs) {
-        await supabase
-          .from('pricing_configs')
-          .update({ value_amount: item.value_amount })
-          .eq('id', item.id);
+        // Hanya update jika value_amount adalah angka
+        if (typeof item.value_amount === 'number') {
+            await supabase
+              .from('pricing_configs')
+              .update({ value_amount: item.value_amount })
+              .eq('id', item.id);
+        }
       }
+      fetchConfigs(); // Refresh data setelah simpan
       alert('✅ Harga berhasil diperbarui!');
     } catch (error) {
-      alert('❌ Gagal menyimpan.');
+      // PERBAIKAN DI SINI: Memeriksa apakah error memiliki properti 'message'
+      const errorMessage = (error as any).message || String(error); 
+      alert('❌ Gagal menyimpan. Error: ' + errorMessage);
     } finally {
       setSaving(false);
     }
   };
 
   if (loading) return <div className="flex h-full items-center justify-center text-gray-500">Memuat data...</div>;
+
+  // Daftar kategori diurutkan sesuai keinginan user
+  const categories = ['GENERAL', 'DTF', 'MANUAL'];
 
   return (
     <div className="bg-gray-100 min-h-full pb-20 rounded-xl border border-gray-200 overflow-hidden relative">
@@ -83,14 +95,15 @@ export default function ConfigPriceView() {
       {/* --- KONTEN GRID --- */}
       <div className="max-w-5xl mx-auto px-4 py-8">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {['DTF', 'MANUAL', 'GENERAL'].map((cat) => {
+          {categories.map((cat) => {
             const categoryItems = configs.filter((item) => item.category === cat);
             if (categoryItems.length === 0) return null;
 
             return (
               <div key={cat} className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden flex flex-col">
                 <div className="bg-slate-50 px-5 py-3 border-b border-gray-100">
-                  <h3 className="font-bold text-slate-700 tracking-wide">{cat} CONFIG</h3>
+                  {/* PERBAIKAN: Hapus kurung kurawal ekstra di sini */}
+                  <h3 className="font-bold text-slate-700 tracking-wide">{cat} CONFIG</h3> 
                 </div>
                 <div className="p-5 space-y-5 flex-1">
                   {categoryItems.map((item) => (
