@@ -2,10 +2,9 @@
 
 import React, { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabaseClient'; 
-import { UserData, Order, ProductionTypeData } from '@/types'; // Import tipe dari file terpisah
-import { DEFAULT_USERS, DEFAULT_PRODUCTION_TYPES } from '@/lib/utils'; // Import konstanta
+import { UserData, Order, ProductionTypeData } from '@/types';
+import { DEFAULT_USERS, DEFAULT_PRODUCTION_TYPES } from '@/lib/utils';
 
-// Import Komponen Pecahan
 import Sidebar from '@/app/components/layout/Sidebar';
 import CustomAlert from '@/app/components/ui/CustomAlert';
 import LoginScreen from '@/app/components/auth/LoginScreen';
@@ -31,7 +30,6 @@ export default function ProductionApp() {
   const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   
-  // Custom Alert State
   const [alertState, setAlertState] = useState<{
     isOpen: boolean;
     title: string;
@@ -40,7 +38,6 @@ export default function ProductionApp() {
     onConfirm?: () => void;
   }>({ isOpen: false, title: '', message: '', type: 'success' });
 
-  // --- HANDLERS ---
   const showAlert = (title: string, message: string, type: 'success' | 'error' = 'success') => {
     setAlertState({ isOpen: true, title, message, type, onConfirm: undefined });
   };
@@ -51,7 +48,6 @@ export default function ProductionApp() {
 
   const closeAlert = () => setAlertState(prev => ({ ...prev, isOpen: false }));
 
-  // --- EFFECTS ---
   useEffect(() => {
     const savedUser = localStorage.getItem('currentUser');
     if (savedUser) {
@@ -76,11 +72,9 @@ export default function ProductionApp() {
     return () => { supabase.removeChannel(channel); };
   }, [currentUser]);
 
-  // --- FETCHERS ---
   const fetchOrders = async () => {
     const { data } = await supabase.from('orders').select('*').order('created_at', { ascending: false });
     if (data) {
-       // Parsing data JSON dan boolean
        const parsedOrders = data.map((order: any) => ({
          ...order,
          kendala: (order.kendala || []).map((k: any) => ({ ...k, isResolved: k.isResolved || false }))
@@ -107,7 +101,6 @@ export default function ProductionApp() {
     }
   };
 
-  // --- ACTIONS (LOGIN/LOGOUT) ---
   const handleLogin = (user: UserData) => {
     setCurrentUser(user);
     localStorage.setItem('currentUser', JSON.stringify(user));
@@ -121,7 +114,6 @@ export default function ProductionApp() {
     setView('list');
   };
 
-  // --- ACTIONS (ORDER CRUD) ---
   const generateProductionCode = () => {
     const now = new Date();
     const month = String(now.getMonth() + 1).padStart(2, '0');
@@ -147,7 +139,6 @@ export default function ProductionApp() {
       deadline: newOrderData.deadline,
       jenis_produksi: newOrderData.type,
       status: 'Pesanan Masuk',
-      // Inisialisasi JSON kosong/default agar tidak error
       steps_manual: [{ id: 'm1', name: 'Pecah Gambar (PDF)', type: 'upload_pdf', isCompleted: false }, { id: 'm2', name: 'Print Film', type: 'upload_image', isCompleted: false }, { id: 'm3', name: 'Proofing', type: 'upload_image', isCompleted: false }, { id: 'm4', name: 'Produksi Massal', type: 'upload_image', isCompleted: false }],
       steps_dtf: [{ id: 'd1', name: 'Cetak DTF', type: 'status_update', isCompleted: false }, { id: 'd2', name: 'Press Kaos', type: 'upload_image', isCompleted: false }],
       finishing_qc: { isPassed: false, notes: '' },
@@ -208,9 +199,7 @@ export default function ProductionApp() {
     });
   };
 
-  // --- ACTIONS (UPLOAD & UPDATE DETAIL) ---
   const triggerUpload = (targetType: string, stepId?: string, kendalaId?: string) => {
-    // Fungsi ini membuat input file "virtual" diklik
     const input = document.createElement('input');
     input.type = 'file';
     input.accept = 'image/*,application/pdf';
@@ -218,7 +207,6 @@ export default function ProductionApp() {
        const file = e.target.files?.[0];
        if (!file || !selectedOrderId) return;
        
-       // Upload ke Supabase Storage
        const fileExt = file.name.split('.').pop();
        const fileName = `${selectedOrderId}/${Date.now()}.${fileExt}`;
        const { error: uploadError } = await supabase.storage.from('production-proofs').upload(fileName, file);
@@ -230,11 +218,10 @@ export default function ProductionApp() {
        const timestamp = new Date().toLocaleString();
        const uploader = currentUser?.name || 'unknown';
 
-       // Update Data Order
        const order = orders.find(o => o.id === selectedOrderId);
        if (!order) return;
        
-       let updatedOrder = JSON.parse(JSON.stringify(order)); // Deep copy
+       let updatedOrder = JSON.parse(JSON.stringify(order));
 
        if (targetType === 'approval') {
           updatedOrder.link_approval = { link: publicUrl, by: uploader, timestamp };
@@ -253,55 +240,46 @@ export default function ProductionApp() {
           if (idx >= 0) updatedOrder.kendala[idx].buktiFile = publicUrl;
        }
        
-       // Cek status otomatis
        checkAutoStatus(updatedOrder);
     };
     input.click();
   };
 
-
-const checkAutoStatus = async (orderData: Order) => {
+  const checkAutoStatus = async (orderData: Order) => {
     let newStatus = orderData.status;
     const hasApproval = !!(orderData.link_approval?.link);
     const steps = orderData.jenis_produksi === 'manual' ? orderData.steps_manual : orderData.steps_dtf;
     const productionDone = steps.every(s => s.isCompleted);
     const hasActiveKendala = orderData.kendala.some(k => !k.isResolved); 
     
-    // Logika Urutan Status Utama (Sequential Flow)
     if (!hasApproval) {
       newStatus = 'Pesanan Masuk';
     } else if (!productionDone) {
       newStatus = 'On Process';
     } 
-    // FINISHING: Jika produksi sudah selesai, status akan 'Finishing' sampai QC dan Packing selesai
     else if (!orderData.finishing_qc.isPassed || !orderData.finishing_packing.isPacked) {
       newStatus = 'Finishing';
     } 
-    // KIRIM: Status tetap 'Kirim' selama SALAH SATU dari bukti kirim ATAU bukti terima belum ada
     else if (!orderData.shipping.bukti_kirim || !orderData.shipping.bukti_terima) {
       newStatus = 'Kirim';
     } 
-    // SELESAI: Baru dianggap selesai jika keduanya (Resi & Bukti Terima) sudah ada
     else {
       newStatus = 'Selesai';
     }
     
-    // Override: Jika ada kendala aktif, status selalu 'Ada Kendala'
     if (hasActiveKendala) {
       newStatus = 'Ada Kendala';
     }
     
-    // Update ke DB
     const { error } = await supabase.from('orders').update({
         ...orderData,
         status: newStatus
     }).eq('id', orderData.id);
 
     if (error) showAlert('Error', 'Gagal update: ' + error.message, 'error');
-    else fetchOrders(); // Refresh data
+    else fetchOrders();
   };
 
-  // --- ACTIONS (SETTINGS) ---
   const handleSaveUser = async (u: any) => {
       const payload = { username: u.username, password: u.password, name: u.name, role: u.role };
       let res;
@@ -336,14 +314,10 @@ const checkAutoStatus = async (orderData: Order) => {
       });
   };
 
-
- // --- RENDER UTAMA ---
   if (!currentUser) return <LoginScreen usersList={usersList} onLogin={handleLogin} />;
 
   const handleNav = (tab: any) => { setActiveTab(tab); setView('list'); setSidebarOpen(false); };
 
-  // --- FILTER TAMBAHAN (PERBAIKAN BUG) ---
-  // Kita buat variabel khusus yang isinya HANYA pesanan yang belum dihapus
   const activeOrders = orders.filter(o => !o.deleted_at);
 
   return (
@@ -360,13 +334,12 @@ const checkAutoStatus = async (orderData: Order) => {
       />
 
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
-        {/* Mobile Header */}
-        <header className="md:hidden bg-white px-4 py-3 shadow-md flex items-center justify-between sticky top-0 z-50 border-b">
+        <header className="md:hidden bg-white px-4 py-3 shadow-md flex items-center justify-between sticky top-0 z-30 border-b">
             <div className="flex items-center gap-3">
               <button onClick={() => setSidebarOpen(true)} className="p-2 bg-slate-100 rounded-lg text-slate-700 hover:bg-slate-200 transition">
                 <Menu className="w-6 h-6"/>
               </button>
-              <span className="font-bold text-slate-800 text-lg">ProdMon</span>
+              <span className="font-bold text-slate-800 text-lg">Langitan.co</span>
             </div>
             <div className="text-[10px] font-bold bg-blue-600 text-white px-2 py-1 rounded uppercase tracking-wide">{currentUser.role}</div>
         </header>
@@ -374,7 +347,6 @@ const checkAutoStatus = async (orderData: Order) => {
         <main className="flex-1 overflow-y-auto px-4 py-6 md:p-8 pb-24">
            <div className="max-w-6xl mx-auto">
               
-              {/* DASHBOARD: Pakai activeOrders (yang bersih dari sampah) */}
               {activeTab === 'dashboard' && (
                   <Dashboard 
                     role={currentUser.role} 
@@ -385,7 +357,6 @@ const checkAutoStatus = async (orderData: Order) => {
 
               {activeTab === 'orders' && (
                 <>
-                  {/* LIST: Pakai activeOrders (yang bersih dari sampah) */}
                   {view === 'list' && (
                     <OrderList 
                       role={currentUser.role} 
@@ -397,7 +368,6 @@ const checkAutoStatus = async (orderData: Order) => {
                     />
                   )}
                   
-                  {/* CREATE, EDIT, DETAIL tetap sama */}
                   {view === 'create' && <CreateOrder productionTypes={productionTypes} onCancel={() => setView('list')} onSubmit={handleCreateOrder}/>}
                   
                   {view === 'edit' && selectedOrderId && (
@@ -424,7 +394,6 @@ const checkAutoStatus = async (orderData: Order) => {
                 </>
               )}
 
-              {/* TRASH: Tetap pakai orders.filter agar khusus menampilkan yang dihapus */}
               {activeTab === 'trash' && currentUser.role === 'supervisor' && (
                  <TrashView orders={orders.filter(o => o.deleted_at)} onRestore={handleRestoreOrder} onPermanentDelete={handlePermanentDelete} />
               )}
@@ -440,8 +409,6 @@ const checkAutoStatus = async (orderData: Order) => {
                  />
               )}
 
-              {/* --- TEMPEL KODE BARU DI SINI (Di bawah blok settings) --- */}
-
               {activeTab === 'kalkulator' && (
                  <CalculatorView />
               )}
@@ -449,8 +416,6 @@ const checkAutoStatus = async (orderData: Order) => {
               {activeTab === 'config_harga' && currentUser.role === 'supervisor' && (
                  <ConfigPriceView />
               )}
-
-              {/* --- BATAS AKHIR (Jangan tempel di bawah div penutup ini) --- */}
 
            </div>
         </main>
