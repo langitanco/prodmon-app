@@ -1,3 +1,5 @@
+'use client';
+
 import React from 'react';
 import { 
   ClipboardList, 
@@ -9,7 +11,15 @@ import {
   Calculator, 
   DollarSign 
 } from 'lucide-react';
-import { UserData } from '@/types';
+import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
+import { useRouter } from 'next/navigation';
+// import { UserData } from '@/types'; // UserData mungkin tidak lagi diperlukan di sini
+
+// Definisikan tipe dasar UserData agar kode tidak error di bagian bawah
+interface UserData {
+    name: string;
+    role: string;
+}
 
 interface SidebarProps {
   sidebarOpen: boolean;
@@ -17,13 +27,24 @@ interface SidebarProps {
   currentUser: UserData;
   activeTab: string;
   handleNav: (tab: any) => void;
-  handleLogout: () => void;
+  // handleLogout: () => void; <--- Fungsi ini TIDAK diperlukan lagi
 }
 
-export default function Sidebar({ sidebarOpen, setSidebarOpen, currentUser, activeTab, handleNav, handleLogout }: SidebarProps) {
+export default function Sidebar({ sidebarOpen, setSidebarOpen, currentUser, activeTab, handleNav }: SidebarProps) {
   
+  const router = useRouter();
+  const supabase = createClientComponentClient();
+
   const isSupervisor = currentUser.role === 'supervisor';
   const isAdmin = currentUser.role === 'admin';
+
+  // FUNGSI LOGOUT BARU
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    // Setelah Logout, refresh dan redirect ke halaman login
+    router.refresh(); 
+    router.push('/'); // Asumsi redirect ke halaman root atau login
+  };
 
   return (
     <>
@@ -35,12 +56,6 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen, currentUser, acti
         />
       )}
 
-      {/* PERBAIKAN: 
-          - Ganti 'md:static' menjadi 'md:sticky'.
-          - Tambahkan 'md:top-0'.
-          - Ini membuat sidebar 'lengket' di pojok kiri atas layar,
-            sementara konten kanan bisa discroll bebas.
-      */}
       <aside className={`
         fixed inset-y-0 left-0 z-50 w-72 bg-slate-900 text-white 
         transform transition-transform duration-300 ease-in-out 
