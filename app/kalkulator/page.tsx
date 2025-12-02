@@ -1,43 +1,27 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
-import { supabase } from '@/lib/supabaseClient';
-import Sidebar from '@/app/components/layout/Sidebar'; // Import Sidebar
-import { UserData } from '@/types';
-import { Menu } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { supabase } from '../../lib/supabaseClient';
 
 export default function CalculatorPage() {
-  const router = useRouter();
-  
-  // 1. STATE MANAGEMENT
   const [loading, setLoading] = useState(true);
   const [config, setConfig] = useState<any>({});
   const [mode, setMode] = useState('DTF');
   const [finalPrice, setFinalPrice] = useState(0);
 
-  // State untuk Sidebar & User
-  const [currentUser, setCurrentUser] = useState<UserData | null>(null);
-  const [sidebarOpen, setSidebarOpen] = useState(false);
-
-  // Input User
   const [inputs, setInputs] = useState({
-    qty: 1, width: 28, length: 40, colors: 1, kaosPrice: 35000,
+    qty: 0, 
+    width: 0,
+    length: 0,
+    colors: 0,
+    kaosPrice: 0,
   });
 
-  // 2. CHECK USER & FETCH CONFIG
+  // --- 1. FETCH DATA AWAL & SUBSCRIBE REALTIME ---
   useEffect(() => {
-    // Cek User Login dari LocalStorage (agar sidebar tampil benar)
-    const savedUser = localStorage.getItem('currentUser');
-    if (savedUser) {
-        setCurrentUser(JSON.parse(savedUser));
-    } else {
-        router.push('/'); // Jika belum login, tendang ke login
-        return;
-    }
-
+    // Fungsi ambil data awal
     const fetchConfig = async () => {
-      const { data, error } = await supabase.from('pricing_configs').select('key_name, value_amount');
+      const { data } = await supabase.from('pricing_configs').select('key_name, value_amount');
       if (data) {
         const configMap = data.reduce((acc: any, item: any) => {
           acc[item.key_name] = Number(item.value_amount);
@@ -47,133 +31,138 @@ export default function CalculatorPage() {
         setLoading(false);
       }
     };
+
     fetchConfig();
+
+    // --- BAGIAN AJAIB (REALTIME) ---
+    // Kita pasang "Antena" untuk mendengarkan perubahan di tabel pricing_configs
+    const channel = supabase
+      .channel('realtime-pricing')
+      .on(
+        'postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'pricing_configs' },
+        (payload) => {
+          // Saat ada data berubah, payload.new membawa data baru tersebut
+          const newData = payload.new as any;
+          console.log('Harga berubah!', newData);
+
+          // Update state config secara instan
+          setConfig((prevConfig: any) => ({
+            ...prevConfig,
+            [newData.key_name]: Number(newData.value_amount)
+          }));
+        }
+      )
+      .subscribe();
+
+    // Matikan antena saat halaman ditutup agar hemat memori
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, []);
 
-  // 3. LOGIKA KALKULASI (Tetap Sama)
+  // --- 2. LOGIKA HITUNG (Sama seperti sebelumnya) ---
   useEffect(() => {
     if (loading) return;
-    let price = 0;
-    const area = inputs.width * inputs.length; 
+    let hppSablon = 0;
+    const margin = (config.margin_percentage || 40) / 100;
+    const safeQty = inputs.qty > 0 ? inputs.qty : 1; 
 
     if (mode === 'DTF') {
-      const pricePerCm = config['dtf_price_per_cm'] || 50; 
-      price = (area * pricePerCm) + Number(inputs.kaosPrice);
-    } else if (mode === 'MANUAL') {
-      const screenCost = config['manual_screen_cost'] || 25000;
-      const inkCost = config['manual_ink_cost'] || 1500;
-      const jasaCost = config['manual_jasa_cost'] || 5000;
-      price = (screenCost / inputs.qty) + (inkCost * inputs.colors) + jasaCost + Number(inputs.kaosPrice);
+      const area = inputs.width * inputs.length;
+      const dtfPrice = config.dtf_price_per_cm || 35;
+      const pressCost = config.dtf_press_cost || 1500;
+      hppSablon = (area * dtfPrice) + pressCost;
+    } else {
+      const screenCost = config.manual_screen_cost || 40000;
+      const laborCost = config.manual_labor_cost || 3000;
+      const finishCost = config.manual_finishing || 1000;
+      const totalSetupCost = screenCost * inputs.colors;
+      const setupCostPerPcs = totalSetupCost / safeQty;
+      hppSablon = setupCostPerPcs + laborCost + finishCost;
     }
-    
-    // Margin Profit
-    const profitMargin = config['general_profit_margin'] || 20; 
-    price = price + (price * (profitMargin / 100));
-    setFinalPrice(Math.ceil(price / 1000) * 1000); 
+
+    const totalHPP = inputs.kaosPrice + hppSablon;
+    const sellingPrice = totalHPP + (totalHPP * margin);
+    setFinalPrice(sellingPrice);
   }, [inputs, mode, config, loading]);
 
-  // Handle Navigasi Sidebar
-  const handleNav = (tab: string) => {
-      // Jika user klik menu dashboard/pesanan, kita pindahkan halamannya ke root
-      if (['dashboard', 'orders', 'trash', 'settings'].includes(tab)) {
-          router.push('/');
-      }
-      // Jika klik kalkulator, diam saja (sudah disini)
+  // --- FORMATTER HELPERS ---
+  const formatRupiahDisplay = (num: number) => {
+    if (!num) return ''; 
+    return 'Rp ' + num.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ".");
   };
 
-  const handleLogout = () => {
-      localStorage.removeItem('currentUser');
-      router.push('/');
+  const formatNumberDisplay = (num: number) => {
+    if (!num) return ''; 
+    return num.toString();
   };
 
-  if (!currentUser) return null; // Loading state
+  const handleInputChange = (e: any, field: string) => {
+    const rawValue = e.target.value.replace(/\D/g, ''); 
+    setInputs((prev) => ({ ...prev, [field]: Number(rawValue) }));
+  };
+
+  const formatResult = (num: number) => new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(num);
+
+  if (loading) return <div className="flex h-screen items-center justify-center text-gray-500 font-bold animate-pulse">Menghubungkan ke Server...</div>;
 
   return (
-    <div className="min-h-screen bg-gray-100 font-sans flex flex-col md:flex-row">
-      {/* SIDEBAR TERINTEGRASI */}
-      <Sidebar 
-        sidebarOpen={sidebarOpen} 
-        setSidebarOpen={setSidebarOpen} 
-        currentUser={currentUser} 
-        activeTab="kalkulator"  // <-- Ini kuncinya agar menyala biru
-        handleNav={handleNav} 
-        handleLogout={handleLogout} 
-      />
-
-      <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
-        {/* Mobile Header */}
-        <header className="md:hidden bg-white px-4 py-3 shadow-md flex items-center justify-between sticky top-0 z-50">
-            <button onClick={() => setSidebarOpen(true)} className="p-2 bg-slate-100 rounded-lg text-slate-700">
-                <Menu className="w-6 h-6"/>
-            </button>
-            <span className="font-bold text-slate-800">Kalkulator HPP</span>
-            <div className="w-8"></div>
-        </header>
-
-        <main className="flex-1 overflow-y-auto p-4 md:p-8">
-          <div className="max-w-2xl mx-auto bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
-            <h1 className="text-2xl font-bold text-slate-800 mb-6 flex items-center gap-2">
-                Simulasi Harga Pokok
-            </h1>
-
-            {/* --- KONTEN KALKULATOR ASLI ANDA --- */}
-            {/* Tab Mode */}
-            <div className="flex bg-slate-100 p-1 rounded-xl mb-6">
-                {['DTF', 'MANUAL'].map((m) => (
-                <button
-                    key={m}
-                    onClick={() => setMode(m)}
-                    className={`flex-1 py-2 rounded-lg text-sm font-bold transition ${mode === m ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
-                >
-                    {m}
-                </button>
-                ))}
-            </div>
-
-            {/* Form Inputs */}
-            <div className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
-                    <div>
-                        <label className="text-xs font-bold text-slate-500 uppercase">Qty (Pcs)</label>
-                        <input type="number" className="w-full border p-2 rounded-lg font-bold text-slate-800 mt-1" value={inputs.qty} onChange={(e)=>setInputs({...inputs, qty: Number(e.target.value)})}/>
-                    </div>
-                    <div>
-                        <label className="text-xs font-bold text-slate-500 uppercase">Harga Kaos Polos</label>
-                        <input type="number" className="w-full border p-2 rounded-lg font-bold text-slate-800 mt-1" value={inputs.kaosPrice} onChange={(e)=>setInputs({...inputs, kaosPrice: Number(e.target.value)})}/>
-                    </div>
-                </div>
-
-                {mode === 'DTF' ? (
-                    <div className="grid grid-cols-2 gap-4">
-                        <div>
-                            <label className="text-xs font-bold text-slate-500 uppercase">Lebar (cm)</label>
-                            <input type="number" className="w-full border p-2 rounded-lg font-bold text-slate-800 mt-1" value={inputs.width} onChange={(e)=>setInputs({...inputs, width: Number(e.target.value)})}/>
-                        </div>
-                        <div>
-                            <label className="text-xs font-bold text-slate-500 uppercase">Panjang (cm)</label>
-                            <input type="number" className="w-full border p-2 rounded-lg font-bold text-slate-800 mt-1" value={inputs.length} onChange={(e)=>setInputs({...inputs, length: Number(e.target.value)})}/>
-                        </div>
-                    </div>
-                ) : (
-                    <div>
-                        <label className="text-xs font-bold text-slate-500 uppercase">Jumlah Warna</label>
-                        <input type="number" className="w-full border p-2 rounded-lg font-bold text-slate-800 mt-1" value={inputs.colors} onChange={(e)=>setInputs({...inputs, colors: Number(e.target.value)})}/>
-                    </div>
-                )}
-            </div>
-
-            {/* Result */}
-            <div className="mt-8 pt-6 border-t border-dashed border-slate-200">
-                <div className="text-center">
-                    <p className="text-sm text-slate-500 font-medium mb-1">Estimasi Harga Jual Per Pcs</p>
-                    <div className="text-4xl font-extrabold text-blue-600">
-                        Rp {finalPrice.toLocaleString('id-ID')}
-                    </div>
-                    <p className="text-xs text-slate-400 mt-2">*Sudah termasuk profit margin settingan sistem</p>
-                </div>
-            </div>
+    <div className="min-h-screen bg-slate-50 flex flex-col md:flex-row">
+      
+      {/* --- KOLOM KIRI: INPUT --- */}
+      <div className="flex-1 p-4 md:p-8 overflow-y-auto pb-40 md:pb-8">
+        <div className="max-w-xl mx-auto">
+          <div className="flex items-center justify-between mb-6">
+             <h2 className="text-2xl font-bold text-slate-800">Kalkulator Produksi</h2>
+             <span className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded-full animate-pulse">● Live Update</span>
           </div>
-        </main>
+          
+          <div className="bg-white p-1 rounded-xl shadow-sm border border-gray-200 flex mb-6">
+            <button onClick={() => setMode('DTF')} className={`flex-1 py-3 rounded-lg text-sm font-bold transition-all ${mode === 'DTF' ? 'bg-blue-600 text-white shadow-md' : 'text-gray-500 hover:bg-gray-50'}`}>Sablon DTF</button>
+            <button onClick={() => setMode('MANUAL')} className={`flex-1 py-3 rounded-lg text-sm font-bold transition-all ${mode === 'MANUAL' ? 'bg-blue-600 text-white shadow-md' : 'text-gray-500 hover:bg-gray-50'}`}>Sablon Manual</button>
+          </div>
+
+          <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200 space-y-6">
+            <div>
+              <label className="block text-xs font-bold text-gray-500 uppercase mb-2">Jumlah Order (Pcs)</label>
+              <input type="text" inputMode="numeric" value={formatNumberDisplay(inputs.qty)} onChange={(e) => handleInputChange(e, 'qty')} className="w-full text-xl font-bold text-gray-900 border-gray-300 border rounded-lg p-3 focus:ring-2 focus:ring-blue-500 outline-none placeholder-gray-300" placeholder="0" />
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-gray-500 uppercase mb-2">Harga Kaos Polos</label>
+              <input type="text" inputMode="numeric" value={formatRupiahDisplay(inputs.kaosPrice)} onChange={(e) => handleInputChange(e, 'kaosPrice')} className="w-full text-xl font-bold text-gray-900 border-gray-300 border rounded-lg p-3 focus:ring-2 focus:ring-blue-500 outline-none placeholder-gray-300" placeholder="Rp 0" />
+            </div>
+            <hr className="border-dashed border-gray-200 my-4" />
+            {mode === 'DTF' ? (
+              <div className="grid grid-cols-2 gap-4">
+                <div><label className="block text-xs font-bold text-gray-500 uppercase mb-2">Lebar (cm)</label><input type="text" inputMode="numeric" value={formatNumberDisplay(inputs.width)} onChange={(e) => handleInputChange(e, 'width')} className="w-full text-xl font-bold text-gray-900 border-gray-300 border rounded-lg p-3 focus:ring-2 focus:ring-blue-500 outline-none placeholder-gray-300" placeholder="0" /></div>
+                <div><label className="block text-xs font-bold text-gray-500 uppercase mb-2">Panjang (cm)</label><input type="text" inputMode="numeric" value={formatNumberDisplay(inputs.length)} onChange={(e) => handleInputChange(e, 'length')} className="w-full text-xl font-bold text-gray-900 border-gray-300 border rounded-lg p-3 focus:ring-2 focus:ring-blue-500 outline-none placeholder-gray-300" placeholder="0" /></div>
+              </div>
+            ) : (
+              <div>
+                <label className="block text-xs font-bold text-gray-500 uppercase mb-2">Jumlah Warna</label>
+                <input type="text" inputMode="numeric" value={formatNumberDisplay(inputs.colors)} onChange={(e) => handleInputChange(e, 'colors')} className="w-full text-xl font-bold text-gray-900 border-gray-300 border rounded-lg p-3 focus:ring-2 focus:ring-blue-500 outline-none placeholder-gray-300" placeholder="0" />
+                <p className="text-xs text-orange-500 mt-2 bg-orange-50 p-2 rounded">⚠️ Biaya afdruk dibagi rata ke {inputs.qty || 1} pcs baju.</p>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* --- KOLOM KANAN: HASIL --- */}
+      <div className="fixed bottom-0 left-0 right-0 md:relative md:w-1/3 bg-slate-900 text-white p-6 md:p-10 rounded-t-3xl md:rounded-none shadow-2xl z-30 flex flex-col justify-center border-t-4 border-blue-500 md:border-t-0">
+        <div className="max-w-sm mx-auto w-full">
+          <p className="text-slate-400 text-xs font-bold mb-1 uppercase tracking-widest">Rekomendasi Harga Jual</p>
+          <div className="text-4xl md:text-5xl font-extrabold text-white mb-2 tracking-tight truncate transition-all duration-300">
+            {formatResult(finalPrice)}
+            <span className="text-lg text-slate-400 font-normal ml-1">/pcs</span>
+          </div>
+          <div className="mt-6 space-y-3 border-t border-slate-700 pt-6">
+            <div className="flex justify-between text-sm"><span className="text-slate-400">Total Omset</span><span className="font-bold text-white">{formatResult(finalPrice * inputs.qty)}</span></div>
+            <div className="flex justify-between text-sm"><span className="text-slate-400">Estimasi Margin</span><span className="font-bold text-green-400">+{config.margin_percentage}%</span></div>
+            {mode === 'MANUAL' && (<div className="flex justify-between text-sm"><span className="text-slate-400">Beban Screen/kaos</span><span className="font-bold text-yellow-400">{formatResult((config.manual_screen_cost * inputs.colors) / (inputs.qty || 1))}</span></div>)}
+          </div>
+        </div>
       </div>
     </div>
   );

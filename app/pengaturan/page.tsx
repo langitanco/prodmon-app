@@ -1,121 +1,144 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
-import { supabase } from '@/lib/supabaseClient';
-import Sidebar from '@/app/components/layout/Sidebar';
-import { UserData } from '@/types';
-import { Menu, Save } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { supabase } from '../../lib/supabaseClient';
 
-export default function PricingSettings() {
-  const router = useRouter();
-  const [currentUser, setCurrentUser] = useState<UserData | null>(null);
-  const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [config, setConfig] = useState<any[]>([]);
+export default function SettingsPage() {
   const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [configs, setConfigs] = useState<any[]>([]);
 
+  // 1. AMBIL DATA
   useEffect(() => {
-    // 1. Cek User (Security: Hanya Supervisor yang boleh akses)
-    const savedUser = localStorage.getItem('currentUser');
-    if (savedUser) {
-        const user = JSON.parse(savedUser);
-        if (user.role !== 'supervisor') {
-            alert('Akses Ditolak. Hanya Supervisor.');
-            router.push('/');
-            return;
-        }
-        setCurrentUser(user);
-    } else {
-        router.push('/');
-        return;
-    }
-
-    // 2. Fetch Data
-    const fetchData = async () => {
-      const { data } = await supabase.from('pricing_configs').select('*').order('id');
-      if (data) setConfig(data);
-      setLoading(false);
-    };
-    fetchData();
+    fetchConfigs();
   }, []);
 
-  const handleSave = async () => {
-    for (const item of config) {
-      await supabase.from('pricing_configs').update({ value_amount: item.value_amount }).eq('id', item.id);
+  const fetchConfigs = async () => {
+    const { data } = await supabase
+      .from('pricing_configs')
+      .select('*')
+      .order('id', { ascending: true }); 
+    if (data) {
+      setConfigs(data);
+      setLoading(false);
     }
-    alert('Pengaturan harga berhasil disimpan!');
   };
 
-  const handleNav = (tab: string) => {
-    if (['dashboard', 'orders', 'trash', 'settings'].includes(tab)) router.push('/');
-    if (tab === 'kalkulator') router.push('/kalkulator');
-  };
+  // 2. HELPER FORMATTING (LOGIKA UTAMA)
   
-  const handleLogout = () => { localStorage.removeItem('currentUser'); router.push('/'); };
+  // Fungsi menentukan apa yang harus ditampilkan di layar
+  const getDisplayValue = (item: any) => {
+    // Jika datanya 0 atau kosong, kembalikan string kosong
+    if (!item.value_amount) return '';
 
-  if (!currentUser) return null;
+    // Cek apakah unit mengandung kata 'rupiah' (case insensitive)
+    const isRupiah = item.unit && item.unit.toLowerCase().includes('rupiah');
+
+    if (isRupiah) {
+      // Format: Rp 35.000
+      return 'Rp ' + item.value_amount.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+    }
+
+    // Jika bukan rupiah (misal: persen), tampilkan angka biasa
+    return item.value_amount.toString();
+  };
+
+  // 3. HANDLE INPUT CHANGE
+  const handleChange = (e: any, id: number) => {
+    // Ambil hanya angka (hapus Rp, titik, huruf lain)
+    const rawValue = e.target.value.replace(/\D/g, ''); 
+    
+    setConfigs((prev) =>
+      prev.map((item) => (item.id === id ? { ...item, value_amount: Number(rawValue) } : item))
+    );
+  };
+
+  // 4. SIMPAN
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      for (const item of configs) {
+        await supabase
+          .from('pricing_configs')
+          .update({ value_amount: item.value_amount })
+          .eq('id', item.id);
+      }
+      alert('✅ Harga berhasil diperbarui!');
+    } catch (error) {
+      alert('❌ Gagal menyimpan.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (loading) return <div className="flex h-screen items-center justify-center text-gray-500">Memuat data...</div>;
 
   return (
-    <div className="min-h-screen bg-gray-100 font-sans flex flex-col md:flex-row">
-      <Sidebar 
-        sidebarOpen={sidebarOpen} 
-        setSidebarOpen={setSidebarOpen} 
-        currentUser={currentUser} 
-        activeTab="config_harga" // <-- Tab ini akan menyala kuning/biru di sidebar
-        handleNav={handleNav} 
-        handleLogout={handleLogout} 
-      />
+    <div className="min-h-screen bg-gray-100 pb-20">
+      
+      {/* --- HEADER STICKY --- */}
+      <div className="sticky top-0 z-20 bg-white shadow-sm border-b border-gray-200">
+        <div className="max-w-5xl mx-auto px-4 py-4 flex justify-between items-center">
+          <div>
+            <h1 className="text-xl font-bold text-gray-800">Pengaturan Harga</h1>
+            <p className="text-xs text-gray-500 hidden md:block">Update dasar perhitungan HPP</p>
+          </div>
+          <button 
+            onClick={handleSave} 
+            disabled={saving}
+            className={`px-6 py-2.5 rounded-lg font-bold text-white shadow-lg transition-transform transform active:scale-95 ${saving ? 'bg-gray-400 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-700'}`}
+          >
+            {saving ? 'Menyimpan...' : 'SIMPAN PERUBAHAN'}
+          </button>
+        </div>
+      </div>
 
-      <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
-         <header className="md:hidden bg-white px-4 py-3 shadow-md flex items-center justify-between sticky top-0 z-50">
-            <button onClick={() => setSidebarOpen(true)} className="p-2 bg-slate-100 rounded-lg"><Menu className="w-6 h-6"/></button>
-            <span className="font-bold text-slate-800">Config Harga</span>
-            <div className="w-8"></div>
-        </header>
+      {/* --- KONTEN GRID --- */}
+      <div className="max-w-5xl mx-auto px-4 py-8">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          
+          {/* LOOP KATEGORI */}
+          {['DTF', 'MANUAL', 'GENERAL'].map((cat) => {
+            const categoryItems = configs.filter((item) => item.category === cat);
+            if (categoryItems.length === 0) return null;
 
-        <main className="flex-1 overflow-y-auto p-4 md:p-8">
-            <div className="max-w-3xl mx-auto">
-                <div className="bg-slate-800 text-white p-6 rounded-t-2xl flex justify-between items-center">
-                    <div>
-                        <h1 className="text-xl font-bold">Pengaturan Harga Dasar</h1>
-                        <p className="text-slate-400 text-sm">Ubah variabel perhitungan HPP sistem</p>
+            return (
+              <div key={cat} className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden flex flex-col">
+                {/* Judul Kategori */}
+                <div className="bg-slate-50 px-5 py-3 border-b border-gray-100">
+                  <h3 className="font-bold text-slate-700 tracking-wide">{cat} CONFIG</h3>
+                </div>
+
+                {/* List Input */}
+                <div className="p-5 space-y-5 flex-1">
+                  {categoryItems.map((item) => (
+                    <div key={item.id}>
+                      <div className="flex justify-between items-center mb-1">
+                        <label className="text-sm font-medium text-gray-600">
+                          {item.display_name}
+                        </label>
+                        {/* Tampilkan unit kecil di atas kanan label, bukan di dalam input */}
+                        <span className="text-[10px] text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded uppercase">
+                          {item.unit}
+                        </span>
+                      </div>
+                      
+                      <input
+                        type="text"
+                        inputMode="numeric"
+                        value={getDisplayValue(item)}
+                        onChange={(e) => handleChange(e, item.id)}
+                        className="block w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition text-gray-900 font-bold text-lg outline-none placeholder-gray-300"
+                        placeholder="0"
+                      />
                     </div>
-                    <button onClick={handleSave} className="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-lg font-bold flex items-center gap-2 shadow-lg transition">
-                        <Save className="w-4 h-4"/> Simpan Perubahan
-                    </button>
+                  ))}
                 </div>
+              </div>
+            );
+          })}
 
-                <div className="bg-white p-6 rounded-b-2xl shadow-sm border border-slate-200 space-y-8">
-                    {/* Render Form Dinamis */}
-                    {['DTF', 'MANUAL', 'GENERAL'].map((category) => (
-                        <div key={category}>
-                            <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-4 border-b pb-2">Kategori: {category}</h3>
-                            <div className="grid gap-4">
-                                {config.filter(c => c.category === category).map((item, idx) => (
-                                    <div key={item.id} className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                                        <label className="font-medium text-slate-700 w-1/2">{item.description}</label>
-                                        <div className="flex items-center gap-2 w-full sm:w-1/2">
-                                            <span className="text-slate-400 font-bold text-sm">Rp</span>
-                                            <input 
-                                                type="number" 
-                                                className="w-full border-2 border-slate-200 rounded-lg p-2 font-bold text-slate-800 focus:border-blue-500 outline-none"
-                                                value={item.value_amount}
-                                                onChange={(e) => {
-                                                    const newConfig = [...config];
-                                                    const target = newConfig.find(c => c.id === item.id);
-                                                    if(target) target.value_amount = Number(e.target.value);
-                                                    setConfig(newConfig);
-                                                }}
-                                            />
-                                        </div>
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
-                    ))}
-                </div>
-            </div>
-        </main>
+        </div>
       </div>
     </div>
   );

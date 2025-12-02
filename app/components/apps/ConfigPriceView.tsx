@@ -1,9 +1,13 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { supabase } from '@/lib/supabaseClient';
+// UPDATE PENTING: Menggunakan Auth Helper agar session terbaca di Vercel
+import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 
 export default function ConfigPriceView() {
+  // Inisialisasi client supabase khusus komponen Next.js
+  const supabase = createClientComponentClient();
+  
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   
@@ -60,6 +64,10 @@ export default function ConfigPriceView() {
   const handleAddAddon = async () => {
     if (!newAddonName || !newAddonCost) return alert("Nama dan Harga harus diisi!");
     
+    // Cek session dulu untuk memastikan user terautentikasi
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) return alert("Sesi login kadaluarsa. Silakan refresh atau login ulang.");
+
     const { error } = await supabase.from('product_addons').insert({
       name: newAddonName,
       cost: Number(newAddonCost),
@@ -110,9 +118,9 @@ export default function ConfigPriceView() {
     }
   };
 
-  const handleStatusChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const isTrue = e.target.value === 'true';
-    setTempEditData(prev => ({ ...prev, is_active: isTrue }));
+  const handleStatusChange = (e: any) => {
+     // Handle manual change for mobile select if needed, 
+     // but we are using buttons now (see below)
   };
 
   if (loading && configs.length === 0) return <div className="p-10 text-center text-gray-500">Memuat data...</div>;
@@ -213,7 +221,7 @@ export default function ConfigPriceView() {
                                     {editingId === addon.id ? (
                                         <select 
                                             value={String(tempEditData.is_active)}
-                                            onChange={handleStatusChange}
+                                            onChange={(e) => setTempEditData({...tempEditData, is_active: e.target.value === 'true'})}
                                             className="w-full border border-blue-400 rounded px-2 py-1 text-sm text-slate-700 focus:outline-none bg-white"
                                         >
                                             <option value="true">Aktif</option>
@@ -265,7 +273,7 @@ export default function ConfigPriceView() {
                 {addons.map((addon) => (
                     <div key={addon.id} className="border border-slate-200 rounded-lg p-4 bg-white shadow-sm flex flex-col gap-3">
                         {editingId === addon.id ? (
-                            // MODE EDIT (MOBILE) - DIPERBAIKI (GANTI DROPDOWN DENGAN TOMBOL PILIHAN)
+                            // MODE EDIT (MOBILE) - DIPERBAIKI
                             <div className="space-y-3 bg-slate-50 p-3 rounded-md border border-slate-200">
                                 <h4 className="font-semibold text-slate-700 text-xs mb-2 uppercase">Edit Item</h4>
                                 <div>
@@ -277,7 +285,7 @@ export default function ConfigPriceView() {
                                     <input type="number" className="w-full border border-blue-400 rounded px-2 py-2 text-sm text-slate-700" value={tempEditData.cost} onChange={(e) => setTempEditData({...tempEditData, cost: e.target.value})} />
                                 </div>
                                 
-                                {/* PENGGANTI DROPDOWN: SEGMENTED BUTTON (ANTI-BUG) */}
+                                {/* BUTTONS FOR STATUS (Mobile) */}
                                 <div>
                                     <label className="text-xs text-slate-500 mb-1 block">Status</label>
                                     <div className="flex w-full border border-blue-400 rounded overflow-hidden">
