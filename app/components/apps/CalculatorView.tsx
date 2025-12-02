@@ -1,3 +1,4 @@
+// CalculatorView.tsx
 'use client';
 
 import React, { useState, useEffect } from 'react';
@@ -6,9 +7,12 @@ import { supabase } from '@/lib/supabaseClient';
 export default function CalculatorView() {
   const [loading, setLoading] = useState(true);
   const [config, setConfig] = useState<any>({});
+  const [addons, setAddons] = useState<any[]>([]); // Data Bonus dari DB
+  
   const [mode, setMode] = useState('DTF');
   const [finalPrice, setFinalPrice] = useState(0);
 
+  // Input User
   const [inputs, setInputs] = useState({
     qty: 0, 
     width: 0,
@@ -17,41 +21,47 @@ export default function CalculatorView() {
     kaosPrice: 0,
   });
 
+  // Checklist Bonus yang dipilih (Array of IDs)
+  const [selectedAddonIds, setSelectedAddonIds] = useState<number[]>([]);
+
+  // 1. Fetch Config & Addons
   useEffect(() => {
-    const fetchConfig = async () => {
-      const { data } = await supabase.from('pricing_configs').select('key_name, value_amount');
-      if (data) {
-        const configMap = data.reduce((acc: any, item: any) => {
+    const fetchData = async () => {
+      // Ambil Config Utama
+      const { data: configData } = await supabase.from('pricing_configs').select('key_name, value_amount');
+      if (configData) {
+        const configMap = configData.reduce((acc: any, item: any) => {
           acc[item.key_name] = Number(item.value_amount);
           return acc;
         }, {});
         setConfig(configMap);
-        setLoading(false);
       }
+
+      // Ambil Addons (Hanya yang aktif)
+      const { data: addonData } = await supabase
+        .from('product_addons')
+        .select('*')
+        .eq('is_active', true)
+        .order('name', { ascending: true });
+        
+      if (addonData) setAddons(addonData);
+
+      setLoading(false);
     };
 
-    fetchConfig();
+    fetchData();
 
-    const channel = supabase
-      .channel('realtime-pricing')
-      .on(
-        'postgres_changes',
-        { event: 'UPDATE', schema: 'public', table: 'pricing_configs' },
-        (payload) => {
-          const newData = payload.new as any;
-          setConfig((prevConfig: any) => ({
-            ...prevConfig,
-            [newData.key_name]: Number(newData.value_amount)
-          }));
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
+    // Opsional: Realtime listener jika diperlukan (saya sederhanakan dulu agar stabil)
   }, []);
 
+  // 2. Logic Toggle Checklist
+  const toggleAddon = (id: number) => {
+    setSelectedAddonIds((prev) => 
+      prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
+    );
+  };
+
+  // 3. Kalkulasi Utama
   useEffect(() => {
     if (loading) return;
 
@@ -69,11 +79,18 @@ export default function CalculatorView() {
     const margin = (config.margin_percentage ?? 0) / 100; 
     const safeQty = inputs.qty > 0 ? inputs.qty : 1; 
     
+    // Biaya Operasional Dasar (Listrik/LPG + Penunjang)
+    // Catatan: config.cost_bonus_stiker (yang lama) bisa Anda biarkan 0 di setting jika sudah pindah ke checklist
     const costListrikLPG = config.cost_listrik_lpg ?? 0; 
     const costPenunjang = config.cost_bahan_penunjang ?? 0; 
-    const costBonus = config.cost_bonus_stiker ?? 0; 
     
-    const hppOperasionalTambahan = costListrikLPG + costPenunjang + costBonus;
+    // Hitung Biaya Bonus dari Checklist
+    const totalBonusCost = selectedAddonIds.reduce((total, id) => {
+        const item = addons.find(a => a.id === id);
+        return total + (item ? Number(item.cost) : 0);
+    }, 0);
+
+    const hppOperasionalTotal = costListrikLPG + costPenunjang + totalBonusCost;
 
     if (mode === 'DTF') {
       const area = inputs.width * inputs.length;
@@ -89,7 +106,7 @@ export default function CalculatorView() {
       const screenCost = config.manual_screen_cost ?? 0; 
       const laborCost = config.manual_labor_cost ?? 0; 
       const finishCost = config.manual_finishing ?? 0; 
-      const plastisolCostPerPcs = config.cost_plastisol_ink ?? 0; // ✅ DIPERBAIKI
+      const plastisolCostPerPcs = config.cost_plastisol_ink ?? 0;
       
       const totalSetupCost = screenCost * inputs.colors;
       const setupCostPerPcs = totalSetupCost / safeQty;
@@ -97,12 +114,13 @@ export default function CalculatorView() {
       hppSablon = setupCostPerPcs + laborCost + finishCost + plastisolCostPerPcs;
     }
 
-    const totalHPP = inputs.kaosPrice + hppSablon + hppOperasionalTambahan;
+    const totalHPP = inputs.kaosPrice + hppSablon + hppOperasionalTotal;
     
     const sellingPrice = totalHPP + (totalHPP * margin);
     setFinalPrice(sellingPrice);
-  }, [inputs, mode, config, loading]);
+  }, [inputs, mode, config, loading, selectedAddonIds, addons]); // Dependencies updated
 
+  // Helper Formatter
   const formatRupiahDisplay = (num: number) => {
     if (!num) return ''; 
     return 'Rp ' + num.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ".");
@@ -123,6 +141,12 @@ export default function CalculatorView() {
   if (loading) return <div className="flex h-full items-center justify-center text-gray-500 font-bold animate-pulse p-10">Menghubungkan ke Server...</div>;
 
   const showResult = finalPrice > 0;
+  
+  // Hitung total bonus terpilih untuk display di rincian
+  const currentTotalBonus = selectedAddonIds.reduce((total, id) => {
+      const item = addons.find(a => a.id === id);
+      return total + (item ? Number(item.cost) : 0);
+  }, 0);
 
   return (
     <div className="h-full bg-slate-50 flex flex-col md:flex-row rounded-xl overflow-hidden border border-slate-200">
@@ -140,6 +164,7 @@ export default function CalculatorView() {
           </div>
 
           <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200 space-y-6">
+            {/* Input Utama */}
             <div>
               <label className="block text-xs font-bold text-gray-500 uppercase mb-2">Jumlah Order (Pcs)</label>
               <input type="text" inputMode="numeric" value={formatNumberDisplay(inputs.qty)} onChange={(e) => handleInputChange(e, 'qty')} className="w-full text-xl font-bold text-gray-900 border-gray-300 border rounded-lg p-3 focus:ring-2 focus:ring-blue-500 outline-none placeholder-gray-300" placeholder="0" />
@@ -148,7 +173,8 @@ export default function CalculatorView() {
               <label className="block text-xs font-bold text-gray-500 uppercase mb-2">Harga Kaos Polos</label>
               <input type="text" inputMode="numeric" value={formatRupiahDisplay(inputs.kaosPrice)} onChange={(e) => handleInputChange(e, 'kaosPrice')} className="w-full text-xl font-bold text-gray-900 border-gray-300 border rounded-lg p-3 focus:ring-2 focus:ring-blue-500 outline-none placeholder-gray-300" placeholder="Rp 0" />
             </div>
-            <hr className="border-dashed border-gray-200 my-4" />
+            
+            {/* Input Variabel Mode */}
             {mode === 'DTF' ? (
               <div className="grid grid-cols-2 gap-4">
                 <div><label className="block text-xs font-bold text-gray-500 uppercase mb-2">Lebar Desain (cm)</label><input type="text" inputMode="numeric" value={formatNumberDisplay(inputs.width)} onChange={(e) => handleInputChange(e, 'width')} className="w-full text-xl font-bold text-gray-900 border-gray-300 border rounded-lg p-3 focus:ring-2 focus:ring-blue-500 outline-none placeholder-gray-300" placeholder="0" /></div>
@@ -158,9 +184,36 @@ export default function CalculatorView() {
               <div>
                 <label className="block text-xs font-bold text-gray-500 uppercase mb-2">Jumlah Warna</label>
                 <input type="text" inputMode="numeric" value={formatNumberDisplay(inputs.colors)} onChange={(e) => handleInputChange(e, 'colors')} className="w-full text-xl font-bold text-gray-900 border-gray-300 border rounded-lg p-3 focus:ring-2 focus:ring-blue-500 outline-none placeholder-gray-300" placeholder="0" />
-                <p className="text-xs text-orange-500 mt-2 bg-orange-50 p-2 rounded">⚠️ Biaya afdruk dibagi rata ke {inputs.qty || 1} pcs baju.</p>
               </div>
             )}
+
+            <hr className="border-dashed border-gray-200" />
+
+            {/* CHECKLIST BONUS (DINAMIS DARI DB) */}
+            <div>
+                <label className="block text-xs font-bold text-gray-500 uppercase mb-3">Tambahan / Bonus (Checklist)</label>
+                <div className="grid grid-cols-1 gap-2">
+                    {addons.length === 0 ? (
+                        <p className="text-sm text-gray-400 italic">Tidak ada opsi bonus aktif.</p>
+                    ) : (
+                        addons.map((addon) => (
+                            <label key={addon.id} className={`flex items-center justify-between p-3 rounded-lg border cursor-pointer transition-all ${selectedAddonIds.includes(addon.id) ? 'bg-blue-50 border-blue-300 shadow-sm' : 'bg-white border-gray-200 hover:bg-gray-50'}`}>
+                                <div className="flex items-center gap-3">
+                                    <input 
+                                        type="checkbox" 
+                                        checked={selectedAddonIds.includes(addon.id)}
+                                        onChange={() => toggleAddon(addon.id)}
+                                        className="w-5 h-5 text-blue-600 rounded focus:ring-blue-500 border-gray-300"
+                                    />
+                                    <span className={`font-medium text-sm ${selectedAddonIds.includes(addon.id) ? 'text-blue-900' : 'text-gray-700'}`}>{addon.name}</span>
+                                </div>
+                                <span className="text-xs font-mono text-gray-500 font-bold">+Rp {Number(addon.cost).toLocaleString('id-ID')}</span>
+                            </label>
+                        ))
+                    )}
+                </div>
+            </div>
+
           </div>
         </div>
       </div>
@@ -180,21 +233,28 @@ export default function CalculatorView() {
                 <div className="flex justify-between text-sm"><span className="text-slate-400">Estimasi Margin</span><span className="font-bold text-green-400">+{config.margin_percentage ?? 0}%</span></div>
                 
                 <hr className="border-slate-700/50" />
-                <div className="flex justify-between text-sm"><span className="text-slate-400">Listrik/LPG/Penunjang/Bonus</span><span className="font-bold text-yellow-400">{formatResult((config.cost_listrik_lpg ?? 0) + (config.cost_bahan_penunjang ?? 0) + (config.cost_bonus_stiker ?? 0))} /pcs</span></div>
+                <div className="flex justify-between text-sm">
+                    <span className="text-slate-400">Listrik/LPG & Penunjang</span>
+                    <span className="font-bold text-yellow-400">{formatResult((config.cost_listrik_lpg ?? 0) + (config.cost_bahan_penunjang ?? 0))} /pcs</span>
+                </div>
+                
+                {/* Tampilkan Total Bonus Terpilih */}
+                {currentTotalBonus > 0 && (
+                    <div className="flex justify-between text-sm">
+                        <span className="text-slate-400">Total Bonus (Add-ons)</span>
+                        <span className="font-bold text-orange-400">+{formatResult(currentTotalBonus)} /pcs</span>
+                    </div>
+                )}
 
                 {mode === 'MANUAL' ? (
                     <>
                         <div className="flex justify-between text-sm"><span className="text-slate-400">Beban Screen/kaos</span><span className="font-bold text-yellow-400">{formatResult(((config.manual_screen_cost ?? 0) * inputs.colors) / (inputs.qty || 1))}</span></div>
-                        
-                        <div className="flex justify-between text-sm"><span className="text-slate-400">Cost Tinta Plastisol</span><span className="font-bold text-yellow-400">{formatResult(config.cost_plastisol_ink ?? 0)} /pcs</span></div>
-                        
-                        <div className="flex justify-between text-sm"><span className="text-slate-400">Cost Jasa Gesut & Finishing</span><span className="font-bold text-yellow-400">{formatResult((config.manual_labor_cost ?? 0) + (config.manual_finishing ?? 0))} /pcs</span></div>
+                        <div className="flex justify-between text-sm"><span className="text-slate-400">Cost Tinta & Jasa</span><span className="font-bold text-yellow-400">{formatResult((config.cost_plastisol_ink ?? 0) + (config.manual_labor_cost ?? 0) + (config.manual_finishing ?? 0))} /pcs</span></div>
                     </>
                 ) : (
                     <>
-                        <div className="flex justify-between text-sm"><span className="text-slate-400">HPP Tinta DTF/kaos</span><span className="font-bold text-yellow-400">{formatResult((inputs.width * inputs.length) * (config.dtf_tinta_cost ?? 0))}</span></div>
-                        <div className="flex justify-between text-sm"><span className="text-slate-400">Cost Print Film/kaos</span><span className="font-bold text-yellow-400">{formatResult(config.cost_print_film ?? 0)} /pcs</span></div>
-                        <div className="flex justify-between text-sm"><span className="text-slate-400">Cost Cetak Dasar & Press</span><span className="font-bold text-yellow-400">{formatResult(((inputs.width * inputs.length) * (config.dtf_price_per_cm ?? 0)) + (config.dtf_press_cost ?? 0))} /pcs</span></div>
+                        <div className="flex justify-between text-sm"><span className="text-slate-400">HPP Tinta & Film</span><span className="font-bold text-yellow-400">{formatResult(((inputs.width * inputs.length) * (config.dtf_tinta_cost ?? 0)) + (config.cost_print_film ?? 0))}</span></div>
+                        <div className="flex justify-between text-sm"><span className="text-slate-400">Cost Cetak & Press</span><span className="font-bold text-yellow-400">{formatResult(((inputs.width * inputs.length) * (config.dtf_price_per_cm ?? 0)) + (config.dtf_press_cost ?? 0))} /pcs</span></div>
                     </>
                 )}
             </div>
@@ -203,7 +263,6 @@ export default function CalculatorView() {
                 <p className="text-sm text-slate-500 italic">Silakan lengkapi input (Qty, Ukuran, atau Warna) untuk melihat estimasi harga.</p>
             </div>
           )}
-
         </div>
       </div>
     </div>
