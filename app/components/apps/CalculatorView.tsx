@@ -1,4 +1,3 @@
-// CalculatorView.tsx
 'use client';
 
 import React, { useState, useEffect } from 'react';
@@ -7,7 +6,7 @@ import { supabase } from '@/lib/supabaseClient';
 export default function CalculatorView() {
   const [loading, setLoading] = useState(true);
   const [config, setConfig] = useState<any>({});
-  const [addons, setAddons] = useState<any[]>([]); // Data Bonus dari DB
+  const [addons, setAddons] = useState<any[]>([]); 
   
   const [mode, setMode] = useState('DTF');
   const [finalPrice, setFinalPrice] = useState(0);
@@ -21,13 +20,11 @@ export default function CalculatorView() {
     kaosPrice: 0,
   });
 
-  // Checklist Bonus yang dipilih (Array of IDs)
   const [selectedAddonIds, setSelectedAddonIds] = useState<number[]>([]);
 
   // 1. Fetch Config & Addons
   useEffect(() => {
     const fetchData = async () => {
-      // Ambil Config Utama
       const { data: configData } = await supabase.from('pricing_configs').select('key_name, value_amount');
       if (configData) {
         const configMap = configData.reduce((acc: any, item: any) => {
@@ -37,7 +34,6 @@ export default function CalculatorView() {
         setConfig(configMap);
       }
 
-      // Ambil Addons (Hanya yang aktif)
       const { data: addonData } = await supabase
         .from('product_addons')
         .select('*')
@@ -50,11 +46,8 @@ export default function CalculatorView() {
     };
 
     fetchData();
-
-    // Opsional: Realtime listener jika diperlukan (saya sederhanakan dulu agar stabil)
   }, []);
 
-  // 2. Logic Toggle Checklist
   const toggleAddon = (id: number) => {
     setSelectedAddonIds((prev) => 
       prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
@@ -75,16 +68,12 @@ export default function CalculatorView() {
     }
 
     let hppSablon = 0;
-    
     const margin = (config.margin_percentage ?? 0) / 100; 
     const safeQty = inputs.qty > 0 ? inputs.qty : 1; 
     
-    // Biaya Operasional Dasar (Listrik/LPG + Penunjang)
-    // Catatan: config.cost_bonus_stiker (yang lama) bisa Anda biarkan 0 di setting jika sudah pindah ke checklist
     const costListrikLPG = config.cost_listrik_lpg ?? 0; 
     const costPenunjang = config.cost_bahan_penunjang ?? 0; 
     
-    // Hitung Biaya Bonus dari Checklist
     const totalBonusCost = selectedAddonIds.reduce((total, id) => {
         const item = addons.find(a => a.id === id);
         return total + (item ? Number(item.cost) : 0);
@@ -94,14 +83,12 @@ export default function CalculatorView() {
 
     if (mode === 'DTF') {
       const area = inputs.width * inputs.length;
-      
       const dtfPricePerCm = config.dtf_price_per_cm ?? 0; 
       const pressCost = config.dtf_press_cost ?? 0; 
       const dtfTintaCostPerCm = config.dtf_tinta_cost ?? 0; 
       const dtfPrintFilmCostPerPcs = config.cost_print_film ?? 0; 
       
       hppSablon = (area * dtfPricePerCm) + (area * dtfTintaCostPerCm) + pressCost + dtfPrintFilmCostPerPcs;
-      
     } else {
       const screenCost = config.manual_screen_cost ?? 0; 
       const laborCost = config.manual_labor_cost ?? 0; 
@@ -115,12 +102,10 @@ export default function CalculatorView() {
     }
 
     const totalHPP = inputs.kaosPrice + hppSablon + hppOperasionalTotal;
-    
     const sellingPrice = totalHPP + (totalHPP * margin);
     setFinalPrice(sellingPrice);
-  }, [inputs, mode, config, loading, selectedAddonIds, addons]); // Dependencies updated
+  }, [inputs, mode, config, loading, selectedAddonIds, addons]);
 
-  // Helper Formatter
   const formatRupiahDisplay = (num: number) => {
     if (!num) return ''; 
     return 'Rp ' + num.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ".");
@@ -138,11 +123,16 @@ export default function CalculatorView() {
 
   const formatResult = (num: number) => new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(num);
 
-  if (loading) return <div className="flex h-full items-center justify-center text-gray-500 font-bold animate-pulse p-10">Menghubungkan ke Server...</div>;
+  // --- 1. PERBAIKAN LOADING: Menggunakan Spinner Seragam ---
+  if (loading) return (
+    <div className="flex flex-col items-center justify-center h-[60vh]">
+        <div className="w-12 h-12 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin mb-4"></div>
+        <p className="text-slate-500 font-medium animate-pulse">Menghubungkan ke Server...</p>
+    </div>
+  );
 
   const showResult = finalPrice > 0;
   
-  // Hitung total bonus terpilih untuk display di rincian
   const currentTotalBonus = selectedAddonIds.reduce((total, id) => {
       const item = addons.find(a => a.id === id);
       return total + (item ? Number(item.cost) : 0);
@@ -151,11 +141,12 @@ export default function CalculatorView() {
   return (
     <div className="h-full bg-slate-50 flex flex-col md:flex-row rounded-xl overflow-hidden border border-slate-200">
       
+      {/* PANEL KIRI: INPUT */}
       <div className="flex-1 p-4 md:p-8 overflow-y-auto pb-40 md:pb-8">
         <div className="max-w-xl mx-auto">
           <div className="flex items-center justify-between mb-6">
              <h2 className="text-2xl font-bold text-slate-800">Kalkulator Produksi</h2>
-             <span className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded-full animate-pulse">● Live Update</span>
+             <span className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded-full animate-pulse font-bold">● Live</span>
           </div>
           
           <div className="bg-white p-1 rounded-xl shadow-sm border border-gray-200 flex mb-6">
@@ -164,7 +155,7 @@ export default function CalculatorView() {
           </div>
 
           <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200 space-y-6">
-            {/* Input Utama */}
+            {/* Input Utama (Full Width) */}
             <div>
               <label className="block text-xs font-bold text-gray-500 uppercase mb-2">Jumlah Order (Pcs)</label>
               <input type="text" inputMode="numeric" value={formatNumberDisplay(inputs.qty)} onChange={(e) => handleInputChange(e, 'qty')} className="w-full text-xl font-bold text-gray-900 border-gray-300 border rounded-lg p-3 focus:ring-2 focus:ring-blue-500 outline-none placeholder-gray-300" placeholder="0" />
@@ -174,11 +165,18 @@ export default function CalculatorView() {
               <input type="text" inputMode="numeric" value={formatRupiahDisplay(inputs.kaosPrice)} onChange={(e) => handleInputChange(e, 'kaosPrice')} className="w-full text-xl font-bold text-gray-900 border-gray-300 border rounded-lg p-3 focus:ring-2 focus:ring-blue-500 outline-none placeholder-gray-300" placeholder="Rp 0" />
             </div>
             
-            {/* Input Variabel Mode */}
+            {/* --- 2. PERBAIKAN SIMETRI LAYOUT --- */}
+            {/* Menggunakan 'grid-cols-1' di HP (stack) dan 'sm:grid-cols-2' di Tablet/Desktop (sebelahan) */}
             {mode === 'DTF' ? (
-              <div className="grid grid-cols-2 gap-4">
-                <div><label className="block text-xs font-bold text-gray-500 uppercase mb-2">Lebar Desain (cm)</label><input type="text" inputMode="numeric" value={formatNumberDisplay(inputs.width)} onChange={(e) => handleInputChange(e, 'width')} className="w-full text-xl font-bold text-gray-900 border-gray-300 border rounded-lg p-3 focus:ring-2 focus:ring-blue-500 outline-none placeholder-gray-300" placeholder="0" /></div>
-                <div><label className="block text-xs font-bold text-gray-500 uppercase mb-2">Panjang Desain (cm)</label><input type="text" inputMode="numeric" value={formatNumberDisplay(inputs.length)} onChange={(e) => handleInputChange(e, 'length')} className="w-full text-xl font-bold text-gray-900 border-gray-300 border rounded-lg p-3 focus:ring-2 focus:ring-blue-500 outline-none placeholder-gray-300" placeholder="0" /></div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                    <label className="block text-xs font-bold text-gray-500 uppercase mb-2">Lebar Desain (cm)</label>
+                    <input type="text" inputMode="numeric" value={formatNumberDisplay(inputs.width)} onChange={(e) => handleInputChange(e, 'width')} className="w-full text-xl font-bold text-gray-900 border-gray-300 border rounded-lg p-3 focus:ring-2 focus:ring-blue-500 outline-none placeholder-gray-300" placeholder="0" />
+                </div>
+                <div>
+                    <label className="block text-xs font-bold text-gray-500 uppercase mb-2">Panjang Desain (cm)</label>
+                    <input type="text" inputMode="numeric" value={formatNumberDisplay(inputs.length)} onChange={(e) => handleInputChange(e, 'length')} className="w-full text-xl font-bold text-gray-900 border-gray-300 border rounded-lg p-3 focus:ring-2 focus:ring-blue-500 outline-none placeholder-gray-300" placeholder="0" />
+                </div>
               </div>
             ) : (
               <div>
@@ -189,7 +187,7 @@ export default function CalculatorView() {
 
             <hr className="border-dashed border-gray-200" />
 
-            {/* CHECKLIST BONUS (DINAMIS DARI DB) */}
+            {/* CHECKLIST BONUS */}
             <div>
                 <label className="block text-xs font-bold text-gray-500 uppercase mb-3">Tambahan / Bonus (Checklist)</label>
                 <div className="grid grid-cols-1 gap-2">
@@ -218,6 +216,7 @@ export default function CalculatorView() {
         </div>
       </div>
 
+      {/* PANEL KANAN: HASIL */}
       <div className={`md:w-1/3 p-6 md:p-10 flex flex-col justify-center border-t-4 md:border-t-0 md:border-l border-slate-700 transition-colors duration-300 ${showResult ? 'bg-slate-900 border-blue-500' : 'bg-slate-800 border-slate-600'}`}>
         <div className="max-w-sm mx-auto w-full">
           <p className="text-slate-400 text-xs font-bold mb-1 uppercase tracking-widest">Rekomendasi Harga Jual</p>
@@ -238,7 +237,6 @@ export default function CalculatorView() {
                     <span className="font-bold text-yellow-400">{formatResult((config.cost_listrik_lpg ?? 0) + (config.cost_bahan_penunjang ?? 0))} /pcs</span>
                 </div>
                 
-                {/* Tampilkan Total Bonus Terpilih */}
                 {currentTotalBonus > 0 && (
                     <div className="flex justify-between text-sm">
                         <span className="text-slate-400">Total Bonus (Add-ons)</span>

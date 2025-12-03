@@ -1,11 +1,10 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-// UPDATE PENTING: Menggunakan Auth Helper agar session terbaca di Vercel
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
+import { Save, Plus, Trash2, Edit2, X, Check, Package } from 'lucide-react';
 
 export default function ConfigPriceView() {
-  // Inisialisasi client supabase khusus komponen Next.js
   const supabase = createClientComponentClient();
   
   const [loading, setLoading] = useState(true);
@@ -59,14 +58,16 @@ export default function ConfigPriceView() {
     }
   };
 
-  // --- LOGIC CRUD ADDONS (BONUS) ---
-
+  // --- LOGIC CRUD ADDONS ---
   const handleAddAddon = async () => {
     if (!newAddonName || !newAddonCost) return alert("Nama dan Harga harus diisi!");
     
-    // Cek session dulu untuk memastikan user terautentikasi
     const { data: { session } } = await supabase.auth.getSession();
-    if (!session) return alert("Sesi login kadaluarsa. Silakan refresh atau login ulang.");
+    
+    if (!session) {
+        alert("Sesi login berakhir. Silakan refresh halaman.");
+        return;
+    }
 
     const { error } = await supabase.from('product_addons').insert({
       name: newAddonName,
@@ -74,7 +75,7 @@ export default function ConfigPriceView() {
       is_active: true 
     });
 
-    if (error) alert("Gagal: " + error.message);
+    if (error) alert("Gagal simpan: " + error.message);
     else {
       setNewAddonName('');
       setNewAddonCost('');
@@ -118,228 +119,264 @@ export default function ConfigPriceView() {
     }
   };
 
-  const handleStatusChange = (e: any) => {
-     // Handle manual change for mobile select if needed, 
-     // but we are using buttons now (see below)
-  };
+  // KOMPONEN SWITCH (TOGGLE)
+  const StatusSwitch = ({ isActive, onToggle }: { isActive: boolean, onToggle: () => void }) => (
+    <div 
+        onClick={onToggle}
+        className={`w-12 h-6 flex items-center bg-gray-300 rounded-full p-1 cursor-pointer transition-colors duration-300 ${isActive ? 'bg-green-500' : 'bg-gray-300'}`}
+    >
+        <div className={`bg-white w-4 h-4 rounded-full shadow-md transform transition-transform duration-300 ${isActive ? 'translate-x-6' : 'translate-x-0'}`}></div>
+    </div>
+  );
 
-  if (loading && configs.length === 0) return <div className="p-10 text-center text-gray-500">Memuat data...</div>;
+  // --- LOADING STATE (UPDATED: Sama persis dengan Page.tsx) ---
+  if (loading && configs.length === 0) return (
+    <div className="flex flex-col items-center justify-center h-[60vh]">
+        <div className="w-12 h-12 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin mb-4"></div>
+        <p className="text-slate-500 font-medium animate-pulse">Memuat Pengaturan...</p>
+    </div>
+  );
 
   const categories = ['GENERAL', 'DTF', 'MANUAL'];
 
   return (
-    <div className="bg-slate-50 min-h-full pb-20 rounded-xl border border-slate-200 overflow-hidden relative font-sans">
+    <div className="space-y-8 pb-20">
       
       {/* HEADER */}
-      <div className="sticky top-0 z-20 bg-white shadow-sm border-b border-slate-200">
-        <div className="max-w-5xl mx-auto px-6 py-4 flex flex-col md:flex-row justify-between items-center gap-4">
-          <div className="text-center md:text-left">
-            <h1 className="text-lg font-semibold text-slate-800">Pengaturan Harga</h1>
-            <p className="text-xs text-slate-500">Update dasar perhitungan HPP</p>
-          </div>
-          <button 
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold text-slate-900">Pengaturan Harga</h1>
+          <p className="text-slate-600 text-sm">Kelola HPP dasar dan harga add-ons produksi.</p>
+        </div>
+        <button 
             onClick={handleSaveConfigs} 
             disabled={saving}
-            className={`w-full md:w-auto px-5 py-2 rounded-lg text-sm font-medium text-white shadow-sm transition-all active:scale-95 ${saving ? 'bg-slate-400' : 'bg-blue-600 hover:bg-blue-700'}`}
-          >
-            {saving ? 'Menyimpan...' : 'Simpan Config Utama'}
-          </button>
-        </div>
+            className="flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-6 py-2.5 rounded-xl font-medium transition shadow-lg shadow-blue-500/30 active:scale-95 disabled:opacity-70"
+        >
+            <Save className="w-4 h-4" />
+            {saving ? 'Menyimpan...' : 'Simpan Perubahan'}
+        </button>
       </div>
 
-      <div className="max-w-5xl mx-auto px-4 md:px-6 py-8 space-y-8">
-        
-        {/* SECTION 1: CONFIG UTAMA */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      {/* SECTION 1: CONFIG UTAMA */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           {categories.map((cat) => {
             const categoryItems = configs.filter((item) => item.category === cat);
             if (categoryItems.length === 0) return null;
             return (
-              <div key={cat} className="bg-white rounded-lg shadow-sm border border-slate-200 overflow-hidden flex flex-col">
-                <div className="bg-slate-50 px-5 py-3 border-b border-slate-100">
-                  <h3 className="font-semibold text-slate-700 text-sm tracking-wide">{cat} CONFIG</h3> 
-                </div>
-                <div className="p-5 space-y-4 flex-1">
-                  {categoryItems.map((item) => (
-                    <div key={item.id}>
-                      <div className="flex justify-between items-center mb-1">
-                        <label className="text-sm text-slate-600 font-medium">{item.display_name}</label>
-                        <span className="text-[10px] text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded uppercase border border-slate-200">{item.unit}</span>
+              <div key={cat} className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 flex flex-col h-full">
+                <h3 className="font-bold text-slate-800 mb-4 border-b border-slate-100 pb-2">{cat}</h3> 
+                <div className="space-y-5 flex-1">
+                  {categoryItems.map((item) => {
+                    const isPercentage = item.unit === '%';
+                    return (
+                      <div key={item.id}>
+                        <div className="flex justify-between items-center mb-1.5">
+                          <label className="text-sm text-slate-600 font-medium">{item.display_name}</label>
+                          <span className="text-[10px] font-bold text-slate-500 bg-slate-100 px-2 py-0.5 rounded border border-slate-200">{item.unit}</span>
+                        </div>
+                        <div className="relative">
+                          {!isPercentage && (
+                            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 text-sm font-medium">Rp</span>
+                          )}
+                          <input
+                              type="text" inputMode="numeric"
+                              value={item.value_amount.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ".")}
+                              onChange={(e) => handleConfigChange(e, item.id)}
+                              className={`block w-full py-2.5 bg-white border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-slate-900 font-bold text-lg outline-none transition placeholder-slate-400 ${isPercentage ? 'pl-4 pr-8' : 'pl-9 pr-3'}`}
+                          />
+                          {isPercentage && (
+                             <span className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 text-sm font-bold">%</span>
+                          )}
+                        </div>
                       </div>
-                      <input
-                        type="text" inputMode="numeric"
-                        value={item.value_amount.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ".")}
-                        onChange={(e) => handleConfigChange(e, item.id)}
-                        className="block w-full px-3 py-2 border border-slate-300 rounded-md focus:ring-1 focus:ring-blue-500 focus:border-blue-500 text-slate-800 font-medium text-base outline-none transition"
-                      />
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
             );
           })}
-        </div>
+      </div>
 
-        {/* SECTION 2: MANAGEMENT BONUS */}
-        <div className="bg-white rounded-lg shadow-sm border border-slate-200 overflow-hidden">
-          <div className="bg-slate-50 px-6 py-4 border-b border-slate-100 flex justify-between items-center">
-            <h3 className="font-semibold text-slate-700 text-sm tracking-wide">DAFTAR BONUS & ADD-ONS</h3>
-          </div>
-          
-          <div className="p-4 md:p-6">
-            {/* Form Tambah Baru */}
-            <div className="flex flex-col md:flex-row gap-3 mb-6 p-4 bg-slate-50 rounded-lg border border-slate-200 items-end">
-                <div className="flex-1 w-full">
-                    <label className="text-xs font-medium text-slate-500 uppercase">Nama Item Baru</label>
-                    <input type="text" placeholder="Contoh: Sticker" value={newAddonName} onChange={(e) => setNewAddonName(e.target.value)} className="w-full mt-1 px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 text-slate-700 text-sm" />
-                </div>
-                <div className="w-full md:w-1/3">
-                    <label className="text-xs font-medium text-slate-500 uppercase">HPP (Rp)</label>
-                    <input type="number" placeholder="0" value={newAddonCost} onChange={(e) => setNewAddonCost(e.target.value)} className="w-full mt-1 px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 text-slate-700 text-sm" />
-                </div>
-                <button onClick={handleAddAddon} className="w-full md:w-auto bg-blue-600 text-white px-5 py-2 rounded-md text-sm font-medium hover:bg-blue-700 transition shadow-sm">
-                    + Tambah
+      {/* SECTION 2: ADD-ONS (HYBRID VIEW) */}
+      <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+          <div className="p-6 border-b border-slate-100 flex flex-col md:flex-row justify-between md:items-center gap-4">
+            <h3 className="font-bold text-slate-800 text-lg">Daftar Bonus & Add-ons</h3>
+            
+            {/* Form Input */}
+            <div className="flex flex-col md:flex-row gap-2 md:items-center w-full md:w-auto">
+                <input 
+                    type="text" 
+                    placeholder="Nama Item (mis: Sticker)" 
+                    value={newAddonName} 
+                    onChange={(e) => setNewAddonName(e.target.value)} 
+                    className="px-4 py-2 bg-white border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-slate-900 text-sm w-full md:w-48 placeholder-slate-400" 
+                />
+                <input 
+                    type="number" 
+                    placeholder="Harga (Rp)" 
+                    value={newAddonCost} 
+                    onChange={(e) => setNewAddonCost(e.target.value)} 
+                    className="px-4 py-2 bg-white border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-slate-900 text-sm w-full md:w-32 placeholder-slate-400" 
+                />
+                <button 
+                    onClick={handleAddAddon} 
+                    className="bg-slate-800 hover:bg-slate-900 text-white px-4 py-2 rounded-lg text-sm font-medium transition flex items-center justify-center gap-2"
+                >
+                    <Plus className="w-4 h-4" /> Tambah
                 </button>
             </div>
-
-            {/* --- TABLE VIEW (Desktop) --- */}
-            <div className="hidden md:block overflow-x-auto rounded-md border border-slate-200">
-                <table className="w-full text-left text-sm">
-                    <thead className="bg-slate-50 text-slate-500 border-b border-slate-200">
-                        <tr>
-                            <th className="py-3 px-4 font-medium text-xs uppercase tracking-wider w-32">Status</th>
-                            <th className="py-3 px-4 font-medium text-xs uppercase tracking-wider">Nama Item</th>
-                            <th className="py-3 px-4 font-medium text-xs uppercase tracking-wider">HPP (Rp)</th>
-                            <th className="py-3 px-4 text-center font-medium text-xs uppercase tracking-wider w-32">Aksi</th>
-                        </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100 bg-white">
-                        {addons.map((addon) => (
-                            <tr key={addon.id} className="hover:bg-slate-50 transition">
-                                {/* KOLOM STATUS (Teks Saja) */}
-                                <td className="py-3 px-4 align-middle">
-                                    {editingId === addon.id ? (
-                                        <select 
-                                            value={String(tempEditData.is_active)}
-                                            onChange={(e) => setTempEditData({...tempEditData, is_active: e.target.value === 'true'})}
-                                            className="w-full border border-blue-400 rounded px-2 py-1 text-sm text-slate-700 focus:outline-none bg-white"
-                                        >
-                                            <option value="true">Aktif</option>
-                                            <option value="false">Non-Aktif</option>
-                                        </select>
-                                    ) : (
-                                        <span className={`text-[10px] font-medium px-2.5 py-1 rounded-full border ${addon.is_active ? 'bg-green-50 text-green-700 border-green-200' : 'bg-slate-100 text-slate-500 border-slate-200'}`}>
-                                            {addon.is_active ? 'Aktif' : 'Non-Aktif'}
-                                        </span>
-                                    )}
-                                </td>
-                                
-                                {editingId === addon.id ? (
-                                    <>
-                                        <td className="py-3 px-4 align-middle">
-                                            <input type="text" className="w-full border border-blue-400 rounded px-2 py-1 text-sm text-slate-700" value={tempEditData.name} onChange={(e) => setTempEditData({...tempEditData, name: e.target.value})} />
-                                        </td>
-                                        <td className="py-3 px-4 align-middle">
-                                            <input type="number" className="w-full border border-blue-400 rounded px-2 py-1 text-sm text-slate-700" value={tempEditData.cost} onChange={(e) => setTempEditData({...tempEditData, cost: e.target.value})} />
-                                        </td>
-                                        <td className="py-3 px-4 align-middle flex justify-center gap-2">
-                                            <button onClick={() => handleUpdateAddon(addon.id)} className="bg-green-600 text-white px-3 py-1 rounded text-xs font-medium hover:bg-green-700">Simpan</button>
-                                            <button onClick={cancelEditing} className="bg-slate-200 text-slate-600 px-3 py-1 rounded text-xs font-medium hover:bg-slate-300">Batal</button>
-                                        </td>
-                                    </>
-                                ) : (
-                                    <>
-                                        <td className="py-3 px-4 text-slate-700 font-medium align-middle">{addon.name}</td>
-                                        <td className="py-3 px-4 text-slate-600 font-mono align-middle">Rp {Number(addon.cost).toLocaleString('id-ID')}</td>
-                                        
-                                        <td className="py-3 px-4 align-middle flex justify-center gap-2">
-                                            <button onClick={() => startEditing(addon)} className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition" title="Edit">
-                                                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/></svg>
-                                            </button>
-                                            <button onClick={() => handleDeleteAddon(addon.id)} className="p-2 text-red-500 hover:bg-red-50 rounded-lg transition" title="Hapus">
-                                                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" x2="10" y1="11" y2="17"/><line x1="14" x2="14" y1="11" y2="17"/></svg>
-                                            </button>
-                                        </td>
-                                    </>
-                                )}
-                            </tr>
-                        ))}
-                    </tbody>
-                </table>
-            </div>
-
-            {/* --- CARD LIST VIEW (Mobile) --- */}
-            <div className="md:hidden space-y-3">
-                {addons.map((addon) => (
-                    <div key={addon.id} className="border border-slate-200 rounded-lg p-4 bg-white shadow-sm flex flex-col gap-3">
-                        {editingId === addon.id ? (
-                            // MODE EDIT (MOBILE) - DIPERBAIKI
-                            <div className="space-y-3 bg-slate-50 p-3 rounded-md border border-slate-200">
-                                <h4 className="font-semibold text-slate-700 text-xs mb-2 uppercase">Edit Item</h4>
-                                <div>
-                                    <label className="text-xs text-slate-500 mb-1 block">Nama</label>
-                                    <input type="text" className="w-full border border-blue-400 rounded px-2 py-2 text-sm text-slate-700" value={tempEditData.name} onChange={(e) => setTempEditData({...tempEditData, name: e.target.value})} />
-                                </div>
-                                <div>
-                                    <label className="text-xs text-slate-500 mb-1 block">Harga (Rp)</label>
-                                    <input type="number" className="w-full border border-blue-400 rounded px-2 py-2 text-sm text-slate-700" value={tempEditData.cost} onChange={(e) => setTempEditData({...tempEditData, cost: e.target.value})} />
-                                </div>
-                                
-                                {/* BUTTONS FOR STATUS (Mobile) */}
-                                <div>
-                                    <label className="text-xs text-slate-500 mb-1 block">Status</label>
-                                    <div className="flex w-full border border-blue-400 rounded overflow-hidden">
-                                        <button 
-                                            onClick={() => setTempEditData({ ...tempEditData, is_active: true })}
-                                            className={`flex-1 py-2 text-sm font-medium transition ${tempEditData.is_active ? 'bg-blue-600 text-white' : 'bg-white text-slate-600 hover:bg-slate-50'}`}
-                                        >
-                                            Aktif
-                                        </button>
-                                        <div className="w-px bg-blue-400"></div>
-                                        <button 
-                                            onClick={() => setTempEditData({ ...tempEditData, is_active: false })}
-                                            className={`flex-1 py-2 text-sm font-medium transition ${!tempEditData.is_active ? 'bg-red-500 text-white' : 'bg-white text-slate-600 hover:bg-slate-50'}`}
-                                        >
-                                            Non-Aktif
-                                        </button>
-                                    </div>
-                                </div>
-
-                                <div className="flex gap-2 pt-2">
-                                    <button onClick={() => handleUpdateAddon(addon.id)} className="flex-1 bg-green-600 text-white py-2 rounded text-sm font-medium">Simpan</button>
-                                    <button onClick={cancelEditing} className="flex-1 bg-slate-200 text-slate-600 py-2 rounded text-sm font-medium">Batal</button>
-                                </div>
-                            </div>
-                        ) : (
-                            // MODE TAMPIL (MOBILE)
-                            <>
-                                <div className="flex justify-between items-start">
-                                    <div>
-                                        <h4 className="font-medium text-slate-800 text-base">{addon.name}</h4>
-                                        <p className="text-slate-500 text-sm font-mono mt-0.5">Rp {Number(addon.cost).toLocaleString('id-ID')}</p>
-                                    </div>
-                                    <span className={`text-[10px] font-medium px-2 py-0.5 rounded border ${addon.is_active ? 'bg-green-50 text-green-700 border-green-200' : 'bg-slate-50 text-slate-500 border-slate-200'}`}>
-                                        {addon.is_active ? 'Aktif' : 'Non-Aktif'}
-                                    </span>
-                                </div>
-                                <div className="flex gap-2 pt-2 border-t border-slate-100 mt-1">
-                                    <button onClick={() => startEditing(addon)} className="flex-1 flex items-center justify-center gap-2 py-2 text-sm text-blue-600 bg-blue-50 rounded border border-blue-100 font-medium">
-                                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/></svg>
-                                        Edit
-                                    </button>
-                                    <button onClick={() => handleDeleteAddon(addon.id)} className="flex-1 flex items-center justify-center gap-2 py-2 text-sm text-red-500 bg-red-50 rounded border border-red-100 font-medium">
-                                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" x2="10" y1="11" y2="17"/><line x1="14" x2="14" y1="11" y2="17"/></svg>
-                                        Hapus
-                                    </button>
-                                </div>
-                            </>
-                        )}
-                    </div>
-                ))}
-            </div>
-
           </div>
-        </div>
+          
+          {/* --- TAMPILAN DESKTOP (TABEL) --- */}
+          <div className="hidden md:block overflow-x-auto">
+            <table className="w-full text-left text-sm">
+                <thead className="bg-slate-50 text-slate-600 border-b border-slate-200">
+                    <tr>
+                        <th className="py-4 px-6 font-semibold w-32">Status</th>
+                        <th className="py-4 px-6 font-semibold">Nama Item</th>
+                        <th className="py-4 px-6 font-semibold">HPP (Rp)</th>
+                        <th className="py-4 px-6 text-center font-semibold w-32">Aksi</th>
+                    </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                    {addons.length === 0 ? (
+                        <tr>
+                            <td colSpan={4} className="py-8 text-center text-slate-400">Belum ada data add-ons.</td>
+                        </tr>
+                    ) : (
+                        addons.map((addon) => (
+                        <tr key={addon.id} className="hover:bg-slate-50 transition group">
+                            {/* STATUS COLUMN */}
+                            <td className="py-3 px-6">
+                                {editingId === addon.id ? (
+                                    // MODE EDIT: Tampilkan Switch
+                                    <StatusSwitch 
+                                        isActive={tempEditData.is_active} 
+                                        onToggle={() => setTempEditData({...tempEditData, is_active: !tempEditData.is_active})}
+                                    />
+                                ) : (
+                                    // MODE VIEW: Tampilkan Badge
+                                    <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-[10px] font-bold ${addon.is_active ? 'bg-green-100 text-green-700' : 'bg-slate-100 text-slate-500'}`}>
+                                        {addon.is_active ? 'AKTIF' : 'OFF'}
+                                    </span>
+                                )}
+                            </td>
+                            
+                            {/* EDIT MODE (DESKTOP) */}
+                            {editingId === addon.id ? (
+                                <>
+                                    <td className="py-3 px-6">
+                                        <input type="text" className="w-full border border-blue-300 rounded px-3 py-1.5 text-sm text-slate-900 bg-white focus:ring-2 focus:ring-blue-500 outline-none" value={tempEditData.name} onChange={(e) => setTempEditData({...tempEditData, name: e.target.value})} />
+                                    </td>
+                                    <td className="py-3 px-6">
+                                        <input type="number" className="w-full border border-blue-300 rounded px-3 py-1.5 text-sm text-slate-900 bg-white focus:ring-2 focus:ring-blue-500 outline-none" value={tempEditData.cost} onChange={(e) => setTempEditData({...tempEditData, cost: e.target.value})} />
+                                    </td>
+                                    <td className="py-3 px-6 flex justify-center gap-2">
+                                        <button onClick={() => handleUpdateAddon(addon.id)} className="p-2 bg-green-100 text-green-600 rounded-lg hover:bg-green-200"><Check className="w-4 h-4"/></button>
+                                        <button onClick={cancelEditing} className="p-2 bg-red-100 text-red-600 rounded-lg hover:bg-red-200"><X className="w-4 h-4"/></button>
+                                    </td>
+                                </>
+                            ) : (
+                                // VIEW MODE (DESKTOP)
+                                <>
+                                    <td className="py-3 px-6 font-medium text-slate-800">{addon.name}</td>
+                                    <td className="py-3 px-6 font-mono text-slate-700">Rp {Number(addon.cost).toLocaleString('id-ID')}</td>
+                                    <td className="py-3 px-6 flex justify-center gap-2">
+                                        <button onClick={() => startEditing(addon)} className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition" title="Edit"><Edit2 className="w-4 h-4"/></button>
+                                        <button onClick={() => handleDeleteAddon(addon.id)} className="p-2 text-red-500 hover:bg-red-50 rounded-lg transition" title="Hapus"><Trash2 className="w-4 h-4"/></button>
+                                    </td>
+                                </>
+                            )}
+                        </tr>
+                    )))}
+                </tbody>
+            </table>
+          </div>
+
+          {/* --- TAMPILAN MOBILE (CARD LIST) --- */}
+          <div className="md:hidden flex flex-col divide-y divide-slate-100">
+             {addons.length === 0 && (
+                <div className="p-6 text-center text-slate-400 text-sm">Belum ada data add-ons.</div>
+             )}
+             
+             {addons.map((addon) => (
+               <div key={addon.id} className="p-4 flex flex-col gap-3">
+                  {editingId === addon.id ? (
+                      // EDIT MODE (MOBILE)
+                      <div className="bg-slate-50 p-4 rounded-lg border border-blue-200 shadow-sm space-y-4">
+                          <div className="flex justify-between items-center border-b border-blue-100 pb-2">
+                              <span className="text-xs font-bold text-slate-500 uppercase">Status Item</span>
+                              {/* SWITCH TOGGLE DI MOBILE */}
+                              <div className="flex items-center gap-2">
+                                  <span className={`text-xs font-medium ${tempEditData.is_active ? 'text-green-600' : 'text-slate-400'}`}>
+                                      {tempEditData.is_active ? 'Aktif' : 'Non-Aktif'}
+                                  </span>
+                                  <StatusSwitch 
+                                      isActive={tempEditData.is_active} 
+                                      onToggle={() => setTempEditData({...tempEditData, is_active: !tempEditData.is_active})}
+                                  />
+                              </div>
+                          </div>
+                          
+                          <div>
+                            <label className="text-xs text-slate-400 mb-1 block">Nama Item</label>
+                            <input 
+                                type="text" 
+                                className="w-full border border-blue-300 rounded px-3 py-2 text-sm text-slate-900 bg-white font-medium" 
+                                value={tempEditData.name} 
+                                onChange={(e) => setTempEditData({...tempEditData, name: e.target.value})} 
+                            />
+                          </div>
+                          
+                          <div>
+                            <label className="text-xs text-slate-400 mb-1 block">Harga (Rp)</label>
+                            <input 
+                                type="number" 
+                                className="w-full border border-blue-300 rounded px-3 py-2 text-sm text-slate-900 bg-white font-medium" 
+                                value={tempEditData.cost} 
+                                onChange={(e) => setTempEditData({...tempEditData, cost: e.target.value})} 
+                            />
+                          </div>
+
+                          <div className="flex gap-2 pt-2">
+                              <button onClick={() => handleUpdateAddon(addon.id)} className="flex-1 bg-blue-600 text-white py-2 rounded-lg text-sm font-medium shadow-sm hover:bg-blue-700">Simpan</button>
+                              <button onClick={cancelEditing} className="flex-1 bg-slate-200 text-slate-600 py-2 rounded-lg text-sm font-medium hover:bg-slate-300">Batal</button>
+                          </div>
+                      </div>
+                  ) : (
+                      // VIEW MODE (MOBILE)
+                      <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-3">
+                              <div className={`p-2.5 rounded-xl ${addon.is_active ? 'bg-blue-50 text-blue-600' : 'bg-slate-100 text-slate-400'}`}>
+                                  {addon.is_active ? <Package className="w-5 h-5" /> : <X className="w-5 h-5" />}
+                              </div>
+                              <div>
+                                  <h4 className={`font-bold text-sm ${addon.is_active ? 'text-slate-800' : 'text-slate-400'}`}>{addon.name}</h4>
+                                  <p className="text-xs text-slate-500 font-mono mt-0.5">Rp {Number(addon.cost).toLocaleString('id-ID')}</p>
+                              </div>
+                          </div>
+                          
+                          <div className="flex items-center gap-1">
+                              <button 
+                                onClick={() => startEditing(addon)} 
+                                className="p-2 text-blue-600 bg-white border border-slate-100 shadow-sm hover:bg-blue-50 rounded-full transition"
+                              >
+                                <Edit2 className="w-4 h-4" />
+                              </button>
+                              <button 
+                                onClick={() => handleDeleteAddon(addon.id)} 
+                                className="p-2 text-red-500 bg-white border border-slate-100 shadow-sm hover:bg-red-50 rounded-full transition"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                          </div>
+                      </div>
+                  )}
+               </div>
+             ))}
+          </div>
+
       </div>
     </div>
   );

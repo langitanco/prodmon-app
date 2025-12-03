@@ -109,7 +109,7 @@ export default function LoginScreen() {
             </form>
 
             <div className="mt-8 text-center text-xs text-slate-500 bg-slate-50 p-3 rounded-lg border border-slate-100">
-              Pastikan akun Anda sudah terdaftar di Supabase Auth & Tabel Users.
+              Pastikan akun Anda sudah terdaftar untuk bisa melanjutkan.
             </div>
         </div>
       </div>
