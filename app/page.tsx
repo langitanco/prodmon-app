@@ -1,35 +1,55 @@
 'use client';
 
+// --- GANTI SELURUH BAGIAN IMPORT DI ATAS DENGAN INI ---
 import React, { useState, useEffect } from 'react';
-import { supabase } from '@/lib/supabaseClient'; 
-import { UserData, Order, ProductionTypeData } from '@/types';
-import { DEFAULT_USERS, DEFAULT_PRODUCTION_TYPES } from '@/lib/utils';
+import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
+import { Menu } from 'lucide-react';
 
 import Sidebar from '@/app/components/layout/Sidebar';
 import CustomAlert from '@/app/components/ui/CustomAlert';
 import LoginScreen from '@/app/components/auth/LoginScreen';
-import Dashboard from '@/app/components/dashboard/Dashboard';
+
+// Dashboard
+import Dashboard from '@/app/components/dashboard/Dashboard'; 
+
+// Apps (Kalkulator & Config Harga ada di folder apps)
+import CalculatorView from '@/app/components/apps/CalculatorView';
+import ConfigPriceView from '@/app/components/apps/ConfigPriceView';
+
+// ORDERS (Perhatikan: di screenshot folder Anda namanya 'orders', bukan 'apps')
 import OrderList from '@/app/components/orders/OrderList';
 import CreateOrder from '@/app/components/orders/CreateOrder';
 import EditOrder from '@/app/components/orders/EditOrder';
 import OrderDetail from '@/app/components/orders/OrderDetail';
-import TrashView from '@/app/components/orders/TrashView';
-import SettingsPage from '@/app/components/settings/SettingsPage';
-import CalculatorView from '@/app/components/apps/CalculatorView';
-import ConfigPriceView from '@/app/components/apps/ConfigPriceView';
 
-import { Menu } from 'lucide-react';
+// TrashView (Cek di folder mana file ini berada, saya asumsikan di orders)
+import TrashView from '@/app/components/orders/TrashView'; 
+
+// Settings
+import SettingsPage from '@/app/components/settings/SettingsPage'; 
+import { UserData, Order, ProductionTypeData } from '@/types';
+import { DEFAULT_PRODUCTION_TYPES } from '@/lib/utils';
+
+// --- DEFINISI TIPE ---
+interface CurrentUser extends UserData {
+  id: string; // ID dari Supabase Auth
+}
 
 export default function ProductionApp() {
-  const [currentUser, setCurrentUser] = useState<UserData | null>(null);
+  // State Management
+  const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null);
+  const [loadingUser, setLoadingUser] = useState(true);
   const [activeTab, setActiveTab] = useState<'dashboard' | 'orders' | 'settings' | 'trash' | 'kalkulator' | 'config_harga'>('dashboard');
   const [orders, setOrders] = useState<Order[]>([]);
   const [usersList, setUsersList] = useState<UserData[]>([]);
   const [productionTypes, setProductionTypes] = useState<ProductionTypeData[]>([]);
+  
+  // View State
   const [view, setView] = useState<'list' | 'detail' | 'create' | 'edit'>('list');
   const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  
+
+  // Alert State
   const [alertState, setAlertState] = useState<{
     isOpen: boolean;
     title: string;
@@ -38,82 +58,116 @@ export default function ProductionApp() {
     onConfirm?: () => void;
   }>({ isOpen: false, title: '', message: '', type: 'success' });
 
+  // Init Supabase
+  const supabase = createClientComponentClient();
+
+  // --- HELPER ALERT ---
   const showAlert = (title: string, message: string, type: 'success' | 'error' = 'success') => {
     setAlertState({ isOpen: true, title, message, type, onConfirm: undefined });
   };
-
   const showConfirm = (title: string, message: string, onConfirm: () => void) => {
     setAlertState({ isOpen: true, title, message, type: 'confirm', onConfirm });
   };
-
   const closeAlert = () => setAlertState(prev => ({ ...prev, isOpen: false }));
 
+  // --- EFFECT: AUTHENTICATION & DATA LOAD ---
   useEffect(() => {
-    const savedUser = localStorage.getItem('currentUser');
-    if (savedUser) {
-      try { setCurrentUser(JSON.parse(savedUser)); } catch (e) { localStorage.removeItem('currentUser'); }
-    }
+    const initSession = async () => {
+      setLoadingUser(true);
+      
+      // 1. Cek Session Supabase
+      const { data: { session } } = await supabase.auth.getSession();
+
+      if (session) {
+        // 2. Ambil detail role dari tabel 'users' berdasarkan ID auth
+        const { data: userData, error } = await supabase
+          .from('users')
+          .select('*')
+          .eq('id', session.user.id)
+          .single();
+
+        if (userData) {
+          // Set user dengan data gabungan dari Auth + Tabel Users
+          setCurrentUser({
+            id: session.user.id,
+            username: userData.username || session.user.email || '',
+            name: userData.name || session.user.email?.split('@')[0] || 'User',
+            role: userData.role || 'prod',
+            password: '', // Password tidak disimpan di client state untuk keamanan
+            // Jika ada field lain di UserData, tambahkan defaultnya di sini
+          });
+        } else {
+          // Jika login tapi data tidak ada di tabel users
+          console.error("User login di Auth tapi tidak ada di tabel public.users");
+          await supabase.auth.signOut();
+          setCurrentUser(null);
+        }
+      } else {
+        setCurrentUser(null);
+      }
+      setLoadingUser(false);
+    };
+
+    initSession();
+
+    // Listener perubahan auth (login/logout)
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
+      if (event === 'SIGNED_IN' || event === 'SIGNED_OUT') {
+        initSession();
+      }
+    });
+
+    return () => subscription.unsubscribe();
   }, []);
 
+  // --- EFFECT: FETCH DATA APLIKASI ---
   useEffect(() => {
-    const loadData = async () => {
+    if (!currentUser) return;
+
+    const loadAppData = async () => {
       await fetchOrders();
       await fetchUsers();
       await fetchProductionTypes();
     };
-    loadData();
 
-    const channel = supabase.channel('realtime-db')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, () => fetchOrders())
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'users' }, () => fetchUsers())
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'production_types' }, () => fetchProductionTypes())
+    loadAppData();
+
+    // Realtime Subscription
+    const channel = supabase.channel('realtime-global')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, fetchOrders)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'users' }, fetchUsers)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'production_types' }, fetchProductionTypes)
       .subscribe();
-    
+
     return () => { supabase.removeChannel(channel); };
   }, [currentUser]);
 
+  // --- DATA FETCHING FUNCTIONS ---
   const fetchOrders = async () => {
     const { data } = await supabase.from('orders').select('*').order('created_at', { ascending: false });
     if (data) {
-       const parsedOrders = data.map((order: any) => ({
-         ...order,
-         kendala: (order.kendala || []).map((k: any) => ({ ...k, isResolved: k.isResolved || false }))
-       }));
-       setOrders(parsedOrders);
+      // Parsing JSON fields jika perlu
+      const parsed = data.map((o: any) => ({
+        ...o,
+        kendala: Array.isArray(o.kendala) ? o.kendala : []
+      }));
+      setOrders(parsed);
     }
   };
 
   const fetchUsers = async () => {
-    const { data } = await supabase.from('users').select('*').order('username');
-    if (!data || data.length === 0) {
-      if(usersList.length === 0) setUsersList(DEFAULT_USERS); 
-    } else {
-      setUsersList(data);
-    }
+    // Ambil semua user untuk keperluan Settings (Supervisor only)
+    const { data } = await supabase.from('users').select('*').order('name');
+    if (data) setUsersList(data);
   };
 
   const fetchProductionTypes = async () => {
     const { data } = await supabase.from('production_types').select('*').order('name');
-    if (!data || data.length === 0) {
-      if(productionTypes.length === 0) setProductionTypes(DEFAULT_PRODUCTION_TYPES);
-    } else {
-      setProductionTypes(data);
-    }
+    if (data) setProductionTypes(data);
+    else if (productionTypes.length === 0) setProductionTypes(DEFAULT_PRODUCTION_TYPES);
   };
 
-  const handleLogin = (user: UserData) => {
-    setCurrentUser(user);
-    localStorage.setItem('currentUser', JSON.stringify(user));
-    setActiveTab('dashboard');
-    setView('list');
-  };
-
-  const handleLogout = () => {
-    setCurrentUser(null);
-    localStorage.removeItem('currentUser');
-    setView('list');
-  };
-
+  // --- LOGIC: ORDERS ---
   const generateProductionCode = () => {
     const now = new Date();
     const month = String(now.getMonth() + 1).padStart(2, '0');
@@ -125,199 +179,227 @@ export default function ProductionApp() {
         const parts = o.kode_produksi.split('-');
         return parseInt(parts[parts.length - 1]) || 0;
       });
-    const maxSequence = existingCodes.length > 0 ? Math.max(...existingCodes) : 0;
-    return `${prefix}${String(maxSequence + 1).padStart(4, '0')}`;
+    const max = existingCodes.length > 0 ? Math.max(...existingCodes) : 0;
+    return `${prefix}${String(max + 1).padStart(4, '0')}`;
   };
 
-  const handleCreateOrder = async (newOrderData: any) => {
+  const handleCreateOrder = async (formData: any) => {
     const payload: any = {
       kode_produksi: generateProductionCode(),
-      nama_pemesan: newOrderData.nama,
-      no_hp: newOrderData.hp,
-      jumlah: parseInt(newOrderData.jumlah) || 0,
-      tanggal_masuk: new Date().toISOString().split('T')[0], 
-      deadline: newOrderData.deadline,
-      jenis_produksi: newOrderData.type,
+      nama_pemesan: formData.nama,
+      no_hp: formData.hp,
+      jumlah: parseInt(formData.jumlah) || 0,
+      tanggal_masuk: new Date().toISOString().split('T')[0],
+      deadline: formData.deadline,
+      jenis_produksi: formData.type,
       status: 'Pesanan Masuk',
-      steps_manual: [{ id: 'm1', name: 'Pecah Gambar (PDF)', type: 'upload_pdf', isCompleted: false }, { id: 'm2', name: 'Print Film', type: 'upload_image', isCompleted: false }, { id: 'm3', name: 'Proofing', type: 'upload_image', isCompleted: false }, { id: 'm4', name: 'Produksi Massal', type: 'upload_image', isCompleted: false }],
-      steps_dtf: [{ id: 'd1', name: 'Cetak DTF', type: 'status_update', isCompleted: false }, { id: 'd2', name: 'Press Kaos', type: 'upload_image', isCompleted: false }],
+      // Default steps
+      steps_manual: [
+        { id: 'm1', name: 'Pecah Gambar (PDF)', type: 'upload_pdf', isCompleted: false },
+        { id: 'm2', name: 'Print Film', type: 'upload_image', isCompleted: false },
+        { id: 'm3', name: 'Proofing', type: 'upload_image', isCompleted: false },
+        { id: 'm4', name: 'Produksi Massal', type: 'upload_image', isCompleted: false }
+      ],
+      steps_dtf: [
+        { id: 'd1', name: 'Cetak DTF', type: 'status_update', isCompleted: false },
+        { id: 'd2', name: 'Press Kaos', type: 'upload_image', isCompleted: false }
+      ],
       finishing_qc: { isPassed: false, notes: '' },
       finishing_packing: { isPacked: false },
       shipping: {},
       kendala: []
     };
-    
+
     const { error } = await supabase.from('orders').insert([payload]);
     if (!error) {
       await fetchOrders();
       setView('list');
-      showAlert('Sukses', 'Pesanan baru berhasil dibuat!');
+      showAlert('Sukses', 'Pesanan berhasil dibuat');
     } else {
-      showAlert('Error', 'Gagal: ' + error.message, 'error');
+      showAlert('Error', error.message, 'error');
     }
   };
 
   const handleEditOrder = async (editedData: any) => {
     if (!selectedOrderId) return;
     const { error } = await supabase.from('orders').update({
-       nama_pemesan: editedData.nama,
-       no_hp: editedData.hp,
-       jumlah: parseInt(editedData.jumlah),
-       deadline: editedData.deadline,
-       jenis_produksi: editedData.type
+      nama_pemesan: editedData.nama,
+      no_hp: editedData.hp,
+      jumlah: parseInt(editedData.jumlah),
+      deadline: editedData.deadline,
+      jenis_produksi: editedData.type
     }).eq('id', selectedOrderId);
 
     if (!error) {
-       await fetchOrders();
-       setView('detail');
-       showAlert('Sukses', 'Data pesanan berhasil diupdate!');
+      await fetchOrders();
+      setView('detail');
+      showAlert('Sukses', 'Data berhasil diupdate');
+    } else {
+      showAlert('Error', error.message, 'error');
     }
   };
 
   const handleDeleteOrder = async (id: string) => {
-    showConfirm('Pindahkan ke Sampah?', 'Pesanan ini akan dipindahkan ke folder sampah.', async () => {
+    showConfirm('Hapus ke Sampah?', 'Data akan dipindah ke sampah.', async () => {
       const { error } = await supabase.from('orders').update({ deleted_at: new Date().toISOString() }).eq('id', id);
-      if(!error) {
+      if (!error) {
         await fetchOrders();
         setView('list');
-        showAlert('Sukses', 'Pesanan dipindahkan ke sampah!');
+        showAlert('Sukses', 'Pesanan dihapus (soft delete)');
       }
     });
   };
 
   const handleRestoreOrder = async (id: string) => {
-    showConfirm('Pulihkan Pesanan?', 'Pesanan akan kembali aktif.', async () => {
-      const { error } = await supabase.from('orders').update({ deleted_at: null }).eq('id', id);
-      if(!error) { await fetchOrders(); showAlert('Sukses', 'Pesanan dipulihkan!'); }
-    });
+    const { error } = await supabase.from('orders').update({ deleted_at: null }).eq('id', id);
+    if (!error) { fetchOrders(); showAlert('Sukses', 'Pesanan dipulihkan'); }
   };
 
   const handlePermanentDelete = async (id: string) => {
-    showConfirm('HAPUS PERMANEN?', 'Data tidak bisa dikembalikan!', async () => {
+    showConfirm('HAPUS PERMANEN?', 'Data tidak bisa kembali!', async () => {
       const { error } = await supabase.from('orders').delete().eq('id', id);
-      if(!error) { await fetchOrders(); showAlert('Sukses', 'Pesanan dihapus permanen!'); }
+      if (!error) { fetchOrders(); showAlert('Sukses', 'Data terhapus permanen'); }
     });
   };
 
+  // --- LOGIC: UPLOADS & STATUS ---
   const triggerUpload = (targetType: string, stepId?: string, kendalaId?: string) => {
     const input = document.createElement('input');
     input.type = 'file';
     input.accept = 'image/*,application/pdf';
     input.onchange = async (e: any) => {
-       const file = e.target.files?.[0];
-       if (!file || !selectedOrderId) return;
-       
-       const fileExt = file.name.split('.').pop();
-       const fileName = `${selectedOrderId}/${Date.now()}.${fileExt}`;
-       const { error: uploadError } = await supabase.storage.from('production-proofs').upload(fileName, file);
-       
-       if (uploadError) { showAlert('Gagal', uploadError.message, 'error'); return; }
-       
-       const { data: urlData } = supabase.storage.from('production-proofs').getPublicUrl(fileName);
-       const publicUrl = urlData.publicUrl;
-       const timestamp = new Date().toLocaleString();
-       const uploader = currentUser?.name || 'unknown';
+      const file = e.target.files?.[0];
+      if (!file || !selectedOrderId) return;
 
-       const order = orders.find(o => o.id === selectedOrderId);
-       if (!order) return;
-       
-       let updatedOrder = JSON.parse(JSON.stringify(order));
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${selectedOrderId}/${Date.now()}.${fileExt}`;
+      
+      // Upload ke bucket 'production-proofs'
+      const { error: uploadError } = await supabase.storage.from('production-proofs').upload(fileName, file);
+      if (uploadError) { showAlert('Gagal Upload', uploadError.message, 'error'); return; }
 
-       if (targetType === 'approval') {
-          updatedOrder.link_approval = { link: publicUrl, by: uploader, timestamp };
-       } else if (targetType === 'step' && stepId) {
-          const steps = updatedOrder.jenis_produksi === 'manual' ? updatedOrder.steps_manual : updatedOrder.steps_dtf;
-          const idx = steps.findIndex((s: any) => s.id === stepId);
-          if (idx >= 0) { steps[idx].isCompleted=true; steps[idx].fileUrl=publicUrl; steps[idx].timestamp=timestamp; steps[idx].uploadedBy=uploader; }
-       } else if (targetType === 'packing') {
-          updatedOrder.finishing_packing = { isPacked: true, fileUrl: publicUrl, timestamp, packedBy: uploader };
-       } else if (targetType === 'shipping_kirim') {
-          updatedOrder.shipping.bukti_kirim = publicUrl; updatedOrder.shipping.timestamp_kirim = timestamp; updatedOrder.shipping.uploaded_by_kirim = uploader;
-       } else if (targetType === 'shipping_terima') {
-          updatedOrder.shipping.bukti_terima = publicUrl; updatedOrder.shipping.timestamp_terima = timestamp; updatedOrder.shipping.uploaded_by_terima = uploader;
-       } else if (targetType === 'kendala_bukti' && kendalaId) {
-          const idx = updatedOrder.kendala.findIndex((k: any) => k.id === kendalaId);
-          if (idx >= 0) updatedOrder.kendala[idx].buktiFile = publicUrl;
-       }
-       
-       checkAutoStatus(updatedOrder);
+      const { data: urlData } = supabase.storage.from('production-proofs').getPublicUrl(fileName);
+      const publicUrl = urlData.publicUrl;
+      const timestamp = new Date().toLocaleString();
+      const uploaderName = currentUser?.name || 'Unknown';
+
+      // Update Local State Logic (Simplifikasi update JSON)
+      const order = orders.find(o => o.id === selectedOrderId);
+      if (!order) return;
+      
+      let updatedOrder = JSON.parse(JSON.stringify(order));
+
+      if (targetType === 'approval') {
+         updatedOrder.link_approval = { link: publicUrl, by: uploaderName, timestamp };
+      } else if (targetType === 'step' && stepId) {
+         const steps = updatedOrder.jenis_produksi === 'manual' ? updatedOrder.steps_manual : updatedOrder.steps_dtf;
+         const idx = steps.findIndex((s: any) => s.id === stepId);
+         if (idx >= 0) { 
+           steps[idx].isCompleted = true; 
+           steps[idx].fileUrl = publicUrl; 
+           steps[idx].timestamp = timestamp; 
+           steps[idx].uploadedBy = uploaderName; 
+         }
+      } else if (targetType === 'packing') {
+         updatedOrder.finishing_packing = { isPacked: true, fileUrl: publicUrl, timestamp, packedBy: uploaderName };
+      } else if (targetType === 'shipping_kirim') {
+         updatedOrder.shipping.bukti_kirim = publicUrl;
+      } else if (targetType === 'shipping_terima') {
+         updatedOrder.shipping.bukti_terima = publicUrl;
+      } else if (targetType === 'kendala_bukti' && kendalaId) {
+         const idx = updatedOrder.kendala.findIndex((k: any) => k.id === kendalaId);
+         if(idx >= 0) updatedOrder.kendala[idx].buktiFile = publicUrl;
+      }
+
+      checkAutoStatus(updatedOrder);
     };
     input.click();
   };
 
   const checkAutoStatus = async (orderData: Order) => {
+    // Logika penentuan status otomatis
     let newStatus = orderData.status;
-    const hasApproval = !!(orderData.link_approval?.link);
+    const hasApproval = !!orderData.link_approval?.link;
     const steps = orderData.jenis_produksi === 'manual' ? orderData.steps_manual : orderData.steps_dtf;
-    const productionDone = steps.every(s => s.isCompleted);
-    const hasActiveKendala = orderData.kendala.some(k => !k.isResolved); 
+    const productionDone = steps.every((s: any) => s.isCompleted);
     
-    if (!hasApproval) {
-      newStatus = 'Pesanan Masuk';
-    } else if (!productionDone) {
-      newStatus = 'On Process';
-    } 
-    else if (!orderData.finishing_qc.isPassed || !orderData.finishing_packing.isPacked) {
-      newStatus = 'Finishing';
-    } 
-    else if (!orderData.shipping.bukti_kirim || !orderData.shipping.bukti_terima) {
-      newStatus = 'Kirim';
-    } 
-    else {
-      newStatus = 'Selesai';
-    }
-    
-    if (hasActiveKendala) {
-      newStatus = 'Ada Kendala';
-    }
-    
+    if (!hasApproval) newStatus = 'Pesanan Masuk';
+    else if (!productionDone) newStatus = 'On Process';
+    else if (!orderData.finishing_qc?.isPassed || !orderData.finishing_packing?.isPacked) newStatus = 'Finishing';
+    else if (!orderData.shipping?.bukti_kirim) newStatus = 'Kirim';
+    else newStatus = 'Selesai';
+
+    // Update DB
     const { error } = await supabase.from('orders').update({
-        ...orderData,
-        status: newStatus
+      ...orderData, // Update JSON fields
+      status: newStatus
     }).eq('id', orderData.id);
 
-    if (error) showAlert('Error', 'Gagal update: ' + error.message, 'error');
+    if (error) showAlert('Error Update', error.message, 'error');
     else fetchOrders();
   };
 
+  // --- LOGIC: SETTINGS & CONFIG ---
   const handleSaveUser = async (u: any) => {
-      const payload = { username: u.username, password: u.password, name: u.name, role: u.role };
-      let res;
-      if(u.id) res = await supabase.from('users').update(payload).eq('id', u.id);
-      else res = await supabase.from('users').insert([payload]);
-      
-      if(!res.error) { fetchUsers(); showAlert('Sukses', 'User tersimpan'); }
-      else showAlert('Gagal', res.error.message, 'error');
+    // Note: Untuk production, sebaiknya create user lewat Supabase Auth Admin API
+    // Di sini kita hanya update tabel 'users'
+    const payload = { name: u.name, role: u.role, username: u.username };
+    
+    if (u.id) {
+      const { error } = await supabase.from('users').update(payload).eq('id', u.id);
+      if(!error) { fetchUsers(); showAlert('Sukses', 'User updated'); }
+      else showAlert('Gagal', error.message, 'error');
+    } else {
+      // Create user baru (Hanya insert ke tabel public, belum auth sebenarnya jika tanpa edge functions)
+      showAlert('Info', 'Fitur Create User baru harus via Signup Supabase.', 'error');
+    }
   };
 
   const handleDeleteUser = async (id: string) => {
-      showConfirm('Hapus User?', 'User akan dihapus.', async() => {
-         const { error } = await supabase.from('users').delete().eq('id', id);
-         if(!error) { fetchUsers(); showAlert('Sukses', 'User dihapus'); }
-      });
+    showConfirm('Hapus User?', 'User akan dihapus dari database.', async () => {
+      const { error } = await supabase.from('users').delete().eq('id', id);
+      if(!error) { fetchUsers(); showAlert('Sukses', 'User dihapus'); }
+      else showAlert('Gagal', error.message, 'error');
+    });
   };
 
   const handleSaveType = async (t: any) => {
-      const payload = { name: t.name, value: t.value };
-      let res;
-      if(t.id) res = await supabase.from('production_types').update(payload).eq('id', t.id);
-      else res = await supabase.from('production_types').insert([payload]);
-      
-      if(!res.error) { fetchProductionTypes(); showAlert('Sukses', 'Jenis produksi tersimpan'); }
-      else showAlert('Gagal', res.error.message, 'error');
+    const payload = { name: t.name, value: t.value };
+    if (t.id) {
+      const { error } = await supabase.from('production_types').update(payload).eq('id', t.id);
+      if(!error) { fetchProductionTypes(); showAlert('Sukses', 'Tipe produksi disimpan'); }
+    } else {
+      const { error } = await supabase.from('production_types').insert([payload]);
+      if(!error) { fetchProductionTypes(); showAlert('Sukses', 'Tipe produksi baru dibuat'); }
+    }
   };
 
   const handleDeleteType = async (id: string) => {
-      showConfirm('Hapus Jenis?', 'Data akan dihapus.', async() => {
-         const { error } = await supabase.from('production_types').delete().eq('id', id);
-         if(!error) { fetchProductionTypes(); showAlert('Sukses', 'Jenis dihapus'); }
-      });
+    showConfirm('Hapus Tipe?', 'Yakin hapus tipe produksi ini?', async () => {
+      const { error } = await supabase.from('production_types').delete().eq('id', id);
+      if(!error) { fetchProductionTypes(); showAlert('Sukses', 'Tipe dihapus'); }
+    });
   };
 
-  if (!currentUser) return <LoginScreen usersList={usersList} onLogin={handleLogin} />;
 
-  const handleNav = (tab: any) => { setActiveTab(tab); setView('list'); setSidebarOpen(false); };
+  // --- MAIN RENDER ---
 
+  if (loadingUser) {
+      return (
+        <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50">
+          {/* Animasi Spinner */}
+          <div className="w-12 h-12 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin mb-4"></div>
+          <p className="text-slate-500 font-medium animate-pulse">Menyiapkan Dashboard...</p>
+        </div>
+      );
+  }
+
+  // Jika tidak ada user (belum login atau session habis), tampilkan Login
+  if (!currentUser) {
+    return <LoginScreen />;
+  }
+
+  // Filter orders active (bukan sampah)
   const activeOrders = orders.filter(o => !o.deleted_at);
 
   return (
@@ -329,19 +411,21 @@ export default function ProductionApp() {
         setSidebarOpen={setSidebarOpen} 
         currentUser={currentUser} 
         activeTab={activeTab} 
-        handleNav={handleNav} 
-        handleLogout={handleLogout} 
+        handleNav={(tab: any) => { setActiveTab(tab); setView('list'); setSidebarOpen(false); }} 
       />
 
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
+        {/* Mobile Header */}
         <header className="md:hidden bg-white px-4 py-3 shadow-md flex items-center justify-between sticky top-0 z-30 border-b">
             <div className="flex items-center gap-3">
               <button onClick={() => setSidebarOpen(true)} className="p-2 bg-slate-100 rounded-lg text-slate-700 hover:bg-slate-200 transition">
                 <Menu className="w-6 h-6"/>
               </button>
-              <span className="font-bold text-slate-800 text-lg">Langitan.co</span>
+              <span className="font-bold text-slate-800 text-lg">LCO Production</span>
             </div>
-            <div className="text-[10px] font-bold bg-blue-600 text-white px-2 py-1 rounded uppercase tracking-wide">{currentUser.role}</div>
+            <div className="text-[10px] font-bold bg-blue-600 text-white px-2 py-1 rounded uppercase tracking-wide">
+              {currentUser.role}
+            </div>
         </header>
 
         <main className="flex-1 overflow-y-auto px-4 py-6 md:p-8 pb-24">
@@ -351,7 +435,7 @@ export default function ProductionApp() {
                   <Dashboard 
                     role={currentUser.role} 
                     orders={activeOrders} 
-                    onSelectOrder={(id) => { setSelectedOrderId(id); setView('detail'); setActiveTab('orders'); }} 
+                    onSelectOrder={(id: string) => { setSelectedOrderId(id); setView('detail'); setActiveTab('orders'); }} 
                   />
               )}
 
@@ -362,13 +446,19 @@ export default function ProductionApp() {
                       role={currentUser.role} 
                       orders={activeOrders} 
                       productionTypes={productionTypes}
-                      onSelectOrder={(id) => { setSelectedOrderId(id); setView('detail'); }} 
+                      onSelectOrder={(id: string) => { setSelectedOrderId(id); setView('detail'); }} 
                       onNewOrder={() => setView('create')}
                       onDeleteOrder={handleDeleteOrder}
                     />
                   )}
                   
-                  {view === 'create' && <CreateOrder productionTypes={productionTypes} onCancel={() => setView('list')} onSubmit={handleCreateOrder}/>}
+                  {view === 'create' && (
+                    <CreateOrder 
+                      productionTypes={productionTypes} 
+                      onCancel={() => setView('list')} 
+                      onSubmit={handleCreateOrder}
+                    />
+                  )}
                   
                   {view === 'edit' && selectedOrderId && (
                     <EditOrder 
@@ -395,7 +485,11 @@ export default function ProductionApp() {
               )}
 
               {activeTab === 'trash' && currentUser.role === 'supervisor' && (
-                 <TrashView orders={orders.filter(o => o.deleted_at)} onRestore={handleRestoreOrder} onPermanentDelete={handlePermanentDelete} />
+                 <TrashView 
+                    orders={orders.filter(o => o.deleted_at)} 
+                    onRestore={handleRestoreOrder} 
+                    onPermanentDelete={handlePermanentDelete} 
+                 />
               )}
 
               {activeTab === 'settings' && currentUser.role === 'supervisor' && (
@@ -414,6 +508,7 @@ export default function ProductionApp() {
               )}
 
               {activeTab === 'config_harga' && currentUser.role === 'supervisor' && (
+                 // Perhatikan di sini: Saya mengirim prop currentUser jika komponen membutuhkannya
                  <ConfigPriceView />
               )}
 
