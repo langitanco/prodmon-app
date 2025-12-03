@@ -104,7 +104,7 @@ export default function LoginScreen() {
                 disabled={loading}
                 className="w-full bg-blue-600 text-white py-3.5 rounded-xl font-bold text-lg hover:bg-blue-700 transition shadow-lg active:scale-[0.98] transform disabled:bg-slate-400 disabled:transform-none"
               >
-                {loading ? 'Memproses...' : 'Masuk Sistem'}
+                {loading ? 'Memproses...' : 'Login'}
               </button>
             </form>
 

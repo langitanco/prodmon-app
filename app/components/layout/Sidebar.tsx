@@ -9,26 +9,26 @@ import {
   LogOut, 
   X, 
   Calculator, 
-  DollarSign 
+  DollarSign,
+  Info // Import icon Info
 } from 'lucide-react';
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 import { useRouter } from 'next/navigation';
-// import { UserData } from '@/types'; // UserData mungkin tidak lagi diperlukan di sini
 
-// Definisikan tipe dasar UserData agar kode tidak error di bagian bawah
-interface UserData {
-    name: string;
-    role: string;
-}
+// Import UserData dari file types Anda
+import { UserData } from '@/types'; 
 
+
+// --- DEFINISI TIPE LOKAL UNTUK MEMPERBAIKI ERROR 'Cannot find name SidebarProps' ---
 interface SidebarProps {
   sidebarOpen: boolean;
   setSidebarOpen: (open: boolean) => void;
   currentUser: UserData;
-  activeTab: string;
+  // Gunakan union type yang lengkap, termasuk 'about'
+  activeTab: 'dashboard' | 'orders' | 'settings' | 'trash' | 'kalkulator' | 'config_harga' | 'about'; 
   handleNav: (tab: any) => void;
-  // handleLogout: () => void; <--- Fungsi ini TIDAK diperlukan lagi
 }
+
 
 export default function Sidebar({ sidebarOpen, setSidebarOpen, currentUser, activeTab, handleNav }: SidebarProps) {
   
@@ -38,12 +38,11 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen, currentUser, acti
   const isSupervisor = currentUser.role === 'supervisor';
   const isAdmin = currentUser.role === 'admin';
 
-  // FUNGSI LOGOUT BARU
+  // FUNGSI LOGOUT
   const handleLogout = async () => {
     await supabase.auth.signOut();
-    // Setelah Logout, refresh dan redirect ke halaman login
     router.refresh(); 
-    router.push('/'); // Asumsi redirect ke halaman root atau login
+    router.push('/'); 
   };
 
   return (
@@ -76,7 +75,7 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen, currentUser, acti
               SuperApp
             </p>
             <div className="inline-block bg-slate-800 text-slate-400 text-[10px] px-1.5 py-0.5 rounded mt-1.5 font-mono border border-slate-700">
-              V.5.1
+              V.5.5
             </div>
           </div>
 
@@ -109,21 +108,12 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen, currentUser, acti
           </button>
 
           {isSupervisor && (
-            <>
-              <button 
+            <button 
                 onClick={() => handleNav('trash')}
                 className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-xl transition font-medium ${activeTab === 'trash' ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/50' : 'text-slate-400 hover:bg-slate-800 hover:text-white'}`}
-              >
+            >
                 <Trash2 className="w-5 h-5"/> Sampah
-              </button>
-              
-              <button 
-                onClick={() => handleNav('settings')}
-                className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-xl transition font-medium ${activeTab === 'settings' ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/50' : 'text-slate-400 hover:bg-slate-800 hover:text-white'}`}
-              >
-                <Settings className="w-5 h-5"/> User & Akses
-              </button>
-            </>
+            </button>
           )}
 
           {(isSupervisor || isAdmin) && (
@@ -147,6 +137,27 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen, currentUser, acti
               )}
             </div>
           )}
+          
+          {/* SETTINGS & ABOUT DI BAGIAN BAWAH */}
+          <div className="pt-4 mt-4 border-t border-slate-700">
+              <p className="px-4 text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-2">Sistem</p>
+
+              {isSupervisor && (
+                  <button 
+                    onClick={() => handleNav('settings')}
+                    className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition font-medium text-left ${activeTab === 'settings' ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/50' : 'text-slate-400 hover:bg-slate-800 hover:text-white'}`}
+                  >
+                    <Settings className="w-5 h-5"/> User & Akses
+                  </button>
+              )}
+              
+              <button 
+                onClick={() => handleNav('about')}
+                className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition font-medium text-left ${activeTab === 'about' ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/50' : 'text-slate-400 hover:bg-slate-800 hover:text-white'}`}
+              >
+                <Info className="w-5 h-5"/> Tentang Aplikasi
+              </button>
+          </div>
 
         </nav>
 

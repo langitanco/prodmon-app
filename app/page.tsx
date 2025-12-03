@@ -1,10 +1,10 @@
 'use client';
 
-// --- GANTI SELURUH BAGIAN IMPORT DI ATAS DENGAN INI ---
 import React, { useState, useEffect } from 'react';
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 import { Menu } from 'lucide-react';
 
+// Layout & UI
 import Sidebar from '@/app/components/layout/Sidebar';
 import CustomAlert from '@/app/components/ui/CustomAlert';
 import LoginScreen from '@/app/components/auth/LoginScreen';
@@ -12,34 +12,48 @@ import LoginScreen from '@/app/components/auth/LoginScreen';
 // Dashboard
 import Dashboard from '@/app/components/dashboard/Dashboard'; 
 
-// Apps (Kalkulator & Config Harga ada di folder apps)
+// Apps & Config
 import CalculatorView from '@/app/components/apps/CalculatorView';
 import ConfigPriceView from '@/app/components/apps/ConfigPriceView';
+import AboutView from '@/app/components/misc/AboutView'; // <<< KOMPONEN BARU
 
-// ORDERS (Perhatikan: di screenshot folder Anda namanya 'orders', bukan 'apps')
+// ORDERS 
 import OrderList from '@/app/components/orders/OrderList';
 import CreateOrder from '@/app/components/orders/CreateOrder';
 import EditOrder from '@/app/components/orders/EditOrder';
 import OrderDetail from '@/app/components/orders/OrderDetail';
-
-// TrashView (Cek di folder mana file ini berada, saya asumsikan di orders)
 import TrashView from '@/app/components/orders/TrashView'; 
 
 // Settings
 import SettingsPage from '@/app/components/settings/SettingsPage'; 
+
+// Types & Helpers
 import { UserData, Order, ProductionTypeData } from '@/types';
 import { DEFAULT_PRODUCTION_TYPES } from '@/lib/utils';
 
-// --- DEFINISI TIPE ---
+// --- DEFINISI TIPE UNTUK KOMPONEN SIDEBAR ---
+// Ini memperbaiki error 'Cannot find name SidebarProps' di file sidebar.tsx
+
 interface CurrentUser extends UserData {
   id: string; // ID dari Supabase Auth
 }
+
+interface SidebarProps {
+  sidebarOpen: boolean;
+  setSidebarOpen: (open: boolean) => void;
+  currentUser: UserData;
+  // Tambahkan 'about' di tipe activeTab
+  activeTab: 'dashboard' | 'orders' | 'settings' | 'trash' | 'kalkulator' | 'config_harga' | 'about'; 
+  handleNav: (tab: any) => void;
+}
+// ------------------------------------------
 
 export default function ProductionApp() {
   // State Management
   const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null);
   const [loadingUser, setLoadingUser] = useState(true);
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'orders' | 'settings' | 'trash' | 'kalkulator' | 'config_harga'>('dashboard');
+  // Tambahkan 'about' ke tipe activeTab
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'orders' | 'settings' | 'trash' | 'kalkulator' | 'config_harga' | 'about'>('dashboard');
   const [orders, setOrders] = useState<Order[]>([]);
   const [usersList, setUsersList] = useState<UserData[]>([]);
   const [productionTypes, setProductionTypes] = useState<ProductionTypeData[]>([]);
@@ -75,11 +89,9 @@ export default function ProductionApp() {
     const initSession = async () => {
       setLoadingUser(true);
       
-      // 1. Cek Session Supabase
       const { data: { session } } = await supabase.auth.getSession();
 
       if (session) {
-        // 2. Ambil detail role dari tabel 'users' berdasarkan ID auth
         const { data: userData, error } = await supabase
           .from('users')
           .select('*')
@@ -87,17 +99,14 @@ export default function ProductionApp() {
           .single();
 
         if (userData) {
-          // Set user dengan data gabungan dari Auth + Tabel Users
           setCurrentUser({
             id: session.user.id,
             username: userData.username || session.user.email || '',
             name: userData.name || session.user.email?.split('@')[0] || 'User',
             role: userData.role || 'prod',
-            password: '', // Password tidak disimpan di client state untuk keamanan
-            // Jika ada field lain di UserData, tambahkan defaultnya di sini
+            password: '',
           });
         } else {
-          // Jika login tapi data tidak ada di tabel users
           console.error("User login di Auth tapi tidak ada di tabel public.users");
           await supabase.auth.signOut();
           setCurrentUser(null);
@@ -110,7 +119,6 @@ export default function ProductionApp() {
 
     initSession();
 
-    // Listener perubahan auth (login/logout)
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
       if (event === 'SIGNED_IN' || event === 'SIGNED_OUT') {
         initSession();
@@ -142,11 +150,10 @@ export default function ProductionApp() {
     return () => { supabase.removeChannel(channel); };
   }, [currentUser]);
 
-  // --- DATA FETCHING FUNCTIONS ---
+  // --- DATA FETCHING FUNCTIONS (tetap) ---
   const fetchOrders = async () => {
     const { data } = await supabase.from('orders').select('*').order('created_at', { ascending: false });
     if (data) {
-      // Parsing JSON fields jika perlu
       const parsed = data.map((o: any) => ({
         ...o,
         kendala: Array.isArray(o.kendala) ? o.kendala : []
@@ -156,7 +163,6 @@ export default function ProductionApp() {
   };
 
   const fetchUsers = async () => {
-    // Ambil semua user untuk keperluan Settings (Supervisor only)
     const { data } = await supabase.from('users').select('*').order('name');
     if (data) setUsersList(data);
   };
@@ -167,7 +173,7 @@ export default function ProductionApp() {
     else if (productionTypes.length === 0) setProductionTypes(DEFAULT_PRODUCTION_TYPES);
   };
 
-  // --- LOGIC: ORDERS ---
+  // --- LOGIC: ORDERS (tetap) ---
   const generateProductionCode = () => {
     const now = new Date();
     const month = String(now.getMonth() + 1).padStart(2, '0');
@@ -262,7 +268,7 @@ export default function ProductionApp() {
     });
   };
 
-  // --- LOGIC: UPLOADS & STATUS ---
+  // --- LOGIC: UPLOADS & STATUS (tetap) ---
   const triggerUpload = (targetType: string, stepId?: string, kendalaId?: string) => {
     const input = document.createElement('input');
     input.type = 'file';
@@ -274,7 +280,6 @@ export default function ProductionApp() {
       const fileExt = file.name.split('.').pop();
       const fileName = `${selectedOrderId}/${Date.now()}.${fileExt}`;
       
-      // Upload ke bucket 'production-proofs'
       const { error: uploadError } = await supabase.storage.from('production-proofs').upload(fileName, file);
       if (uploadError) { showAlert('Gagal Upload', uploadError.message, 'error'); return; }
 
@@ -283,7 +288,6 @@ export default function ProductionApp() {
       const timestamp = new Date().toLocaleString();
       const uploaderName = currentUser?.name || 'Unknown';
 
-      // Update Local State Logic (Simplifikasi update JSON)
       const order = orders.find(o => o.id === selectedOrderId);
       if (!order) return;
       
@@ -317,21 +321,23 @@ export default function ProductionApp() {
   };
 
   const checkAutoStatus = async (orderData: Order) => {
-    // Logika penentuan status otomatis
     let newStatus = orderData.status;
     const hasApproval = !!orderData.link_approval?.link;
     const steps = orderData.jenis_produksi === 'manual' ? orderData.steps_manual : orderData.steps_dtf;
     const productionDone = steps.every((s: any) => s.isCompleted);
     
-    if (!hasApproval) newStatus = 'Pesanan Masuk';
-    else if (!productionDone) newStatus = 'On Process';
-    else if (!orderData.finishing_qc?.isPassed || !orderData.finishing_packing?.isPacked) newStatus = 'Finishing';
-    else if (!orderData.shipping?.bukti_kirim) newStatus = 'Kirim';
-    else newStatus = 'Selesai';
+    // Khusus untuk status 'Ada Kendala', status utama tidak boleh di-override
+    if (orderData.status !== 'Ada Kendala') {
+      if (!hasApproval) newStatus = 'Pesanan Masuk';
+      else if (!productionDone) newStatus = 'On Process';
+      else if (!orderData.finishing_qc?.isPassed || !orderData.finishing_packing?.isPacked) newStatus = 'Finishing';
+      else if (!orderData.shipping?.bukti_kirim) newStatus = 'Kirim';
+      else newStatus = 'Selesai';
+    }
 
-    // Update DB
+
     const { error } = await supabase.from('orders').update({
-      ...orderData, // Update JSON fields
+      ...orderData,
       status: newStatus
     }).eq('id', orderData.id);
 
@@ -339,10 +345,8 @@ export default function ProductionApp() {
     else fetchOrders();
   };
 
-  // --- LOGIC: SETTINGS & CONFIG ---
+  // --- LOGIC: SETTINGS & CONFIG (tetap) ---
   const handleSaveUser = async (u: any) => {
-    // Note: Untuk production, sebaiknya create user lewat Supabase Auth Admin API
-    // Di sini kita hanya update tabel 'users'
     const payload = { name: u.name, role: u.role, username: u.username };
     
     if (u.id) {
@@ -350,7 +354,6 @@ export default function ProductionApp() {
       if(!error) { fetchUsers(); showAlert('Sukses', 'User updated'); }
       else showAlert('Gagal', error.message, 'error');
     } else {
-      // Create user baru (Hanya insert ke tabel public, belum auth sebenarnya jika tanpa edge functions)
       showAlert('Info', 'Fitur Create User baru harus via Signup Supabase.', 'error');
     }
   };
@@ -394,12 +397,10 @@ export default function ProductionApp() {
       );
   }
 
-  // Jika tidak ada user (belum login atau session habis), tampilkan Login
   if (!currentUser) {
     return <LoginScreen />;
   }
 
-  // Filter orders active (bukan sampah)
   const activeOrders = orders.filter(o => !o.deleted_at);
 
   return (
@@ -411,6 +412,7 @@ export default function ProductionApp() {
         setSidebarOpen={setSidebarOpen} 
         currentUser={currentUser} 
         activeTab={activeTab} 
+        // @ts-ignore - Karena SidebarProps didefinisikan di sini
         handleNav={(tab: any) => { setActiveTab(tab); setView('list'); setSidebarOpen(false); }} 
       />
 
@@ -508,8 +510,12 @@ export default function ProductionApp() {
               )}
 
               {activeTab === 'config_harga' && currentUser.role === 'supervisor' && (
-                 // Perhatikan di sini: Saya mengirim prop currentUser jika komponen membutuhkannya
                  <ConfigPriceView />
+              )}
+              
+              {/* Tambahan Tampilan About */}
+              {activeTab === 'about' && (
+                 <AboutView />
               )}
 
            </div>
