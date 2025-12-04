@@ -1,13 +1,14 @@
 'use client';
 
-import React, { useMemo } from 'react';
+import React, { useMemo, useRef, useState } from 'react';
 import { Order } from '@/types';
 import { 
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, 
   PieChart, Pie, Cell, Legend 
 } from 'recharts';
-import { TrendingUp, PieChart as PieIcon, AlertCircle, CheckCircle2, Package, AlertTriangle } from 'lucide-react'; 
+import { TrendingUp, PieChart as PieIcon, AlertCircle, CheckCircle2, Package, AlertTriangle, Share2, Loader2 } from 'lucide-react'; 
 import { getDeadlineStatus } from '@/lib/utils';
+import { toPng } from 'html-to-image'; // Library baru pengganti html2canvas
 
 interface DashboardProps {
   role: string;
@@ -25,7 +26,6 @@ export default function Dashboard({ role, orders, onSelectOrder }: DashboardProp
   const monthlyData = useMemo(() => {
     const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
     
-    // Fix: Definisi Tipe Data Array Secara Eksplisit
     const last6Months: { name: string; monthIndex: number; year: number; total: number; pcs: number }[] = [];
     
     for (let i = 5; i >= 0; i--) {
@@ -85,9 +85,8 @@ export default function Dashboard({ role, orders, onSelectOrder }: DashboardProp
             <p className="text-slate-500 text-xs md:text-sm">Ringkasan performa dan analitik produksi.</p>
         </div>
         
-        {/* TAMPILAN STATUS (Telat / Urgent / Kendala) */}
+        {/* TAMPILAN STATUS */}
         <div className="flex w-full md:w-auto gap-2 overflow-x-auto pb-2 md:pb-0 no-scrollbar">
-            {/* BADGE KENDALA */}
             {stats.trouble > 0 && (
                 <div className="flex-1 md:flex-none justify-center bg-purple-50 text-purple-700 px-3 py-2 rounded-lg text-xs font-bold border border-purple-100 flex items-center gap-1.5 shadow-sm md:shadow-none min-w-[100px] animate-pulse">
                     <AlertTriangle className="w-3.5 h-3.5" /> {stats.trouble} Kendala
@@ -189,15 +188,13 @@ export default function Dashboard({ role, orders, onSelectOrder }: DashboardProp
                     return deadlineStatus === 'overdue' || deadlineStatus === 'warning' || hasUnresolvedKendala;
                 })
                 .sort((a, b) => {
-                    // LOGIKA SORTING PRIORITAS: Unresolved Kendala > Telat > Urgent
+                    // LOGIKA SORTING PRIORITAS
                     const aHasUnresolvedKendala = a.kendala && a.kendala.some(k => !k.isResolved);
                     const bHasUnresolvedKendala = b.kendala && b.kendala.some(k => !k.isResolved);
                     
-                    // 1. Kendala selalu di atas
                     if (aHasUnresolvedKendala && !bHasUnresolvedKendala) return -1;
                     if (!aHasUnresolvedKendala && bHasUnresolvedKendala) return 1;
 
-                    // 2. Jika status Kendala sama (sama-sama ada/tidak ada), urutkan berdasarkan Deadline
                     const aDeadline = getDeadlineStatus(a.deadline, a.status);
                     const bDeadline = getDeadlineStatus(b.deadline, b.status);
 
@@ -207,87 +204,10 @@ export default function Dashboard({ role, orders, onSelectOrder }: DashboardProp
                     return 0; 
                 })
                 .slice(0, 5) 
-                .map(o => {
-                 const deadlineStatus = getDeadlineStatus(o.deadline, o.status);
-                 
-                 // Ambil catatan kendala yang BELUM SELESAI (yang paling baru)
-                 const unresolvedKendala = o.kendala 
-                    ? o.kendala.filter(k => !k.isResolved).sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
-                    : [];
-                 const latestKendalaNote = unresolvedKendala.length > 0 ? unresolvedKendala[0].notes : null;
-
-                 const isOverdue = deadlineStatus === 'overdue';
-                 const hasKendala = !!latestKendalaNote;
-
-                 // Tentukan PRIMARY status (untuk badge)
-                 let badgeClass = '';
-                 let badgeLabel = '';
-                 let indicatorColor = '';
-
-                 // PRIORITAS 1: KENDALA
-                 if (hasKendala) {
-                    badgeClass = 'bg-purple-100 text-purple-700 border-purple-200';
-                    badgeLabel = 'KENDALA';
-                    indicatorColor = 'bg-purple-600';
-                 } 
-                 // PRIORITAS 2: TELAT
-                 else if (isOverdue) {
-                    badgeClass = 'bg-red-50 text-red-600 border-red-100';
-                    badgeLabel = 'TELAT';
-                    indicatorColor = 'bg-red-500';
-                 } 
-                 // PRIORITAS 3: URGENT
-                 else {
-                    badgeClass = 'bg-orange-50 text-orange-600 border-orange-100';
-                    badgeLabel = 'URGENT';
-                    indicatorColor = 'bg-orange-400';
-                 }
-
-
-                 return (
-                 <div key={o.id} className="p-3 md:p-4 flex items-center justify-between hover:bg-slate-50 transition cursor-pointer" onClick={() => onSelectOrder(o.id)}>
-                    <div className="flex items-center gap-3">
-                        {/* Indicator Bar */}
-                        <div className={`w-1.5 h-10 md:w-2 md:h-12 rounded-full ${indicatorColor}`}></div>
-                        
-                        <div>
-                            <div className="flex items-center gap-2">
-                                <p className="font-bold text-slate-800 text-xs md:text-sm line-clamp-1">{o.nama_pemesan}</p>
-                                {/* Icon muncul jika ada Kendala */}
-                                {hasKendala && <AlertTriangle className="w-3 h-3 text-purple-600 animate-pulse" />}
-                            </div>
-                            
-                            {/* NEW: Tampilkan Catatan Kendala atau Kode Produksi */}
-                            {latestKendalaNote ? (
-                                <p className="text-[10px] md:text-xs text-red-500 font-semibold line-clamp-1">
-                                    Kendala: {latestKendalaNote}
-                                </p>
-                            ) : (
-                                <p className="text-[10px] md:text-xs text-slate-500 font-mono">{o.kode_produksi}</p>
-                            )}
-                        </div>
-                    </div>
-                    
-                    {/* AREA BADGE (Dual Status Fix) */}
-                    <div className="text-right flex flex-col items-end">
-                        <div className="flex gap-1.5 justify-end">
-                            {/* PRIMARY BADGE: KENDALA/TELAT/URGENT */}
-                            <span className={`text-[10px] md:text-xs font-bold px-1.5 py-0.5 md:px-2 md:py-1 rounded border ${badgeClass}`}>
-                                {badgeLabel}
-                            </span>
-                            
-                            {/* SECONDARY BADGE: +TELAT (Hanya tampil jika Primary=KENDALA TAPI ordernya OVERDUE) */}
-                            {hasKendala && isOverdue && (
-                                <span className="text-[10px] md:text-xs font-bold px-1.5 py-0.5 md:px-2 md:py-1 rounded border bg-red-50 text-red-600 border-red-100">
-                                    +TELAT
-                                </span>
-                            )}
-                        </div>
-                        <p className="text-[9px] md:text-[10px] text-slate-400 mt-0.5 md:mt-1">{new Date(o.deadline).toLocaleDateString('id-ID')}</p>
-                    </div>
-                 </div>
-                 );
-             })}
+                .map(o => (
+                    // MENGGUNAKAN COMPONENT ActionRow UNTUK TIAP BARIS
+                    <ActionRow key={o.id} order={o} onSelectOrder={onSelectOrder} />
+                ))}
              
              {orders.filter(o => ['overdue', 'warning'].includes(getDeadlineStatus(o.deadline, o.status)) || (o.kendala && o.kendala.some(k => !k.isResolved))).length === 0 && (
                  <div className="p-6 md:p-8 text-center flex flex-col items-center text-slate-400">
@@ -302,7 +222,125 @@ export default function Dashboard({ role, orders, onSelectOrder }: DashboardProp
   );
 }
 
-// ... (Komponen helper StatCard dan PieChartIcon tetap sama di bawah)
+// ==========================================
+// SUB-COMPONENT: ACTION ROW (FIX WRAPPING TEXT)
+// ==========================================
+function ActionRow({ order, onSelectOrder }: { order: Order, onSelectOrder: (id: string) => void }) {
+    const ticketRef = useRef<HTMLDivElement>(null);
+    const [isSharing, setIsSharing] = useState(false);
+
+    // --- Logika Penentuan Status Badge ---
+    const deadlineStatus = getDeadlineStatus(order.deadline, order.status);
+    const unresolvedKendala = order.kendala 
+        ? order.kendala.filter(k => !k.isResolved).sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
+        : [];
+    const latestKendalaNote = unresolvedKendala.length > 0 ? unresolvedKendala[0].notes : null;
+
+    let badgeClass = '';
+    let badgeLabel = '';
+    let indicatorColor = '';
+    
+    if (latestKendalaNote) {
+        badgeClass = 'bg-purple-100 text-purple-700 border-purple-200';
+        badgeLabel = 'KENDALA';
+        indicatorColor = 'bg-purple-600';
+    } else if (deadlineStatus === 'overdue') {
+        badgeClass = 'bg-red-50 text-red-600 border-red-100';
+        badgeLabel = 'TELAT';
+        indicatorColor = 'bg-red-500';
+    } else {
+        badgeClass = 'bg-orange-50 text-orange-600 border-orange-100';
+        badgeLabel = 'URGENT';
+        indicatorColor = 'bg-orange-400';
+    }
+
+    // --- Logika Share ---
+    const handleShare = async (e: React.MouseEvent) => {
+        e.stopPropagation(); 
+        if (!ticketRef.current) return;
+        
+        setIsSharing(true);
+        try {
+            const dataUrl = await toPng(ticketRef.current, { 
+                cacheBust: true, 
+                backgroundColor: '#ffffff', 
+                pixelRatio: 2 
+            });
+
+            const blob = await (await fetch(dataUrl)).blob();
+            const file = new File([blob], `kendala-${order.kode_produksi}.png`, { type: 'image/png' });
+
+            if (navigator.share) {
+                await navigator.share({
+                    title: 'Info Produksi',
+                    text: `Cek kendala pada: ${order.nama_pemesan} (${order.kode_produksi})`,
+                    files: [file],
+                });
+            } else {
+                const link = document.createElement('a');
+                link.href = dataUrl;
+                link.download = `kendala-${order.kode_produksi}.png`;
+                link.click();
+            }
+        } catch (err) {
+            console.error('Gagal membuat gambar:', err);
+            // alert('Gagal membagikan gambar.'); // Optional
+        } finally {
+            setIsSharing(false);
+        }
+    };
+
+    return (
+        <div 
+            className="group p-3 md:p-4 flex items-center justify-between hover:bg-slate-50 transition cursor-pointer relative" 
+            onClick={() => onSelectOrder(order.id)}
+        >
+            {/* AREA TIKET YANG AKAN DI-SCREENSHOT */}
+            <div 
+                ref={ticketRef} 
+                className="flex flex-1 items-center gap-3 bg-white pr-4 py-2 rounded-md"
+            >
+                {/* Indicator Bar */}
+                <div className={`w-1.5 h-10 md:w-2 md:h-12 rounded-full ${indicatorColor} flex-shrink-0`}></div>
+                
+                <div className="flex-1 min-w-0"> {/* min-w-0 penting agar text wrapping berfungsi normal di dalam flex */}
+                    <div className="flex items-center gap-2">
+                        <p className="font-bold text-slate-800 text-xs md:text-sm line-clamp-1">{order.nama_pemesan}</p>
+                        {latestKendalaNote && <AlertTriangle className="w-3 h-3 text-purple-600 flex-shrink-0" />}
+                    </div>
+                    
+                    {latestKendalaNote ? (
+                        /* PERUBAHAN DI SINI: Saya hapus 'line-clamp-1' */
+                        <p className="text-[10px] md:text-xs text-red-500 font-semibold mt-0.5 leading-relaxed">
+                            Kendala: {latestKendalaNote}
+                        </p>
+                    ) : (
+                        <p className="text-[10px] md:text-xs text-slate-500 font-mono mt-0.5">{order.kode_produksi}</p>
+                    )}
+                </div>
+
+                <div className="text-right pl-2 flex-shrink-0">
+                    <span className={`text-[10px] md:text-xs font-bold px-1.5 py-0.5 md:px-2 md:py-1 rounded border ${badgeClass}`}>
+                        {badgeLabel}
+                    </span>
+                    <p className="text-[9px] md:text-[10px] text-slate-400 mt-1">{new Date(order.deadline).toLocaleDateString('id-ID')}</p>
+                </div>
+            </div>
+
+            {/* TOMBOL SHARE */}
+            <button 
+                onClick={handleShare}
+                disabled={isSharing}
+                className="ml-2 p-2 text-slate-300 hover:text-blue-600 hover:bg-blue-50 rounded-full transition-all flex-shrink-0"
+                title="Bagikan Bukti ke WA"
+            >
+                {isSharing ? <Loader2 className="w-5 h-5 animate-spin" /> : <Share2 className="w-5 h-5" />}
+            </button>
+        </div>
+    );
+}
+
+// ... (Komponen helper StatCard dan PieChartIcon)
 
 function PieChartIcon(props: any) {
     return <PieIcon {...props} />;

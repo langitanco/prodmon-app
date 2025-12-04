@@ -20,6 +20,13 @@ const APP_INFO = {
 // Data riwayat pembaruan (Anda bisa menambahkan/mengubahnya di sini)
 const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "5.8",
+    date: "2025-12-05",
+    changes: [
+      "Menambah tombol share pada laporan kendala, supaya bisa dibagikan",
+    ],
+  },
+  {
     version: "5.5",
     date: "2025-12-03",
     changes: [
