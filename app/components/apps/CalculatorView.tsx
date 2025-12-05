@@ -11,7 +11,9 @@ export default function CalculatorView() {
   const [mode, setMode] = useState('DTF');
   const [finalPrice, setFinalPrice] = useState(0);
 
-  // Input User
+  // Kita tetap butuh state ini untuk kalkulasi total, meski tidak ditampilkan detailnya
+  const [laborDetails, setLaborDetails] = useState({ gesut: 0, packing: 0 });
+
   const [inputs, setInputs] = useState({
     qty: 0, 
     width: 0,
@@ -64,6 +66,7 @@ export default function CalculatorView() {
 
     if (!hasQty || (mode === 'DTF' && !hasDtfDim) || (mode === 'MANUAL' && !hasManualColor)) {
         setFinalPrice(0);
+        setLaborDetails({ gesut: 0, packing: 0 });
         return;
     }
 
@@ -81,6 +84,10 @@ export default function CalculatorView() {
 
     const hppOperasionalTotal = costListrikLPG + costPenunjang + totalBonusCost;
 
+    // Reset detail labor
+    let currentGesutCost = 0;
+    let currentPackingCost = 0;
+
     if (mode === 'DTF') {
       const area = inputs.width * inputs.length;
       const dtfPricePerCm = config.dtf_price_per_cm ?? 0; 
@@ -89,17 +96,29 @@ export default function CalculatorView() {
       const dtfPrintFilmCostPerPcs = config.cost_print_film ?? 0; 
       
       hppSablon = (area * dtfPricePerCm) + (area * dtfTintaCostPerCm) + pressCost + dtfPrintFilmCostPerPcs;
+      
+      currentGesutCost = pressCost; 
     } else {
+      // --- LOGIKA PAYROLL MANUAL (TETAP ADA DI BACKGROUND) ---
       const screenCost = config.manual_screen_cost ?? 0; 
-      const laborCost = config.manual_labor_cost ?? 0; 
+      
+      // Variable Costing: Gaji Gesut x Jumlah Warna
+      const laborCostPerColor = config.manual_labor_cost ?? 0; 
+      const totalGesutPay = laborCostPerColor * inputs.colors; 
+      
       const finishCost = config.manual_finishing ?? 0; 
-      const plastisolCostPerPcs = config.cost_plastisol_ink ?? 0;
+      const plastisolCostPerPcs = config.cost_plastisol_ink ?? 0; 
       
       const totalSetupCost = screenCost * inputs.colors;
       const setupCostPerPcs = totalSetupCost / safeQty;
       
-      hppSablon = setupCostPerPcs + laborCost + finishCost + plastisolCostPerPcs;
+      currentGesutCost = totalGesutPay;
+      currentPackingCost = finishCost;
+
+      hppSablon = setupCostPerPcs + totalGesutPay + finishCost + plastisolCostPerPcs;
     }
+
+    setLaborDetails({ gesut: currentGesutCost, packing: currentPackingCost });
 
     const totalHPP = inputs.kaosPrice + hppSablon + hppOperasionalTotal;
     const sellingPrice = totalHPP + (totalHPP * margin);
@@ -123,7 +142,6 @@ export default function CalculatorView() {
 
   const formatResult = (num: number) => new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(num);
 
-  // --- 1. PERBAIKAN LOADING: Menggunakan Spinner Seragam ---
   if (loading) return (
     <div className="flex flex-col items-center justify-center h-[60vh]">
         <div className="w-12 h-12 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin mb-4"></div>
@@ -155,7 +173,6 @@ export default function CalculatorView() {
           </div>
 
           <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200 space-y-6">
-            {/* Input Utama (Full Width) */}
             <div>
               <label className="block text-xs font-bold text-gray-500 uppercase mb-2">Jumlah Order (Pcs)</label>
               <input type="text" inputMode="numeric" value={formatNumberDisplay(inputs.qty)} onChange={(e) => handleInputChange(e, 'qty')} className="w-full text-xl font-bold text-gray-900 border-gray-300 border rounded-lg p-3 focus:ring-2 focus:ring-blue-500 outline-none placeholder-gray-300" placeholder="0" />
@@ -165,8 +182,6 @@ export default function CalculatorView() {
               <input type="text" inputMode="numeric" value={formatRupiahDisplay(inputs.kaosPrice)} onChange={(e) => handleInputChange(e, 'kaosPrice')} className="w-full text-xl font-bold text-gray-900 border-gray-300 border rounded-lg p-3 focus:ring-2 focus:ring-blue-500 outline-none placeholder-gray-300" placeholder="Rp 0" />
             </div>
             
-            {/* --- 2. PERBAIKAN SIMETRI LAYOUT --- */}
-            {/* Menggunakan 'grid-cols-1' di HP (stack) dan 'sm:grid-cols-2' di Tablet/Desktop (sebelahan) */}
             {mode === 'DTF' ? (
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
@@ -181,13 +196,16 @@ export default function CalculatorView() {
             ) : (
               <div>
                 <label className="block text-xs font-bold text-gray-500 uppercase mb-2">Jumlah Warna</label>
-                <input type="text" inputMode="numeric" value={formatNumberDisplay(inputs.colors)} onChange={(e) => handleInputChange(e, 'colors')} className="w-full text-xl font-bold text-gray-900 border-gray-300 border rounded-lg p-3 focus:ring-2 focus:ring-blue-500 outline-none placeholder-gray-300" placeholder="0" />
+                <div className="relative">
+                    <input type="text" inputMode="numeric" value={formatNumberDisplay(inputs.colors)} onChange={(e) => handleInputChange(e, 'colors')} className="w-full text-xl font-bold text-gray-900 border-gray-300 border rounded-lg p-3 focus:ring-2 focus:ring-blue-500 outline-none placeholder-gray-300" placeholder="0" />
+                    <div className="absolute right-3 top-3 text-xs text-gray-400 font-medium">Warna</div>
+                </div>
+                {/* TEXT HINT TELAH DIHAPUS UNTUK RAHASIA DAPUR */}
               </div>
             )}
 
             <hr className="border-dashed border-gray-200" />
 
-            {/* CHECKLIST BONUS */}
             <div>
                 <label className="block text-xs font-bold text-gray-500 uppercase mb-3">Tambahan / Bonus (Checklist)</label>
                 <div className="grid grid-cols-1 gap-2">
@@ -232,6 +250,9 @@ export default function CalculatorView() {
                 <div className="flex justify-between text-sm"><span className="text-slate-400">Estimasi Margin</span><span className="font-bold text-green-400">+{config.margin_percentage ?? 0}%</span></div>
                 
                 <hr className="border-slate-700/50" />
+                
+                {/* RAHASIA DAPUR: Breakdown detail dihapus, diganti general cost */}
+
                 <div className="flex justify-between text-sm">
                     <span className="text-slate-400">Listrik/LPG & Penunjang</span>
                     <span className="font-bold text-yellow-400">{formatResult((config.cost_listrik_lpg ?? 0) + (config.cost_bahan_penunjang ?? 0))} /pcs</span>
@@ -247,7 +268,13 @@ export default function CalculatorView() {
                 {mode === 'MANUAL' ? (
                     <>
                         <div className="flex justify-between text-sm"><span className="text-slate-400">Beban Screen/kaos</span><span className="font-bold text-yellow-400">{formatResult(((config.manual_screen_cost ?? 0) * inputs.colors) / (inputs.qty || 1))}</span></div>
-                        <div className="flex justify-between text-sm"><span className="text-slate-400">Cost Tinta & Jasa</span><span className="font-bold text-yellow-400">{formatResult((config.cost_plastisol_ink ?? 0) + (config.manual_labor_cost ?? 0) + (config.manual_finishing ?? 0))} /pcs</span></div>
+                        {/* Di sini Upah SDM digabung dengan Tinta agar admin tidak tahu detail gaji */}
+                        <div className="flex justify-between text-sm">
+                            <span className="text-slate-400">Cost Tinta & SDM</span>
+                            <span className="font-bold text-yellow-400">
+                                {formatResult((config.cost_plastisol_ink ?? 0) + laborDetails.gesut + laborDetails.packing)} /pcs
+                            </span>
+                        </div>
                     </>
                 ) : (
                     <>

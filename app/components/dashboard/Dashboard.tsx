@@ -8,7 +8,7 @@ import {
 } from 'recharts';
 import { TrendingUp, PieChart as PieIcon, AlertCircle, CheckCircle2, Package, AlertTriangle, Share2, Loader2 } from 'lucide-react'; 
 import { getDeadlineStatus } from '@/lib/utils';
-import { toPng } from 'html-to-image'; // Library baru pengganti html2canvas
+import { toPng } from 'html-to-image'; 
 
 interface DashboardProps {
   role: string;
@@ -20,12 +20,14 @@ const COLORS = ['#3b82f6', '#f59e0b', '#10b981', '#ef4444'];
 
 export default function Dashboard({ role, orders, onSelectOrder }: DashboardProps) {
   
+  // State untuk melacak bagian Pie Chart mana yang sedang di-hover
+  const [activeIndex, setActiveIndex] = useState<number | null>(null);
+
   // --- 1. LOGIKA PENGOLAHAN DATA ---
 
   // A. Data Grafik Batang (Tren PCS)
   const monthlyData = useMemo(() => {
     const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-    
     const last6Months: { name: string; monthIndex: number; year: number; total: number; pcs: number }[] = [];
     
     for (let i = 5; i >= 0; i--) {
@@ -48,7 +50,6 @@ export default function Dashboard({ role, orders, onSelectOrder }: DashboardProp
             item.pcs += order.jumlah;
         }
     });
-
     return last6Months;
   }, [orders]);
 
@@ -74,6 +75,12 @@ export default function Dashboard({ role, orders, onSelectOrder }: DashboardProp
     overdue: orders.filter(o => getDeadlineStatus(o.deadline, o.status) === 'overdue').length,
     trouble: orders.filter(o => o.status === 'Ada Kendala').length, 
   };
+
+  // --- LOGIKA TAMPILAN TENGAH PIE CHART (DINAMIS) ---
+  const activeItem = activeIndex !== null ? productionTypeData[activeIndex] : null;
+  const centerValue = activeItem ? activeItem.value : stats.totalOrders;
+  const centerLabel = activeItem ? activeItem.name : 'TOTAL ORDER';
+  const centerColor = activeItem ? COLORS[activeIndex! % COLORS.length] : '#1e293b'; // Warna teks mengikuti slice
 
   return (
     <div className="space-y-4 md:space-y-6 pb-10">
@@ -138,7 +145,7 @@ export default function Dashboard({ role, orders, onSelectOrder }: DashboardProp
             </div>
         </div>
 
-        {/* GRAFIK 2: PIE CHART */}
+        {/* GRAFIK 2: PIE CHART (DIPERBAIKI) */}
         <div className="bg-white p-4 md:p-6 rounded-2xl shadow-sm border border-slate-200 flex flex-col">
             <div className="mb-2 md:mb-4">
                 <h3 className="font-bold text-slate-800 text-base md:text-lg flex items-center gap-2">
@@ -157,24 +164,35 @@ export default function Dashboard({ role, orders, onSelectOrder }: DashboardProp
                             outerRadius={70}
                             paddingAngle={5}
                             dataKey="value"
+                            onMouseEnter={(_, index) => setActiveIndex(index)} // SET INDEX SAAT HOVER
+                            onMouseLeave={() => setActiveIndex(null)} // RESET SAAT MOUSE KELUAR
                         >
                             {productionTypeData.map((entry, index) => (
-                                <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                                <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} stroke="none" />
                             ))}
                         </Pie>
-                        <RechartsTooltip />
+                        {/* TOOLTIP DIHAPUS agar tidak menutupi tengah. Keterangan muncul di tengah secara dinamis */}
                         <Legend verticalAlign="bottom" height={36} iconType="circle" wrapperStyle={{fontSize: '10px'}} />
                     </PieChart>
                 </ResponsiveContainer>
+                
+                {/* TEXT TENGAH DINAMIS */}
                 <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-center pointer-events-none pb-6">
-                    <span className="text-2xl md:text-3xl font-extrabold text-slate-800">{orders.length}</span>
-                    <p className="text-[8px] md:text-[10px] text-slate-400 uppercase font-bold">Total Order</p>
+                    <span 
+                        className="text-2xl md:text-3xl font-extrabold transition-colors duration-300"
+                        style={{ color: centerColor }}
+                    >
+                        {centerValue}
+                    </span>
+                    <p className="text-[8px] md:text-[10px] text-slate-400 uppercase font-bold transition-all duration-300">
+                        {centerLabel}
+                    </p>
                 </div>
             </div>
         </div>
       </div>
 
-      {/* SECTION 3: LIST PERLU TINDAKAN (UPDATED) */}
+      {/* SECTION 3: LIST PERLU TINDAKAN */}
       <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
         <div className="p-4 md:p-5 border-b border-slate-100 flex justify-between items-center">
              <h3 className="font-bold text-slate-800 text-sm md:text-base">Perlu Tindakan Segera</h3>
@@ -184,28 +202,21 @@ export default function Dashboard({ role, orders, onSelectOrder }: DashboardProp
                 .filter(o => {
                     const deadlineStatus = getDeadlineStatus(o.deadline, o.status);
                     const hasUnresolvedKendala = o.kendala && o.kendala.some(k => !k.isResolved);
-                    
                     return deadlineStatus === 'overdue' || deadlineStatus === 'warning' || hasUnresolvedKendala;
                 })
                 .sort((a, b) => {
-                    // LOGIKA SORTING PRIORITAS
                     const aHasUnresolvedKendala = a.kendala && a.kendala.some(k => !k.isResolved);
                     const bHasUnresolvedKendala = b.kendala && b.kendala.some(k => !k.isResolved);
-                    
                     if (aHasUnresolvedKendala && !bHasUnresolvedKendala) return -1;
                     if (!aHasUnresolvedKendala && bHasUnresolvedKendala) return 1;
-
                     const aDeadline = getDeadlineStatus(a.deadline, a.status);
                     const bDeadline = getDeadlineStatus(b.deadline, b.status);
-
                     if (aDeadline === 'overdue' && bDeadline !== 'overdue') return -1;
                     if (aDeadline !== 'overdue' && bDeadline === 'overdue') return 1;
-                    
                     return 0; 
                 })
                 .slice(0, 5) 
                 .map(o => (
-                    // MENGGUNAKAN COMPONENT ActionRow UNTUK TIAP BARIS
                     <ActionRow key={o.id} order={o} onSelectOrder={onSelectOrder} />
                 ))}
              
@@ -217,19 +228,17 @@ export default function Dashboard({ role, orders, onSelectOrder }: DashboardProp
              )}
         </div>
       </div>
-
     </div>
   );
 }
 
 // ==========================================
-// SUB-COMPONENT: ACTION ROW (FIX WRAPPING TEXT)
+// SUB-COMPONENT: ACTION ROW (FIX WRAPPING & SHARE)
 // ==========================================
 function ActionRow({ order, onSelectOrder }: { order: Order, onSelectOrder: (id: string) => void }) {
     const ticketRef = useRef<HTMLDivElement>(null);
     const [isSharing, setIsSharing] = useState(false);
 
-    // --- Logika Penentuan Status Badge ---
     const deadlineStatus = getDeadlineStatus(order.deadline, order.status);
     const unresolvedKendala = order.kendala 
         ? order.kendala.filter(k => !k.isResolved).sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
@@ -254,7 +263,6 @@ function ActionRow({ order, onSelectOrder }: { order: Order, onSelectOrder: (id:
         indicatorColor = 'bg-orange-400';
     }
 
-    // --- Logika Share ---
     const handleShare = async (e: React.MouseEvent) => {
         e.stopPropagation(); 
         if (!ticketRef.current) return;
@@ -266,7 +274,6 @@ function ActionRow({ order, onSelectOrder }: { order: Order, onSelectOrder: (id:
                 backgroundColor: '#ffffff', 
                 pixelRatio: 2 
             });
-
             const blob = await (await fetch(dataUrl)).blob();
             const file = new File([blob], `kendala-${order.kode_produksi}.png`, { type: 'image/png' });
 
@@ -284,7 +291,6 @@ function ActionRow({ order, onSelectOrder }: { order: Order, onSelectOrder: (id:
             }
         } catch (err) {
             console.error('Gagal membuat gambar:', err);
-            // alert('Gagal membagikan gambar.'); // Optional
         } finally {
             setIsSharing(false);
         }
@@ -295,23 +301,24 @@ function ActionRow({ order, onSelectOrder }: { order: Order, onSelectOrder: (id:
             className="group p-3 md:p-4 flex items-center justify-between hover:bg-slate-50 transition cursor-pointer relative" 
             onClick={() => onSelectOrder(order.id)}
         >
-            {/* AREA TIKET YANG AKAN DI-SCREENSHOT */}
+            {/* AREA TIKET */}
             <div 
                 ref={ticketRef} 
-                className="flex flex-1 items-center gap-3 bg-white pr-4 py-2 rounded-md"
+                className="flex flex-1 items-center gap-3 bg-white pr-4 py-2 rounded-md h-full"
             >
-                {/* Indicator Bar */}
-                <div className={`w-1.5 h-10 md:w-2 md:h-12 rounded-full ${indicatorColor} flex-shrink-0`}></div>
+                {/* Indicator Bar - Menggunakan h-auto self-stretch agar mengikuti tinggi konten */}
+                <div className={`w-1.5 self-stretch rounded-full ${indicatorColor} flex-shrink-0`}></div>
                 
-                <div className="flex-1 min-w-0"> {/* min-w-0 penting agar text wrapping berfungsi normal di dalam flex */}
+                {/* Konten Text - min-w-0 agar flex tidak overflow */}
+                <div className="flex-1 min-w-0 py-1"> 
                     <div className="flex items-center gap-2">
                         <p className="font-bold text-slate-800 text-xs md:text-sm line-clamp-1">{order.nama_pemesan}</p>
                         {latestKendalaNote && <AlertTriangle className="w-3 h-3 text-purple-600 flex-shrink-0" />}
                     </div>
                     
                     {latestKendalaNote ? (
-                        /* PERUBAHAN DI SINI: Saya hapus 'line-clamp-1' */
-                        <p className="text-[10px] md:text-xs text-red-500 font-semibold mt-0.5 leading-relaxed">
+                        // FIX TEXT WRAPPING: line-clamp dihapus, break-words ditambahkan
+                        <p className="text-[10px] md:text-xs text-red-500 font-semibold mt-0.5 leading-relaxed break-words whitespace-normal">
                             Kendala: {latestKendalaNote}
                         </p>
                     ) : (
@@ -319,7 +326,7 @@ function ActionRow({ order, onSelectOrder }: { order: Order, onSelectOrder: (id:
                     )}
                 </div>
 
-                <div className="text-right pl-2 flex-shrink-0">
+                <div className="text-right pl-2 flex-shrink-0 self-start">
                     <span className={`text-[10px] md:text-xs font-bold px-1.5 py-0.5 md:px-2 md:py-1 rounded border ${badgeClass}`}>
                         {badgeLabel}
                     </span>
@@ -327,20 +334,16 @@ function ActionRow({ order, onSelectOrder }: { order: Order, onSelectOrder: (id:
                 </div>
             </div>
 
-            {/* TOMBOL SHARE */}
             <button 
                 onClick={handleShare}
                 disabled={isSharing}
-                className="ml-2 p-2 text-slate-300 hover:text-blue-600 hover:bg-blue-50 rounded-full transition-all flex-shrink-0"
-                title="Bagikan Bukti ke WA"
+                className="ml-2 p-2 text-slate-300 hover:text-blue-600 hover:bg-blue-50 rounded-full transition-all flex-shrink-0 self-center"
             >
                 {isSharing ? <Loader2 className="w-5 h-5 animate-spin" /> : <Share2 className="w-5 h-5" />}
             </button>
         </div>
     );
 }
-
-// ... (Komponen helper StatCard dan PieChartIcon)
 
 function PieChartIcon(props: any) {
     return <PieIcon {...props} />;

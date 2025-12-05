@@ -11,19 +11,36 @@ interface ChangelogEntry {
 
 const APP_INFO = {
   name: "LCO SuperApp",
-  version: "V.5.5",
+  version: "V.5.9", 
   purpose: "Aplikasi produksi Sablon, Langitan.co.",
   creator: "Tim Developer Langitan.co",
   creationDate: "Desember 2025",
 };
 
-// Data riwayat pembaruan (Anda bisa menambahkan/mengubahnya di sini)
+// --- DATA UPDATE DIGABUNG DI SINI ---
 const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: "5.9",
+    date: "2025-12-06",
+    changes: [
+      // Update Hak Akses & UI (Malam ini)
+      "Granular Access Control: Sistem hak akses baru berbasis checklist menu, tidak lagi kaku berdasarkan role.",
+      "Dynamic Sidebar: Menu sidebar otomatis menyesuaikan dengan izin user.",
+      "UI Improvement: Perbaikan kontras warna teks input (hitam pekat) agar lebih mudah dibaca.",
+      "User Settings: Penambahan panel checklist hak akses pada edit user.",
+      
+      // Update Dashboard & Kalkulator (Sebelumnya)
+      "Logika HPP Manual: Perhitungan upah gesut kini proporsional berdasarkan jumlah warna.",
+      "Privasi Data: Nominal upah SDM di kalkulator disembunyikan (digabung ke Cost Material).",
+      "Dashboard Visual: Grafik Pie Chart kini menampilkan detail angka saat disentuh.",
+      "Mobile UI: Teks status kendala yang panjang otomatis turun ke bawah (text-wrap).",
+    ],
+  },
   {
     version: "5.8",
     date: "2025-12-05",
     changes: [
-      "Menambah tombol share pada laporan kendala, supaya bisa dibagikan",
+      "Menambah tombol share pada laporan kendala, supaya bisa dibagikan.",
     ],
   },
   {
@@ -59,15 +76,14 @@ export default function AboutView() {
   const [showChangelog, setShowChangelog] = useState(false);
 
   return (
-    <div className="flex justify-center items-start min-h-full p-2 md:p-8"> {/* Padding dikurangi di HP */}
-      <div className="w-full max-w-2xl bg-white p-4 md:p-8 rounded-2xl shadow-lg border border-slate-200 space-y-5 md:space-y-6"> {/* Padding dan spacing dikurangi */}
+    <div className="flex justify-center items-start min-h-full p-2 md:p-8"> 
+      <div className="w-full max-w-2xl bg-white p-4 md:p-8 rounded-2xl shadow-lg border border-slate-200 space-y-5 md:space-y-6"> 
         
         {/* HEADER APLIKASI */}
         <div className="text-center border-b border-slate-100 pb-5">
           <div className="bg-blue-600 w-14 h-14 md:w-16 md:h-16 rounded-full flex items-center justify-center mx-auto mb-3 shadow-md shadow-blue-500/50">
             <Zap className="w-7 h-7 md:w-8 md:h-8 text-white" />
           </div>
-          {/* FONT SIZE PERBAIKAN: text-2xl di HP */}
           <h2 className="text-2xl md:text-3xl font-extrabold text-slate-800">{APP_INFO.name}</h2>
           <p className="text-slate-500 text-xs md:text-sm mt-1">{APP_INFO.purpose}</p>
         </div>
@@ -77,7 +93,6 @@ export default function AboutView() {
           <h3 className="text-base md:text-lg font-bold text-slate-700 border-b border-dashed border-slate-200 pb-2 flex items-center gap-2">
             <Package className="w-4 h-4 md:w-5 md:h-5 text-slate-400" /> Detail Aplikasi
           </h3>
-          {/* GRID PERBAIKAN: Stack di HP, 2 Kolom di Desktop */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-y-2 md:gap-y-3 text-xs md:text-sm">
             <p className="text-slate-500 font-medium">Versi Saat Ini:</p>
             <p className="font-bold text-slate-800">{APP_INFO.version} (Latest)</p>
@@ -92,7 +107,6 @@ export default function AboutView() {
           <h3 className="text-base md:text-lg font-bold text-slate-700 border-b border-dashed border-slate-200 pb-2 flex items-center gap-2">
             <User className="w-4 h-4 md:w-5 md:h-5 text-slate-400" /> Pengembang
           </h3>
-          {/* GRID PERBAIKAN: Stack di HP, 2 Kolom di Desktop */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-y-2 md:gap-y-3 text-xs md:text-sm">
             <p className="text-slate-500 font-medium">Dibuat Oleh:</p>
             <p className="font-bold text-slate-800">{APP_INFO.creator}</p>
@@ -103,40 +117,46 @@ export default function AboutView() {
         </div>
 
         {/* CHANGELOG SECTION (Toggle) */}
-        <div className="pt-3">
+        <div className="pt-3 border-t border-slate-100">
           <button 
             onClick={() => setShowChangelog(!showChangelog)}
-            className="w-full text-left flex items-center justify-between p-3 bg-slate-50 hover:bg-slate-100 rounded-lg border border-slate-200 transition-colors shadow-sm"
+            className="w-full flex items-center justify-between p-3 rounded-xl bg-slate-50 hover:bg-slate-100 transition group"
           >
-            <h3 className="text-sm md:text-base font-bold text-slate-700 flex items-center gap-2">
-                <Clock className="w-4 h-4 text-slate-500" /> Riwayat Pembaruan ({CHANGELOG.length} Versi)
-            </h3>
-            <div className='p-1'> {/* Menambah wrapper untuk Chevron agar konsisten */}
-                {showChangelog ? <ChevronUp className="w-4 h-4 text-slate-600" /> : <ChevronDown className="w-4 h-4 text-slate-600" />}
+            <div className="flex items-center gap-2">
+               <Clock className="w-4 h-4 text-blue-500" />
+               <span className="text-sm font-bold text-slate-700">Riwayat Pembaruan (Changelog)</span>
             </div>
+            {showChangelog ? (
+              <ChevronUp className="w-4 h-4 text-slate-400 group-hover:text-slate-600" />
+            ) : (
+              <ChevronDown className="w-4 h-4 text-slate-400 group-hover:text-slate-600" />
+            )}
           </button>
 
+          {/* LIST CHANGELOG - DESIGN DISESUAIKAN DENGAN GAYA ASLI ANDA */}
           {showChangelog && (
-            <div className="mt-4 space-y-4 animate-in fade-in duration-300"> {/* Spacing dikurangi */}
-              {CHANGELOG.map((log, index) => (
-                <div key={log.version} className={`p-3 md:p-4 rounded-xl border ${index === 0 ? 'bg-blue-50 border-blue-200 shadow-md' : 'bg-white border-slate-200'}`}>
-                  <div className="flex justify-between items-start mb-2">
-                    {/* FONT SIZE PERBAIKAN: text-base di HP */}
-                    <span className={`font-extrabold text-base md:text-lg ${index === 0 ? 'text-blue-700' : 'text-slate-800'}`}>
-                        v{log.version}
-                    </span>
-                    <span className={`text-[10px] md:text-xs font-medium px-2 py-0.5 rounded-full ${index === 0 ? 'bg-blue-600 text-white' : 'bg-slate-200 text-slate-600'}`}>
-                        {log.date}
-                    </span>
+             <div className="mt-4 space-y-4">
+                {CHANGELOG.map((log, index) => (
+                  <div key={index} className="bg-slate-50 rounded-xl p-4 border border-slate-100">
+                     <div className="flex items-center justify-between mb-3 border-b border-slate-200 pb-2">
+                        <span className={`font-extrabold text-sm ${index === 0 ? 'text-blue-600' : 'text-slate-700'}`}>
+                           Versi {log.version}
+                        </span>
+                        <span className="text-[10px] font-mono text-slate-500 bg-white px-2 py-1 rounded border border-slate-200">
+                           {log.date}
+                        </span>
+                     </div>
+                     <ul className="space-y-1.5 pl-1">
+                        {log.changes.map((change, idx) => (
+                           <li key={idx} className="text-xs md:text-sm text-slate-600 flex items-start gap-2">
+                             <span className="block w-1 h-1 rounded-full bg-slate-400 mt-1.5 flex-shrink-0"></span>
+                             <span className="leading-relaxed">{change}</span>
+                           </li>
+                        ))}
+                     </ul>
                   </div>
-                  <ul className="list-disc list-inside space-y-1 text-xs md:text-sm text-slate-700 ml-1"> {/* Font size dikurangi */}
-                    {log.changes.map((change, i) => (
-                      <li key={i} className={index === 0 ? 'text-blue-900' : 'text-slate-700'}>{change}</li>
-                    ))}
-                  </ul>
-                </div>
-              ))}
-            </div>
+                ))}
+             </div>
           )}
         </div>
 

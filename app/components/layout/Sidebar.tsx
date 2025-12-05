@@ -10,35 +10,33 @@ import {
   X, 
   Calculator, 
   DollarSign,
-  Info // Import icon Info
+  Info 
 } from 'lucide-react';
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 import { useRouter } from 'next/navigation';
-
-// Import UserData dari file types Anda
 import { UserData } from '@/types'; 
 
-
-// --- DEFINISI TIPE LOKAL UNTUK MEMPERBAIKI ERROR 'Cannot find name SidebarProps' ---
 interface SidebarProps {
   sidebarOpen: boolean;
   setSidebarOpen: (open: boolean) => void;
   currentUser: UserData;
-  // Gunakan union type yang lengkap, termasuk 'about'
   activeTab: 'dashboard' | 'orders' | 'settings' | 'trash' | 'kalkulator' | 'config_harga' | 'about'; 
   handleNav: (tab: any) => void;
 }
-
 
 export default function Sidebar({ sidebarOpen, setSidebarOpen, currentUser, activeTab, handleNav }: SidebarProps) {
   
   const router = useRouter();
   const supabase = createClientComponentClient();
 
-  const isSupervisor = currentUser.role === 'supervisor';
-  const isAdmin = currentUser.role === 'admin';
+  // --- LOGIKA BARU HAK AKSES ---
+  // Fungsi helper untuk cek apakah user punya izin ke menu tertentu
+  const canAccess = (menuId: string) => {
+    // Jika allowed_menus belum ada (misal data lama), kembalikan false atau true sesuai kebijakan
+    // Di sini kita anggap array kosong = tidak ada akses
+    return currentUser.allowed_menus?.includes(menuId);
+  };
 
-  // FUNGSI LOGOUT
   const handleLogout = async () => {
     await supabase.auth.signOut();
     router.refresh(); 
@@ -75,7 +73,7 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen, currentUser, acti
               SuperApp
             </p>
             <div className="inline-block bg-slate-800 text-slate-400 text-[10px] px-1.5 py-0.5 rounded mt-1.5 font-mono border border-slate-700">
-              V.5.5
+              V.5.8
             </div>
           </div>
 
@@ -87,27 +85,31 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen, currentUser, acti
         {/* User Info Kecil */}
         <div className="px-6 py-4 bg-slate-800/50 border-b border-slate-800 flex-shrink-0">
            <div className="text-sm font-bold text-white truncate">{currentUser.name}</div>
-           <div className="text-xs text-blue-400 font-mono mt-0.5 tracking-wider">{currentUser.role}</div>
+           <div className="text-xs text-blue-400 font-mono mt-0.5 tracking-wider uppercase">{currentUser.role}</div>
         </div>
 
         {/* Menu Navigasi */}
         <nav className="flex-1 overflow-y-auto p-4 space-y-2 scrollbar-thin scrollbar-thumb-slate-700">
           
-          <button 
-            onClick={() => handleNav('dashboard')}
-            className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-xl transition font-medium ${activeTab === 'dashboard' ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/50' : 'text-slate-400 hover:bg-slate-800 hover:text-white'}`}
-          >
-            <LayoutDashboard className="w-5 h-5"/> Dashboard
-          </button>
+          {canAccess('dashboard') && (
+            <button 
+              onClick={() => handleNav('dashboard')}
+              className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-xl transition font-medium ${activeTab === 'dashboard' ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/50' : 'text-slate-400 hover:bg-slate-800 hover:text-white'}`}
+            >
+              <LayoutDashboard className="w-5 h-5"/> Dashboard
+            </button>
+          )}
           
-          <button 
-            onClick={() => handleNav('orders')}
-            className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-xl transition font-medium ${activeTab === 'orders' ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/50' : 'text-slate-400 hover:bg-slate-800 hover:text-white'}`}
-          >
-            <ClipboardList className="w-5 h-5"/> Daftar Pesanan
-          </button>
+          {canAccess('orders') && (
+            <button 
+              onClick={() => handleNav('orders')}
+              className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-xl transition font-medium ${activeTab === 'orders' ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/50' : 'text-slate-400 hover:bg-slate-800 hover:text-white'}`}
+            >
+              <ClipboardList className="w-5 h-5"/> Daftar Pesanan
+            </button>
+          )}
 
-          {isSupervisor && (
+          {canAccess('trash') && (
             <button 
                 onClick={() => handleNav('trash')}
                 className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-xl transition font-medium ${activeTab === 'trash' ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/50' : 'text-slate-400 hover:bg-slate-800 hover:text-white'}`}
@@ -116,18 +118,22 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen, currentUser, acti
             </button>
           )}
 
-          {(isSupervisor || isAdmin) && (
+          {/* GROUP: APLIKASI LAIN */}
+          {/* Hanya tampil jika salah satu anak menu di dalamnya diizinkan */}
+          {(canAccess('kalkulator') || canAccess('config_harga')) && (
             <div className="pt-4 mt-4 border-t border-slate-700">
               <p className="px-4 text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-2">Aplikasi Lain</p>
               
-              <button 
-                onClick={() => handleNav('kalkulator')}
-                className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition font-medium text-left ${activeTab === 'kalkulator' ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/50' : 'text-slate-400 hover:bg-slate-800 hover:text-green-400'}`}
-              >
-                <Calculator className="w-5 h-5"/> Kalkulator HPP
-              </button>
+              {canAccess('kalkulator') && (
+                <button 
+                  onClick={() => handleNav('kalkulator')}
+                  className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition font-medium text-left ${activeTab === 'kalkulator' ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/50' : 'text-slate-400 hover:bg-slate-800 hover:text-green-400'}`}
+                >
+                  <Calculator className="w-5 h-5"/> Kalkulator HPP
+                </button>
+              )}
 
-              {isSupervisor && (
+              {canAccess('config_harga') && (
                 <button 
                   onClick={() => handleNav('config_harga')}
                   className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition font-medium text-left ${activeTab === 'config_harga' ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/50' : 'text-slate-400 hover:bg-slate-800 hover:text-yellow-400'}`}
@@ -138,26 +144,30 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen, currentUser, acti
             </div>
           )}
           
-          {/* SETTINGS & ABOUT DI BAGIAN BAWAH */}
-          <div className="pt-4 mt-4 border-t border-slate-700">
-              <p className="px-4 text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-2">Sistem</p>
+          {/* GROUP: SISTEM */}
+          {(canAccess('settings') || canAccess('about')) && (
+            <div className="pt-4 mt-4 border-t border-slate-700">
+                <p className="px-4 text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-2">Sistem</p>
 
-              {isSupervisor && (
+                {canAccess('settings') && (
+                    <button 
+                      onClick={() => handleNav('settings')}
+                      className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition font-medium text-left ${activeTab === 'settings' ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/50' : 'text-slate-400 hover:bg-slate-800 hover:text-white'}`}
+                    >
+                      <Settings className="w-5 h-5"/> User & Akses
+                    </button>
+                )}
+                
+                {canAccess('about') && (
                   <button 
-                    onClick={() => handleNav('settings')}
-                    className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition font-medium text-left ${activeTab === 'settings' ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/50' : 'text-slate-400 hover:bg-slate-800 hover:text-white'}`}
+                    onClick={() => handleNav('about')}
+                    className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition font-medium text-left ${activeTab === 'about' ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/50' : 'text-slate-400 hover:bg-slate-800 hover:text-white'}`}
                   >
-                    <Settings className="w-5 h-5"/> User & Akses
+                    <Info className="w-5 h-5"/> Tentang Aplikasi
                   </button>
-              )}
-              
-              <button 
-                onClick={() => handleNav('about')}
-                className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition font-medium text-left ${activeTab === 'about' ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/50' : 'text-slate-400 hover:bg-slate-800 hover:text-white'}`}
-              >
-                <Info className="w-5 h-5"/> Tentang Aplikasi
-              </button>
-          </div>
+                )}
+            </div>
+          )}
 
         </nav>
 

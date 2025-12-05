@@ -7,6 +7,7 @@ export interface UserData {
   password: string; 
   name: string;
   role: UserRole;
+  allowed_menus?: string[]; // <--- TAMBAHAN BARU
 }
 
 export interface ProductionStep {

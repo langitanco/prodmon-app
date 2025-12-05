@@ -15,7 +15,7 @@ import Dashboard from '@/app/components/dashboard/Dashboard';
 // Apps & Config
 import CalculatorView from '@/app/components/apps/CalculatorView';
 import ConfigPriceView from '@/app/components/apps/ConfigPriceView';
-import AboutView from '@/app/components/misc/AboutView'; // <<< KOMPONEN BARU
+import AboutView from '@/app/components/misc/AboutView'; 
 
 // ORDERS 
 import OrderList from '@/app/components/orders/OrderList';
@@ -32,17 +32,14 @@ import { UserData, Order, ProductionTypeData } from '@/types';
 import { DEFAULT_PRODUCTION_TYPES } from '@/lib/utils';
 
 // --- DEFINISI TIPE UNTUK KOMPONEN SIDEBAR ---
-// Ini memperbaiki error 'Cannot find name SidebarProps' di file sidebar.tsx
-
 interface CurrentUser extends UserData {
-  id: string; // ID dari Supabase Auth
+  id: string; 
 }
 
 interface SidebarProps {
   sidebarOpen: boolean;
   setSidebarOpen: (open: boolean) => void;
   currentUser: UserData;
-  // Tambahkan 'about' di tipe activeTab
   activeTab: 'dashboard' | 'orders' | 'settings' | 'trash' | 'kalkulator' | 'config_harga' | 'about'; 
   handleNav: (tab: any) => void;
 }
@@ -52,7 +49,7 @@ export default function ProductionApp() {
   // State Management
   const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null);
   const [loadingUser, setLoadingUser] = useState(true);
-  // Tambahkan 'about' ke tipe activeTab
+  
   const [activeTab, setActiveTab] = useState<'dashboard' | 'orders' | 'settings' | 'trash' | 'kalkulator' | 'config_harga' | 'about'>('dashboard');
   const [orders, setOrders] = useState<Order[]>([]);
   const [usersList, setUsersList] = useState<UserData[]>([]);
@@ -92,19 +89,22 @@ export default function ProductionApp() {
       const { data: { session } } = await supabase.auth.getSession();
 
       if (session) {
+        // PERBAIKAN DI SINI: Fetch data user
         const { data: userData, error } = await supabase
           .from('users')
-          .select('*')
+          .select('*') // Ini sudah benar mengambil semua kolom
           .eq('id', session.user.id)
           .single();
 
         if (userData) {
+          // UPDATE DI SINI: Memasukkan allowed_menus ke state
           setCurrentUser({
             id: session.user.id,
             username: userData.username || session.user.email || '',
             name: userData.name || session.user.email?.split('@')[0] || 'User',
             role: userData.role || 'prod',
             password: '',
+            allowed_menus: userData.allowed_menus || [], // <--- INI KUNCI PERBAIKANNYA
           });
         } else {
           console.error("User login di Auth tapi tidak ada di tabel public.users");
@@ -347,7 +347,13 @@ export default function ProductionApp() {
 
   // --- LOGIC: SETTINGS & CONFIG (tetap) ---
   const handleSaveUser = async (u: any) => {
-    const payload = { name: u.name, role: u.role, username: u.username };
+    // Pastikan allowed_menus ikut disimpan jika ada perubahan di SettingsPage
+    const payload: any = { name: u.name, role: u.role, username: u.username };
+    
+    // Jika ada update allowed_menus dari form
+    if (u.allowed_menus) {
+        payload.allowed_menus = u.allowed_menus;
+    }
     
     if (u.id) {
       const { error } = await supabase.from('users').update(payload).eq('id', u.id);
