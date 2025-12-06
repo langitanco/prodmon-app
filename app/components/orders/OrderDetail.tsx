@@ -22,16 +22,33 @@ export default function OrderDetail({ currentUser, order, onBack, onEdit, onTrig
   const [kendalaNote, setKendalaNote] = useState('');
   const [showKendalaForm, setShowKendalaForm] = useState(false);
   
-  // Ambil role, pastikan tipe datanya divalidasi
+  // --- LOGIKA HAK AKSES BARU (BY PERMISSIONS) ---
   const role = currentUser.role as string;
   const userName = currentUser.name; 
+  
+  // Ambil izin spesifik dari object permissions
+  const orderPerms = currentUser.permissions?.orders;
 
-  // PERBAIKAN: Gunakan 'supervisor' sebagai peran akses penuh, bukan 'admin'
-  const canEditApproval = role === 'supervisor'; // HANYA SUPERVISOR YANG BISA
-  const canEditProduction = role === 'produksi' || role === 'supervisor';
-  const canEditQC = role === 'qc' || role === 'supervisor';
-  const canEditShipping = role === 'supervisor'; 
-  const isManager = role === 'manager';
+  // 1. Cek Permission Global (Supervisor selalu sakti)
+  const isSupervisor = role === 'supervisor';
+  const hasEditAccess = isSupervisor || orderPerms?.edit === true;
+  const hasDeleteAccess = isSupervisor || orderPerms?.delete === true;
+
+  // 2. Mapping ke Akses Per-Step
+  // Step 1: Approval & Tombol Edit Utama (Admin/Supervisor/Editor)
+  const canEditApproval = hasEditAccess; 
+
+  // Step 2: Produksi (Tim Produksi OR Admin/Supervisor)
+  const canEditProduction = role === 'produksi' || hasEditAccess;
+
+  // Step 3: QC (Tim QC OR Admin/Supervisor)
+  const canEditQC = role === 'qc' || hasEditAccess;
+
+  // Step 4: Shipping (Admin/Supervisor)
+  const canEditShipping = hasEditAccess;
+
+  // ---------------------------------------------
+
   const currentSteps = order.jenis_produksi === 'manual' ? order.steps_manual : order.steps_dtf;
 
   const handleStatusStep = (stepId: string) => {
@@ -150,17 +167,21 @@ export default function OrderDetail({ currentUser, order, onBack, onEdit, onTrig
           <ChevronRight className="w-4 h-4 md:w-5 md:h-5 rotate-180"/> Kembali
         </button>
         <div className="flex gap-2">
-          {/* BARIS YANG DIPERBAIKI: Ganti 'admin' jadi 'supervisor' */}
-          {(canEditApproval) && !isManager && (
+          
+          {/* TOMBOL EDIT (Muncul jika punya izin Edit atau Supervisor) */}
+          {canEditApproval && (
             <button onClick={onEdit} className="bg-blue-600 text-white px-3 py-1.5 md:px-4 md:py-2 rounded-lg text-xs md:text-sm font-bold flex items-center gap-2 hover:bg-blue-700 transition shadow-sm">
               <Pencil className="w-3 h-3 md:w-4 md:h-4"/> Edit
             </button>
           )}
-          {role === 'supervisor' && (
+
+          {/* TOMBOL HAPUS (Muncul jika punya izin Delete atau Supervisor) */}
+          {hasDeleteAccess && (
             <button onClick={() => onDelete(order.id)} className="bg-red-600 text-white px-3 py-1.5 md:px-4 md:py-2 rounded-lg text-xs md:text-sm font-bold flex items-center gap-2 hover:bg-red-700 transition shadow-sm">
               <Trash2 className="w-3 h-3 md:w-4 md:h-4"/> Hapus
             </button>
           )}
+
         </div>
       </div>
       
@@ -215,10 +236,10 @@ export default function OrderDetail({ currentUser, order, onBack, onEdit, onTrig
                       <div className="text-[10px] text-slate-400 italic">Data lama (tanpa nama)</div>
                   )}
               </div>
-              {canEditApproval && !isManager && <button onClick={() => handleFileDelete('approval')} className="text-red-500 bg-white border border-red-200 px-2 py-1 md:px-3 md:py-1.5 rounded-lg text-[10px] md:text-xs font-bold hover:bg-red-50 mt-2 sm:mt-0">Hapus</button>}
+              {canEditApproval && <button onClick={() => handleFileDelete('approval')} className="text-red-500 bg-white border border-red-200 px-2 py-1 md:px-3 md:py-1.5 rounded-lg text-[10px] md:text-xs font-bold hover:bg-red-50 mt-2 sm:mt-0">Hapus</button>}
             </div>
           ) : (
-            (canEditApproval && !isManager) ? <button onClick={() => onTriggerUpload('approval')} className="w-full border-2 border-dashed border-blue-200 p-4 md:p-6 text-xs md:text-sm text-blue-600 rounded-xl bg-blue-50 hover:bg-blue-100 transition font-bold flex flex-col items-center gap-2"><Upload className="w-5 h-5 md:w-6 md:h-6"/> Upload File Approval</button> : <div className="text-xs md:text-sm italic text-slate-400 text-center py-4 bg-slate-50 rounded-xl">Menunggu Admin upload approval...</div>
+            (canEditApproval) ? <button onClick={() => onTriggerUpload('approval')} className="w-full border-2 border-dashed border-blue-200 p-4 md:p-6 text-xs md:text-sm text-blue-600 rounded-xl bg-blue-50 hover:bg-blue-100 transition font-bold flex flex-col items-center gap-2"><Upload className="w-5 h-5 md:w-6 md:h-6"/> Upload File Approval</button> : <div className="text-xs md:text-sm italic text-slate-400 text-center py-4 bg-slate-50 rounded-xl">Menunggu Admin upload approval...</div>
           )}
       </div>
 
@@ -265,13 +286,13 @@ export default function OrderDetail({ currentUser, order, onBack, onEdit, onTrig
                       {k.buktiFile && <a href={k.buktiFile} target="_blank" className="text-[10px] md:text-xs text-blue-600 font-bold hover:underline flex items-center gap-1 mt-1"><Eye className="w-3 h-3"/> Lihat Bukti Penanganan</a>}
                     </div>
                     <div className="flex gap-1">
-                      {!k.isResolved && (role === 'supervisor') && (
+                      {!k.isResolved && (canEditProduction) && (
                         <>
                           <button onClick={() => onTriggerUpload('kendala_bukti', undefined, k.id)} className="text-blue-600 hover:bg-blue-50 p-1.5 rounded-lg transition" title="Upload Bukti"><Upload className="w-3 h-3 md:w-4 md:h-4"/></button>
                           <button onClick={() => handleResolveKendala(k.id)} className="text-green-600 hover:bg-green-50 p-1.5 rounded-lg transition" title="Tandai Selesai"><CheckCircle className="w-3 h-3 md:w-4 md:h-4"/></button>
                         </>
                       )}
-                      {((role === 'supervisor') || k.reportedBy === userName) && (
+                      {(canEditProduction || k.reportedBy === userName) && (
                         <button onClick={() => handleDeleteKendala(k.id)} className="text-red-500 hover:bg-red-50 p-1.5 rounded-lg transition" title="Hapus"><Trash2 className="w-3 h-3 md:w-4 md:h-4"/></button>
                       )}
                     </div>
@@ -293,10 +314,10 @@ export default function OrderDetail({ currentUser, order, onBack, onEdit, onTrig
                     <div className="flex items-center gap-2 md:gap-3 bg-green-50 px-2 py-1 md:px-3 md:py-1.5 rounded-lg border border-green-100 self-start sm:self-auto">
                       <CheckCircle className="w-4 h-4 md:w-5 md:h-5 text-green-600"/>
                       <span className="text-[10px] md:text-xs font-bold text-green-700">Selesai</span>
-                      {canEditProduction && !isManager && <button onClick={() => handleFileDelete('step', true, step.id)} className="text-red-400 hover:text-red-600 ml-1 md:ml-2"><Trash2 className="w-3 h-3 md:w-4 md:h-4"/></button>}
+                      {canEditProduction && <button onClick={() => handleFileDelete('step', true, step.id)} className="text-red-400 hover:text-red-600 ml-1 md:ml-2"><Trash2 className="w-3 h-3 md:w-4 md:h-4"/></button>}
                     </div>
                   ) : (
-                    (canEditProduction && !isManager && (order.status === 'On Process' || order.status === 'Revisi' || order.status === 'Ada Kendala')) && (
+                    (canEditProduction && (order.status === 'On Process' || order.status === 'Revisi' || order.status === 'Ada Kendala')) && (
                       step.type === 'status_update' 
                       ? <button onClick={() => handleStatusStep(step.id)} className="bg-blue-600 text-white text-[10px] md:text-xs px-3 py-1.5 md:px-4 md:py-2 rounded-lg font-bold hover:bg-blue-700 transition w-full sm:w-auto">Tandai Selesai</button>
                       : <button onClick={() => onTriggerUpload('step', step.id)} className="border-2 border-slate-200 px-3 py-1.5 md:px-4 md:py-2 rounded-lg text-[10px] md:text-xs font-bold text-slate-600 hover:bg-slate-50 transition w-full sm:w-auto flex items-center justify-center gap-2"><Camera className="w-3 h-3 md:w-4 md:h-4"/> Upload Bukti</button>
@@ -321,7 +342,7 @@ export default function OrderDetail({ currentUser, order, onBack, onEdit, onTrig
                              {order.finishing_qc.isPassed ? <CheckCircle className="w-4 h-4 md:w-5 md:h-5"/> : <X className="w-4 h-4 md:w-5 md:h-5"/>}
                              {order.finishing_qc.isPassed ? 'Lolos QC' : 'Revisi QC'}
                          </div>
-                         {canEditQC && !isManager && (
+                         {canEditQC && (
                            <button onClick={handleDeleteQC} className="bg-white/50 hover:bg-white p-1 rounded text-red-600 hover:text-red-800 transition"><Trash2 className="w-3 h-3 md:w-4 md:h-4"/></button>
                          )}
                       </div>
@@ -331,7 +352,7 @@ export default function OrderDetail({ currentUser, order, onBack, onEdit, onTrig
                       {!order.finishing_qc.isPassed && <div className="text-[10px] italic">"{order.finishing_qc.notes}"</div>}
                   </div>
                 ) : (
-                (canEditQC && !isManager && order.status === 'Finishing' ? (
+                (canEditQC && order.status === 'Finishing' ? (
                   <div className="space-y-2 md:space-y-3">
                     <textarea placeholder="Catatan revisi (wajib diisi jika revisi)..." className="w-full text-xs md:text-sm p-2 md:p-3 border-2 border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none text-slate-800 placeholder-slate-400" value={qcNote} onChange={e=>setQcNote(e.target.value)} rows={3}/>
                     <div className="flex gap-2">
@@ -352,7 +373,7 @@ export default function OrderDetail({ currentUser, order, onBack, onEdit, onTrig
                         <div className="flex items-center gap-2">
                            <Package className="w-4 h-4 md:w-5 md:h-5"/> Sudah Dipacking
                         </div>
-                        {canEditQC && !isManager && (
+                        {canEditQC && (
                             <button onClick={() => handleFileDelete('packing')} className="bg-white/50 hover:bg-white p-1 rounded text-red-600 hover:text-red-800 transition"><Trash2 className="w-3 h-3 md:w-4 md:h-4"/></button>
                         )}
                     </div>
@@ -366,7 +387,7 @@ export default function OrderDetail({ currentUser, order, onBack, onEdit, onTrig
                     )}
                 </div>
                ) : (
-                (canEditQC && !isManager && order.status === 'Finishing' && order.finishing_qc.isPassed ? <button onClick={()=>onTriggerUpload('packing')} className="bg-purple-600 text-white text-xs md:text-sm w-full py-2 md:py-3 rounded-xl font-bold hover:bg-purple-700 flex items-center justify-center gap-2 shadow-lg"><Camera className="w-3 h-3 md:w-4 md:h-4"/> Foto Packing</button> : <div className="text-[10px] md:text-xs text-slate-400 italic py-2">Menunggu QC Lolos...</div>)
+                (canEditQC && order.status === 'Finishing' && order.finishing_qc.isPassed ? <button onClick={()=>onTriggerUpload('packing')} className="bg-purple-600 text-white text-xs md:text-sm w-full py-2 md:py-3 rounded-xl font-bold hover:bg-purple-700 flex items-center justify-center gap-2 shadow-lg"><Camera className="w-3 h-3 md:w-4 md:h-4"/> Foto Packing</button> : <div className="text-[10px] md:text-xs text-slate-400 italic py-2">Menunggu QC Lolos...</div>)
               )}
             </div>
          </div>
@@ -383,12 +404,12 @@ export default function OrderDetail({ currentUser, order, onBack, onEdit, onTrig
                  {order.shipping.bukti_kirim ? (
                      <div className="flex items-center gap-2">
                         <a href={order.shipping.bukti_kirim} target="_blank" className="text-green-600 font-bold underline hover:text-green-800">Lihat Bukti</a>
-                        {canEditShipping && !isManager && (
+                        {canEditShipping && (
                             <button onClick={() => handleFileDelete('shipping_kirim')} className="bg-red-50 text-red-500 p-1 rounded hover:bg-red-100 border border-red-200 ml-2"><Trash2 className="w-3 h-3"/></button>
                         )}
                      </div>
                  ) : (
-                     (canEditShipping && !isManager && order.status === 'Kirim' ? <button onClick={()=>onTriggerUpload('shipping_kirim')} className="text-[10px] md:text-xs bg-blue-600 text-white px-3 py-1.5 rounded-lg font-bold hover:bg-blue-700 shadow-sm">Upload</button> : <span className="text-slate-300 font-bold">-</span>)
+                     (canEditShipping && (order.status === 'Kirim' || order.status === 'Selesai') ? <button onClick={()=>onTriggerUpload('shipping_kirim')} className="text-[10px] md:text-xs bg-blue-600 text-white px-3 py-1.5 rounded-lg font-bold hover:bg-blue-700 shadow-sm">Upload</button> : <span className="text-slate-300 font-bold">-</span>)
                  )}
              </div>
              {order.shipping.uploaded_by_kirim && (
@@ -403,12 +424,12 @@ export default function OrderDetail({ currentUser, order, onBack, onEdit, onTrig
                  {order.shipping.bukti_terima ? (
                      <div className="flex items-center gap-2">
                         <a href={order.shipping.bukti_terima} target="_blank" className="text-green-600 font-bold underline hover:text-green-800">Lihat Bukti</a>
-                        {canEditShipping && !isManager && (
+                        {canEditShipping && (
                             <button onClick={() => handleFileDelete('shipping_terima')} className="bg-red-50 text-red-500 p-1 rounded hover:bg-red-100 border border-red-200 ml-2"><Trash2 className="w-3 h-3"/></button>
                         )}
                      </div>
                  ) : (
-                     (canEditShipping && !isManager && order.status === 'Kirim' ? <button onClick={()=>onTriggerUpload('shipping_terima')} className="text-[10px] md:text-xs bg-orange-600 text-white px-3 py-1.5 rounded-lg font-bold hover:bg-orange-700 shadow-sm">Upload</button> : <span className="text-slate-300 font-bold">-</span>)
+                     (canEditShipping && (order.status === 'Kirim' || order.status === 'Selesai') ? <button onClick={()=>onTriggerUpload('shipping_terima')} className="text-[10px] md:text-xs bg-orange-600 text-white px-3 py-1.5 rounded-lg font-bold hover:bg-orange-700 shadow-sm">Upload</button> : <span className="text-slate-300 font-bold">-</span>)
                  )}
              </div>
              {order.shipping.uploaded_by_terima && (

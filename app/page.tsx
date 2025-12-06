@@ -96,19 +96,15 @@ export default function ProductionApp() {
           .eq('id', session.user.id)
           .single();
 
-          console.log("DEBUG: Data User Mentah dari DB:", userData);
-          console.log("DEBUG: Error dari DB:", error);
-          console.log("DEBUG: Permissions:", userData?.permissions);
-
         if (userData) {
-          // UPDATE: Menggunakan 'permissions' (JSON), bukan allowed_menus
+          // Menggunakan 'permissions' (JSON)
           setCurrentUser({
             id: session.user.id,
             username: userData.username || session.user.email || '',
             name: userData.name || session.user.email?.split('@')[0] || 'User',
             role: userData.role || 'prod',
             password: '',
-            permissions: userData.permissions || {}, // <--- INI PERUBAHAN PENTINGNYA
+            permissions: userData.permissions || {}, 
           });
         } else {
           console.error("User login di Auth tapi tidak ada di tabel public.users");
@@ -330,11 +326,15 @@ export default function ProductionApp() {
     const steps = orderData.jenis_produksi === 'manual' ? orderData.steps_manual : orderData.steps_dtf;
     const productionDone = steps.every((s: any) => s.isCompleted);
     
+    // Khusus untuk status 'Ada Kendala', status utama tidak boleh di-override
     if (orderData.status !== 'Ada Kendala') {
       if (!hasApproval) newStatus = 'Pesanan Masuk';
       else if (!productionDone) newStatus = 'On Process';
       else if (!orderData.finishing_qc?.isPassed || !orderData.finishing_packing?.isPacked) newStatus = 'Finishing';
-      else if (!orderData.shipping?.bukti_kirim) newStatus = 'Kirim';
+      
+      // PERBAIKAN LOGIKA: Hanya pindah ke 'Selesai' jika SUDAH DITERIMA
+      else if (!orderData.shipping?.bukti_terima) newStatus = 'Kirim';
+      
       else newStatus = 'Selesai';
     }
 
