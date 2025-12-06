@@ -1,15 +1,26 @@
 export type UserRole = 'admin' | 'produksi' | 'qc' | 'manager' | 'supervisor';
 export type OrderStatus = 'Pesanan Masuk' | 'On Process' | 'Finishing' | 'Revisi' | 'Kirim' | 'Selesai' | 'Ada Kendala';
 
+// --- STRUKTUR PERMISSION BARU ---
+export interface MenuPermission {
+  view: boolean;    // Ceklis "Lihat"
+  create?: boolean; // Ceklis "Buat"
+  edit?: boolean;   // Ceklis "Ubah"
+  delete?: boolean; // Ceklis "Hapus"
+}
+
 export interface UserData {
   id: string;
   username: string;
   password: string; 
   name: string;
   role: UserRole;
-  allowed_menus?: string[]; // <--- TAMBAHAN BARU
+  permissions?: Record<string, MenuPermission>; // <--- Ganti allowed_menus jadi ini
+  // (Opsional: allowed_menus boleh tetap ada atau dihapus)
+  allowed_menus?: string[];
 }
 
+// ... Interface lainnya (ProductionStep, Order, dll) tetap sama ...
 export interface ProductionStep {
   id: string;
   name: string;
