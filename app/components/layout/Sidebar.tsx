@@ -29,11 +29,6 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen, currentUser, acti
   const router = useRouter();
   const supabase = createClientComponentClient();
 
-  // --- DEBUGGING LOG (Cek Console Browser setelah save) ---
-  console.log("SIDEBAR RENDER - Permissions:", currentUser.permissions);
-  console.log("Check Dashboard View:", currentUser.permissions?.['dashboard']?.view);
-  // -------------------------------------------------------
-
   // --- LOGIKA HAK AKSES (DILONGGARKAN) ---
   const canAccess = (menuId: string) => {
     // Gunakan Boolean() untuk menangkap 'true' (string) atau true (boolean)
