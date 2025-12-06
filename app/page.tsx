@@ -89,22 +89,26 @@ export default function ProductionApp() {
       const { data: { session } } = await supabase.auth.getSession();
 
       if (session) {
-        // PERBAIKAN DI SINI: Fetch data user
+        // Fetch data user detail dari tabel public.users
         const { data: userData, error } = await supabase
           .from('users')
-          .select('*') // Ini sudah benar mengambil semua kolom
+          .select('*') 
           .eq('id', session.user.id)
           .single();
 
+          console.log("DEBUG: Data User Mentah dari DB:", userData);
+          console.log("DEBUG: Error dari DB:", error);
+          console.log("DEBUG: Permissions:", userData?.permissions);
+
         if (userData) {
-          // UPDATE DI SINI: Memasukkan allowed_menus ke state
+          // UPDATE: Menggunakan 'permissions' (JSON), bukan allowed_menus
           setCurrentUser({
             id: session.user.id,
             username: userData.username || session.user.email || '',
             name: userData.name || session.user.email?.split('@')[0] || 'User',
             role: userData.role || 'prod',
             password: '',
-            allowed_menus: userData.allowed_menus || [], // <--- INI KUNCI PERBAIKANNYA
+            permissions: userData.permissions || {}, // <--- INI PERUBAHAN PENTINGNYA
           });
         } else {
           console.error("User login di Auth tapi tidak ada di tabel public.users");
@@ -150,7 +154,7 @@ export default function ProductionApp() {
     return () => { supabase.removeChannel(channel); };
   }, [currentUser]);
 
-  // --- DATA FETCHING FUNCTIONS (tetap) ---
+  // --- DATA FETCHING FUNCTIONS ---
   const fetchOrders = async () => {
     const { data } = await supabase.from('orders').select('*').order('created_at', { ascending: false });
     if (data) {
@@ -173,7 +177,7 @@ export default function ProductionApp() {
     else if (productionTypes.length === 0) setProductionTypes(DEFAULT_PRODUCTION_TYPES);
   };
 
-  // --- LOGIC: ORDERS (tetap) ---
+  // --- LOGIC: ORDERS ---
   const generateProductionCode = () => {
     const now = new Date();
     const month = String(now.getMonth() + 1).padStart(2, '0');
@@ -268,7 +272,7 @@ export default function ProductionApp() {
     });
   };
 
-  // --- LOGIC: UPLOADS & STATUS (tetap) ---
+  // --- LOGIC: UPLOADS & STATUS ---
   const triggerUpload = (targetType: string, stepId?: string, kendalaId?: string) => {
     const input = document.createElement('input');
     input.type = 'file';
@@ -326,7 +330,6 @@ export default function ProductionApp() {
     const steps = orderData.jenis_produksi === 'manual' ? orderData.steps_manual : orderData.steps_dtf;
     const productionDone = steps.every((s: any) => s.isCompleted);
     
-    // Khusus untuk status 'Ada Kendala', status utama tidak boleh di-override
     if (orderData.status !== 'Ada Kendala') {
       if (!hasApproval) newStatus = 'Pesanan Masuk';
       else if (!productionDone) newStatus = 'On Process';
@@ -334,7 +337,6 @@ export default function ProductionApp() {
       else if (!orderData.shipping?.bukti_kirim) newStatus = 'Kirim';
       else newStatus = 'Selesai';
     }
-
 
     const { error } = await supabase.from('orders').update({
       ...orderData,
@@ -345,14 +347,13 @@ export default function ProductionApp() {
     else fetchOrders();
   };
 
-  // --- LOGIC: SETTINGS & CONFIG (tetap) ---
+  // --- LOGIC: SETTINGS & CONFIG ---
   const handleSaveUser = async (u: any) => {
-    // Pastikan allowed_menus ikut disimpan jika ada perubahan di SettingsPage
     const payload: any = { name: u.name, role: u.role, username: u.username };
     
-    // Jika ada update allowed_menus dari form
-    if (u.allowed_menus) {
-        payload.allowed_menus = u.allowed_menus;
+    // UPDATE: Simpan Permissions Object (JSON)
+    if (u.permissions) {
+        payload.permissions = u.permissions;
     }
     
     if (u.id) {
@@ -396,7 +397,6 @@ export default function ProductionApp() {
   if (loadingUser) {
       return (
         <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50">
-          {/* Animasi Spinner */}
           <div className="w-12 h-12 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin mb-4"></div>
           <p className="text-slate-500 font-medium animate-pulse">Menyiapkan Dashboard...</p>
         </div>
@@ -418,7 +418,7 @@ export default function ProductionApp() {
         setSidebarOpen={setSidebarOpen} 
         currentUser={currentUser} 
         activeTab={activeTab} 
-        // @ts-ignore - Karena SidebarProps didefinisikan di sini
+        // @ts-ignore
         handleNav={(tab: any) => { setActiveTab(tab); setView('list'); setSidebarOpen(false); }} 
       />
 
@@ -519,7 +519,6 @@ export default function ProductionApp() {
                  <ConfigPriceView />
               )}
               
-              {/* Tambahan Tampilan About */}
               {activeTab === 'about' && (
                  <AboutView />
               )}

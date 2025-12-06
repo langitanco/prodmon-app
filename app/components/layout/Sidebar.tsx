@@ -29,12 +29,17 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen, currentUser, acti
   const router = useRouter();
   const supabase = createClientComponentClient();
 
-  // --- LOGIKA BARU HAK AKSES ---
-  // Fungsi helper untuk cek apakah user punya izin ke menu tertentu
+  // --- DEBUGGING LOG (Cek Console Browser setelah save) ---
+  console.log("SIDEBAR RENDER - Permissions:", currentUser.permissions);
+  console.log("Check Dashboard View:", currentUser.permissions?.['dashboard']?.view);
+  // -------------------------------------------------------
+
+  // --- LOGIKA HAK AKSES (DILONGGARKAN) ---
   const canAccess = (menuId: string) => {
-    // Jika allowed_menus belum ada (misal data lama), kembalikan false atau true sesuai kebijakan
-    // Di sini kita anggap array kosong = tidak ada akses
-    return currentUser.allowed_menus?.includes(menuId);
+    // Gunakan Boolean() untuk menangkap 'true' (string) atau true (boolean)
+    // dan Optional Chaining (?.) untuk keamanan
+    const perm = currentUser.permissions?.[menuId];
+    return Boolean(perm?.view); 
   };
 
   const handleLogout = async () => {
@@ -73,7 +78,7 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen, currentUser, acti
               SuperApp
             </p>
             <div className="inline-block bg-slate-800 text-slate-400 text-[10px] px-1.5 py-0.5 rounded mt-1.5 font-mono border border-slate-700">
-              V.5.8
+              V.6.0
             </div>
           </div>
 
@@ -119,7 +124,6 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen, currentUser, acti
           )}
 
           {/* GROUP: APLIKASI LAIN */}
-          {/* Hanya tampil jika salah satu anak menu di dalamnya diizinkan */}
           {(canAccess('kalkulator') || canAccess('config_harga')) && (
             <div className="pt-4 mt-4 border-t border-slate-700">
               <p className="px-4 text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-2">Aplikasi Lain</p>

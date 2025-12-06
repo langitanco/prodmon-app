@@ -11,29 +11,34 @@ interface ChangelogEntry {
 
 const APP_INFO = {
   name: "LCO SuperApp",
-  version: "V.5.9", 
+  version: "V.6.0",  // Updated Version
   purpose: "Aplikasi produksi Sablon, Langitan.co.",
   creator: "Tim Developer Langitan.co",
   creationDate: "Desember 2025",
 };
 
-// --- DATA UPDATE DIGABUNG DI SINI ---
+// --- DATA RIWAYAT UPDATE ---
 const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: "6.0",
+    date: "2025-12-07",
+    changes: [
+      // Major Update Malam Ini (Sistem Matrix)
+      "Matrix Hak Akses (CRUD): Upgrade besar sistem keamanan. Kini akses user bisa diatur sangat spesifik: Siapa yang boleh Melihat (View), Membuat (Create), Mengedit (Edit), atau Menghapus (Delete) data.",
+      "Database Security (RLS): Penerapan Row Level Security tingkat lanjut. Data kini terkunci rapat secara database dan hanya bisa diakses oleh user yang memiliki 'Tiket Izin' valid.",
+      "Manajemen User Lanjutan: Tampilan pengaturan user diperbarui dengan tabel matriks checklist untuk kontrol penuh atas izin tim.",
+      "Fix Bug Sidebar Blank: Perbaikan logika rendering menu sidebar yang sebelumnya sempat hilang (kosong) akibat ketidakcocokan tipe data permission.",
+    ],
+  },
   {
     version: "5.9",
     date: "2025-12-06",
     changes: [
-      // Update Hak Akses & UI (Malam ini)
       "Granular Access Control: Sistem hak akses baru berbasis checklist menu, tidak lagi kaku berdasarkan role.",
       "Dynamic Sidebar: Menu sidebar otomatis menyesuaikan dengan izin user.",
       "UI Improvement: Perbaikan kontras warna teks input (hitam pekat) agar lebih mudah dibaca.",
-      "User Settings: Penambahan panel checklist hak akses pada edit user.",
-      
-      // Update Dashboard & Kalkulator (Sebelumnya)
       "Logika HPP Manual: Perhitungan upah gesut kini proporsional berdasarkan jumlah warna.",
       "Privasi Data: Nominal upah SDM di kalkulator disembunyikan (digabung ke Cost Material).",
-      "Dashboard Visual: Grafik Pie Chart kini menampilkan detail angka saat disentuh.",
-      "Mobile UI: Teks status kendala yang panjang otomatis turun ke bawah (text-wrap).",
     ],
   },
   {
@@ -133,7 +138,7 @@ export default function AboutView() {
             )}
           </button>
 
-          {/* LIST CHANGELOG - DESIGN DISESUAIKAN DENGAN GAYA ASLI ANDA */}
+          {/* LIST CHANGELOG */}
           {showChangelog && (
              <div className="mt-4 space-y-4">
                 {CHANGELOG.map((log, index) => (
