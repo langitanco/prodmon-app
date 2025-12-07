@@ -20,6 +20,16 @@ export interface UserData {
   allowed_menus?: string[]; 
 }
 
+export type OrderStatus =
+  | 'Pesanan Masuk'
+  | 'On Process'
+  | 'Finishing'
+  | 'Kirim'
+  | 'Selesai'
+  | 'Revisi'
+  | 'Ada Kendala';
+
+
 export interface Order {
   id: string;
   created_at: string;
