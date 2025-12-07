@@ -1,11 +1,14 @@
 import React, { useState } from 'react';
-import { Pencil, Trash2, Users, Package, X, ShieldCheck, CheckSquare, Square } from 'lucide-react';
+import { Pencil, Trash2, Users, Package, X, ShieldCheck, CheckSquare, Square, FileX } from 'lucide-react';
 import { UserData, ProductionTypeData } from '@/types';
 
 // Definisi Struktur Menu & Kapabilitasnya
 const MENU_CAPABILITIES = [
   { id: 'dashboard', label: 'Dashboard', actions: ['view'] },
-  { id: 'orders', label: 'Daftar Pesanan', actions: ['view', 'create', 'edit', 'delete'] },
+  
+  // UPDATE: Menambahkan 'delete_files' di sini
+  { id: 'orders', label: 'Daftar Pesanan', actions: ['view', 'create', 'edit', 'delete', 'delete_files'] },
+  
   { id: 'trash', label: 'Sampah', actions: ['view', 'restore', 'delete_permanent'] },
   { id: 'kalkulator', label: 'Kalkulator HPP', actions: ['view'] },
   { id: 'config_harga', label: 'Pengaturan Harga', actions: ['view', 'edit'] },
@@ -66,11 +69,20 @@ export default function SettingsPage({ users, productionTypes, onSaveUser, onDel
     };
 
     // LOGIC DEPENDENCY (Otomatisasi)
-    // 1. Jika 'view' dimatikan -> Matikan semua sub-akses (create/edit/delete)
+    // 1. Jika 'view' dimatikan -> Matikan semua sub-akses
     if (action === 'view' && newVal === false) {
-       currentPerms[menuId] = { view: false, create: false, edit: false, delete: false }; 
+       // UPDATE: Reset juga delete_files
+       currentPerms[menuId] = { 
+         view: false, 
+         create: false, 
+         edit: false, 
+         delete: false, 
+         delete_files: false,
+         restore: false,
+         delete_permanent: false
+       }; 
     }
-    // 2. Jika salah satu sub-akses (create/edit/delete) dinyalakan -> Otomatis nyalakan 'view'
+    // 2. Jika salah satu sub-akses dinyalakan -> Otomatis nyalakan 'view'
     if (action !== 'view' && newVal === true) {
        currentPerms[menuId].view = true;
     }
@@ -141,7 +153,7 @@ export default function SettingsPage({ users, productionTypes, onSaveUser, onDel
         </div>
       </div>
 
-      {/* Production Type Management (Tetap sama) */}
+      {/* Production Type Management */}
       <div className="space-y-6">
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
            <div>
@@ -183,7 +195,7 @@ export default function SettingsPage({ users, productionTypes, onSaveUser, onDel
       {/* User Modal - MATRIX PERMISSIONS UI */}
       {isUserModalOpen && editingUser && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[70] flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl w-full max-w-2xl shadow-2xl overflow-hidden transform transition-all scale-100 max-h-[90vh] flex flex-col">
+          <div className="bg-white rounded-2xl w-full max-w-4xl shadow-2xl overflow-hidden transform transition-all scale-100 max-h-[90vh] flex flex-col">
             
             {/* Header Modal */}
             <div className="p-4 border-b bg-slate-50 flex justify-between items-center flex-shrink-0">
@@ -232,11 +244,14 @@ export default function SettingsPage({ users, productionTypes, onSaveUser, onDel
                         <table className="w-full text-sm text-left">
                            <thead className="text-[10px] uppercase bg-white text-slate-500 font-bold border-b border-slate-200">
                              <tr>
-                               <th className="px-4 py-3 w-1/3">Nama Menu</th>
+                               <th className="px-4 py-3 min-w-[120px]">Nama Menu</th>
                                <th className="px-4 py-3 text-center">Lihat</th>
                                <th className="px-4 py-3 text-center">Tambah</th>
                                <th className="px-4 py-3 text-center">Edit</th>
-                               <th className="px-4 py-3 text-center">Hapus</th>
+                               <th className="px-4 py-3 text-center">Hapus Data</th>
+                               
+                               {/* KOLOM BARU UNTUK HAPUS FILE */}
+                               <th className="px-4 py-3 text-center bg-red-50 text-red-600">Hapus File</th>
                              </tr>
                            </thead>
                            <tbody className="divide-y divide-slate-200">
@@ -261,7 +276,6 @@ export default function SettingsPage({ users, productionTypes, onSaveUser, onDel
                                      <button 
                                        type="button"
                                        onClick={() => togglePermission(menu.id, 'create')}
-                                       // Disable jika View mati
                                        disabled={!editingUser.permissions?.[menu.id]?.view}
                                        className={`p-1.5 rounded transition ${editingUser.permissions?.[menu.id]?.create ? 'bg-green-100 text-green-600' : 'text-slate-300'} ${!editingUser.permissions?.[menu.id]?.view ? 'opacity-30 cursor-not-allowed' : 'hover:bg-slate-200'}`}
                                      >
@@ -284,9 +298,8 @@ export default function SettingsPage({ users, productionTypes, onSaveUser, onDel
                                    )}
                                  </td>
 
-                                 {/* Column 4: DELETE (Hapus) */}
+                                 {/* Column 4: DELETE (Hapus Data Pesanan) */}
                                  <td className="px-4 py-3 text-center">
-                                   {/* Standard Delete */}
                                    {menu.actions.includes('delete') && (
                                       <button 
                                         type="button"
@@ -297,10 +310,22 @@ export default function SettingsPage({ users, productionTypes, onSaveUser, onDel
                                         {editingUser.permissions?.[menu.id]?.delete ? <CheckSquare className="w-5 h-5"/> : <Square className="w-5 h-5"/>}
                                       </button>
                                    )}
-                                   
-                                   {/* Special Case: Trash Actions */}
-                                   {menu.id === 'trash' && (
-                                      <span className="text-[10px] text-slate-400 italic">Lihat Detail</span>
+                                 </td>
+
+                                 {/* Column 5: DELETE FILES (Hapus Bukti Upload) */}
+                                 <td className="px-4 py-3 text-center bg-slate-50">
+                                   {menu.actions.includes('delete_files') ? (
+                                      <button 
+                                        type="button"
+                                        onClick={() => togglePermission(menu.id, 'delete_files')}
+                                        disabled={!editingUser.permissions?.[menu.id]?.view}
+                                        className={`p-1.5 rounded transition ${editingUser.permissions?.[menu.id]?.delete_files ? 'bg-purple-100 text-purple-600' : 'text-slate-300'} ${!editingUser.permissions?.[menu.id]?.view ? 'opacity-30 cursor-not-allowed' : 'hover:bg-slate-200'}`}
+                                        title="Izin Hapus Bukti Upload"
+                                      >
+                                        {editingUser.permissions?.[menu.id]?.delete_files ? <FileX className="w-5 h-5"/> : <Square className="w-5 h-5"/>}
+                                      </button>
+                                   ) : (
+                                       <span className="text-slate-300">-</span>
                                    )}
                                  </td>
 
@@ -324,7 +349,7 @@ export default function SettingsPage({ users, productionTypes, onSaveUser, onDel
         </div>
       )}
 
-      {/* Type Modal (Tetap sama) */}
+      {/* Type Modal */}
       {isTypeModalOpen && editingType && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[70] flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl w-full max-w-md shadow-2xl overflow-hidden transform transition-all scale-100">

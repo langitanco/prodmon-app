@@ -457,6 +457,7 @@ export default function ProductionApp() {
                       onSelectOrder={(id: string) => { setSelectedOrderId(id); setView('detail'); }} 
                       onNewOrder={() => setView('create')}
                       onDeleteOrder={handleDeleteOrder}
+                      currentUser={currentUser} // <-- MENGIRIM DATA USER KE SINI
                     />
                   )}
                   

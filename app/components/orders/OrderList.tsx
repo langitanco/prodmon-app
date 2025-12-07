@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { formatDate, getDeadlineStatus, getStatusColor, MONTHS } from '@/lib/utils';
-import { Order, ProductionTypeData } from '@/types';
+import { Order, ProductionTypeData, UserData } from '@/types';
 import { AlertTriangle, BarChart3, Calendar, ClipboardList, Clock, FileText, Trash2 } from 'lucide-react';
 
 interface OrderListProps {
@@ -10,12 +10,16 @@ interface OrderListProps {
   onSelectOrder: (id: string) => void;
   onNewOrder: () => void;
   onDeleteOrder: (id: string) => void;
+  currentUser: UserData; // <-- Tambahan Prop
 }
 
-export default function OrderList({ role, orders, productionTypes, onSelectOrder, onNewOrder, onDeleteOrder }: OrderListProps) {
+export default function OrderList({ role, orders, productionTypes, onSelectOrder, onNewOrder, onDeleteOrder, currentUser }: OrderListProps) {
   const [statusFilter, setStatusFilter] = useState<string | null>(null);
   const [monthFilter, setMonthFilter] = useState<string>('all');
   const [typeFilter, setTypeFilter] = useState<string>('all');
+
+  // Cek Izin Hapus Pesanan (Global)
+  const canDeleteOrder = role === 'supervisor' || currentUser?.permissions?.orders?.delete === true;
 
   const filteredOrders = orders.filter((o) => {
     let statusMatch = true;
@@ -130,14 +134,20 @@ export default function OrderList({ role, orders, productionTypes, onSelectOrder
                   </div>
                 </div>
 
-                {role === 'supervisor' && (
+                {/* --- LOGIKA BARU: TOMBOL HAPUS DI LUAR --- */}
+                {canDeleteOrder && (
                   <button 
-                    onClick={(e) => { e.stopPropagation(); onDeleteOrder(order.id); }}
+                    onClick={(e) => { 
+                      e.stopPropagation(); // Agar tidak masuk ke detail
+                      onDeleteOrder(order.id); 
+                    }}
                     className="mt-3 w-full bg-red-50 text-red-600 px-3 py-1.5 md:py-2 rounded-lg text-[10px] md:text-xs font-bold hover:bg-red-100 transition border border-red-200 flex items-center justify-center gap-2"
                   >
-                    <Trash2 className="w-3 h-3 md:w-3.5 md:h-3.5"/> Hapus
+                    <Trash2 className="w-3 h-3 md:w-3.5 md:h-3.5"/> Hapus Pesanan
                   </button>
                 )}
+                {/* ----------------------------------------- */}
+
               </div>
              );
           })}

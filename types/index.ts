@@ -1,12 +1,13 @@
-export type UserRole = 'admin' | 'produksi' | 'qc' | 'manager' | 'supervisor';
-export type OrderStatus = 'Pesanan Masuk' | 'On Process' | 'Finishing' | 'Revisi' | 'Kirim' | 'Selesai' | 'Ada Kendala';
+// app/types/index.ts
 
-// --- STRUKTUR PERMISSION BARU ---
+export type UserRole = 'admin' | 'produksi' | 'qc' | 'manager' | 'supervisor';
+
 export interface MenuPermission {
-  view: boolean;    // Ceklis "Lihat"
-  create?: boolean; // Ceklis "Buat"
-  edit?: boolean;   // Ceklis "Ubah"
-  delete?: boolean; // Ceklis "Hapus"
+  view: boolean;
+  create?: boolean;
+  edit?: boolean;
+  delete?: boolean;       // Izin Hapus PESANAN (Global)
+  delete_files?: boolean; // Izin Hapus BUKTI UPLOAD (Spesifik)
 }
 
 export interface UserData {
@@ -15,20 +16,42 @@ export interface UserData {
   password: string; 
   name: string;
   role: UserRole;
-  permissions?: Record<string, MenuPermission>; // <--- Ganti allowed_menus jadi ini
-  // (Opsional: allowed_menus boleh tetap ada atau dihapus)
-  allowed_menus?: string[];
+  permissions?: Record<string, MenuPermission>; 
+  allowed_menus?: string[]; 
 }
 
-// ... Interface lainnya (ProductionStep, Order, dll) tetap sama ...
+export interface Order {
+  id: string;
+  created_at: string;
+  kode_produksi: string;
+  nama_pemesan: string;
+  no_hp: string;
+  jumlah: number;
+  tanggal_masuk: string;
+  deadline: string;
+  jenis_produksi: string;
+  status: 'Pesanan Masuk' | 'On Process' | 'Finishing' | 'Kirim' | 'Selesai' | 'Revisi' | 'Ada Kendala';
+  link_approval: { link: string | null; by: string | null; timestamp: string | null } | null;
+  steps_manual: ProductionStep[];
+  steps_dtf: ProductionStep[];
+  finishing_qc: { isPassed: boolean; notes: string; checkedBy?: string; timestamp?: string };
+  finishing_packing: { isPacked: boolean; fileUrl?: string | null; packedBy?: string | null; timestamp?: string | null };
+  shipping: { 
+    bukti_kirim?: string | null; uploaded_by_kirim?: string | null; timestamp_kirim?: string | null;
+    bukti_terima?: string | null; uploaded_by_terima?: string | null; timestamp_terima?: string | null;
+  };
+  kendala: KendalaNote[];
+  deleted_at?: string | null;
+}
+
 export interface ProductionStep {
   id: string;
   name: string;
-  type: 'upload_pdf' | 'upload_image' | 'status_update';
+  type: 'upload_image' | 'upload_pdf' | 'status_update';
   isCompleted: boolean;
-  timestamp?: string;
+  fileUrl?: string | null;
   uploadedBy?: string;
-  fileUrl?: string;
+  timestamp?: string;
 }
 
 export interface KendalaNote {
@@ -39,42 +62,11 @@ export interface KendalaNote {
   isResolved: boolean;
   resolvedBy?: string;
   resolvedTimestamp?: string;
-  buktiFile?: string;
+  buktiFile?: string | null;
 }
 
 export interface ProductionTypeData {
   id: string;
   name: string;
   value: string;
-}
-
-export interface Order {
-  id: string;
-  kode_produksi: string;
-  nama_pemesan: string;
-  no_hp: string;
-  jumlah: number;
-  tanggal_masuk: string;
-  deadline: string;
-  jenis_produksi: string;
-  status: OrderStatus;
-  
-  link_approval?: { link: string; by?: string; timestamp?: string; } | null;
-
-  steps_manual: ProductionStep[];
-  steps_dtf: ProductionStep[];
-  finishing_qc: { isPassed: boolean; notes: string; checkedBy?: string; timestamp?: string; };
-  finishing_packing: { isPacked: boolean; timestamp?: string; fileUrl?: string; packedBy?: string; };
-  
-  shipping: { 
-    bukti_kirim?: string; 
-    bukti_terima?: string; 
-    timestamp_kirim?: string; 
-    timestamp_terima?: string;
-    uploaded_by_kirim?: string; 
-    uploaded_by_terima?: string;
-  };
-  
-  kendala: KendalaNote[];
-  deleted_at?: string | null; 
 }
