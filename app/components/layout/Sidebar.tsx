@@ -12,7 +12,8 @@ import {
   DollarSign,
   Info 
 } from 'lucide-react';
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
+// GANTI IMPORT INI:
+import { createBrowserClient } from '@supabase/ssr';
 import { useRouter } from 'next/navigation';
 import { UserData } from '@/types'; 
 
@@ -27,7 +28,11 @@ interface SidebarProps {
 export default function Sidebar({ sidebarOpen, setSidebarOpen, currentUser, activeTab, handleNav }: SidebarProps) {
   
   const router = useRouter();
-  const supabase = createClientComponentClient();
+  // PERBAIKAN INISIASI:
+  const supabase = createBrowserClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  );
 
   // --- LOGIKA HAK AKSES (DILONGGARKAN) ---
   const canAccess = (menuId: string) => {

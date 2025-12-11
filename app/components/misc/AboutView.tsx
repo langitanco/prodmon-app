@@ -11,7 +11,7 @@ interface ChangelogEntry {
 
 const APP_INFO = {
   name: "LCO SuperApp",
-  version: "V.6.0",  // Updated Version
+  version: "V.6.1",  // UPDATED
   purpose: "Aplikasi produksi Sablon, Langitan.co.",
   creator: "Tim Developer Langitan.co",
   creationDate: "Desember 2025",
@@ -20,14 +20,23 @@ const APP_INFO = {
 // --- DATA RIWAYAT UPDATE ---
 const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "6.1",
+    date: "2025-12-12",
+    changes: [
+      "Revamp Kalkulator Sablon Manual: Kini mendukung perhitungan multi-area (Kecil, Sedang, Besar) dalam satu order untuk akurasi biaya gesut.",
+      "Core System Upgrade: Migrasi total ke `@supabase/ssr` untuk stabilitas penuh di Next.js 16 (Turbopack).",
+      "Fix Logika Status Kendala: Status pesanan kini otomatis kembali normal (Selesai/On Process) setelah semua kendala diselesaikan.",
+      "Smart Sorting: Tampilan pengaturan harga kini otomatis urut (Kecil -> Sedang -> Besar) agar lebih mudah dibaca.",
+    ],
+  },
+  {
     version: "6.0",
     date: "2025-12-07",
     changes: [
-      // Major Update Malam Ini (Sistem Matrix)
-      "Matrix Hak Akses (CRUD): Upgrade besar sistem keamanan. Kini akses user bisa diatur sangat spesifik: Siapa yang boleh Melihat (View), Membuat (Create), Mengedit (Edit), atau Menghapus (Delete) data.",
-      "Database Security (RLS): Penerapan Row Level Security tingkat lanjut. Data kini terkunci rapat secara database dan hanya bisa diakses oleh user yang memiliki 'Tiket Izin' valid.",
-      "Manajemen User Lanjutan: Tampilan pengaturan user diperbarui dengan tabel matriks checklist untuk kontrol penuh atas izin tim.",
-      "Fix Bug Sidebar Blank: Perbaikan logika rendering menu sidebar yang sebelumnya sempat hilang (kosong) akibat ketidakcocokan tipe data permission.",
+      "Matrix Hak Akses (CRUD): Upgrade besar sistem keamanan. Kini akses user bisa diatur sangat spesifik (View, Create, Edit, Delete).",
+      "Database Security (RLS): Penerapan Row Level Security tingkat lanjut.",
+      "Manajemen User Lanjutan: Tampilan pengaturan user diperbarui dengan tabel matriks checklist.",
+      "Fix Bug Sidebar Blank: Perbaikan logika rendering menu sidebar.",
     ],
   },
   {
@@ -36,9 +45,9 @@ const CHANGELOG: ChangelogEntry[] = [
     changes: [
       "Granular Access Control: Sistem hak akses baru berbasis checklist menu, tidak lagi kaku berdasarkan role.",
       "Dynamic Sidebar: Menu sidebar otomatis menyesuaikan dengan izin user.",
-      "UI Improvement: Perbaikan kontras warna teks input (hitam pekat) agar lebih mudah dibaca.",
+      "UI Improvement: Perbaikan kontras warna teks input agar lebih mudah dibaca.",
       "Logika HPP Manual: Perhitungan upah gesut kini proporsional berdasarkan jumlah warna.",
-      "Privasi Data: Nominal upah SDM di kalkulator disembunyikan (digabung ke Cost Material).",
+      "Privasi Data: Nominal upah SDM di kalkulator disembunyikan.",
     ],
   },
   {

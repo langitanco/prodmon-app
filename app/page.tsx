@@ -1,7 +1,8 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
+// PERBAIKAN: Menggunakan library baru
+import { createBrowserClient } from '@supabase/ssr';
 import { Menu } from 'lucide-react';
 
 // Layout & UI
@@ -69,8 +70,11 @@ export default function ProductionApp() {
     onConfirm?: () => void;
   }>({ isOpen: false, title: '', message: '', type: 'success' });
 
-  // Init Supabase
-  const supabase = createClientComponentClient();
+  // --- PERBAIKAN INISIASI SUPABASE ---
+  const supabase = createBrowserClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  );
 
   // --- HELPER ALERT ---
   const showAlert = (title: string, message: string, type: 'success' | 'error' = 'success') => {
@@ -321,30 +325,48 @@ export default function ProductionApp() {
   };
 
   const checkAutoStatus = async (orderData: Order) => {
-    let newStatus = orderData.status;
-    const hasApproval = !!orderData.link_approval?.link;
-    const steps = orderData.jenis_produksi === 'manual' ? orderData.steps_manual : orderData.steps_dtf;
-    const productionDone = steps.every((s: any) => s.isCompleted);
+    // 1. Cek apakah ada kendala yang BELUM selesai
+    // (Jika array kendala kosong/null, dianggap aman)
+    const hasUnresolvedKendala = Array.isArray(orderData.kendala) && 
+                                 orderData.kendala.some((k: any) => !k.isResolved);
+
+    // 2. Hitung Status Normal (Jika tidak ada masalah)
+    let normalStatus = 'Pesanan Masuk';
     
-    // Khusus untuk status 'Ada Kendala', status utama tidak boleh di-override
-    if (orderData.status !== 'Ada Kendala') {
-      if (!hasApproval) newStatus = 'Pesanan Masuk';
-      else if (!productionDone) newStatus = 'On Process';
-      else if (!orderData.finishing_qc?.isPassed || !orderData.finishing_packing?.isPacked) newStatus = 'Finishing';
-      
-      // PERBAIKAN LOGIKA: Hanya pindah ke 'Selesai' jika SUDAH DITERIMA
-      else if (!orderData.shipping?.bukti_terima) newStatus = 'Kirim';
-      
-      else newStatus = 'Selesai';
+    const hasApproval = !!orderData.link_approval?.link;
+    // Pastikan steps ada sebelum dicek
+    const steps = orderData.jenis_produksi === 'manual' ? orderData.steps_manual : orderData.steps_dtf;
+    const productionDone = Array.isArray(steps) && steps.every((s: any) => s.isCompleted);
+
+    if (!hasApproval) {
+        normalStatus = 'Pesanan Masuk';
+    } else if (!productionDone) {
+        normalStatus = 'On Process';
+    } else if (!orderData.finishing_qc?.isPassed || !orderData.finishing_packing?.isPacked) {
+        normalStatus = 'Finishing';
+    } else if (!orderData.shipping?.bukti_terima) {
+        normalStatus = 'Kirim';
+    } else {
+        normalStatus = 'Selesai';
     }
 
+    // 3. Tentukan Status Akhir
+    // Jika ada kendala aktif -> Paksa 'Ada Kendala'
+    // Jika bersih -> Gunakan status normal sesuai progres
+    const finalStatus = hasUnresolvedKendala ? 'Ada Kendala' : normalStatus;
+
+    // 4. SELALU UPDATE DATABASE
+    // Kita hapus pengecekan "if status changed" agar data kendala baru tetap tersimpan
     const { error } = await supabase.from('orders').update({
-      ...orderData,
-      status: newStatus
+      ...orderData,      // Simpan semua data (termasuk array kendala baru)
+      status: finalStatus // Simpan status hasil kalkulasi
     }).eq('id', orderData.id);
 
-    if (error) showAlert('Error Update', error.message, 'error');
-    else fetchOrders();
+    if (error) {
+        showAlert('Error Update', error.message, 'error');
+    } else {
+        fetchOrders();
+    }
   };
 
   // --- LOGIC: SETTINGS & CONFIG ---

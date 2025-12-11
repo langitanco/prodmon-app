@@ -2,13 +2,17 @@
 
 import React, { useState } from 'react';
 import { ClipboardList, Eye, EyeOff } from 'lucide-react';
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
+// PERBAIKAN: Menggunakan library baru @supabase/ssr
+import { createBrowserClient } from '@supabase/ssr';
 
 export default function LoginScreen() {
-  // Setup Client Supabase (Otak Baru)
-  const supabase = createClientComponentClient();
+  // PERBAIKAN: Inisiasi Client Supabase dengan cara baru
+  const supabase = createBrowserClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  );
 
-  // State untuk Input & UI (Wajah Lama)
+  // State untuk Input & UI
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -21,7 +25,6 @@ export default function LoginScreen() {
     setLoading(true);
 
     try {
-      // --- LOGIKA BARU (SISTEM COOKIES) ---
       // Login ke Supabase Auth
       const { error: loginError } = await supabase.auth.signInWithPassword({
         email: email,
@@ -32,20 +35,16 @@ export default function LoginScreen() {
         throw loginError;
       }
 
-      // Jika Sukses:
-      // Kita pakai window.location.reload() agar halaman utama (page.tsx)
-      // memuat ulang dan membaca Cookies sesi yang baru saja dibuat.
+      // Refresh halaman agar middleware mendeteksi cookie baru
       window.location.reload();
 
     } catch (err: any) {
-      // Tampilkan error jika gagal
       setError('Login Gagal. Cek Email & Password Anda.');
       console.error('Login Error:', err.message);
       setLoading(false);
     }
   };
 
-  // --- TAMPILAN LAMA (UI DESIGN) ---
   return (
     <div className="min-h-screen flex items-center justify-center bg-slate-900 p-4">
       <div className="bg-white w-full max-w-md rounded-2xl shadow-2xl overflow-hidden flex flex-col md:flex-row">
