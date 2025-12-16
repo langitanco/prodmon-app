@@ -1,7 +1,6 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-// PERBAIKAN: Menggunakan library baru
 import { createBrowserClient } from '@supabase/ssr';
 import { Menu } from 'lucide-react';
 
@@ -70,7 +69,7 @@ export default function ProductionApp() {
     onConfirm?: () => void;
   }>({ isOpen: false, title: '', message: '', type: 'success' });
 
-  // --- PERBAIKAN INISIASI SUPABASE ---
+  // --- INISIASI SUPABASE ---
   const supabase = createBrowserClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
@@ -101,7 +100,6 @@ export default function ProductionApp() {
           .single();
 
         if (userData) {
-          // Menggunakan 'permissions' (JSON)
           setCurrentUser({
             id: session.user.id,
             username: userData.username || session.user.email || '',
@@ -154,6 +152,41 @@ export default function ProductionApp() {
     return () => { supabase.removeChannel(channel); };
   }, [currentUser]);
 
+  // --- FITUR BARU: SCANNER OTOMATIS STATUS TELAT ---
+  const scanAndFixOverdueOrders = async (currentOrders: Order[]) => {
+    const today = new Date().toISOString().split('T')[0]; // Format: YYYY-MM-DD
+    const updates = [];
+    let hasUpdates = false;
+
+    for (const order of currentOrders) {
+      // 1. Lewati jika status sudah final atau memang sudah ditandai telat/kendala
+      if (['Selesai', 'Kirim', 'Ada Kendala', 'Telat'].includes(order.status)) {
+        continue;
+      }
+
+      // 2. Cek apakah deadline sudah lewat hari ini
+      if (order.deadline && order.deadline < today) {
+        console.log(`Auto-fixing overdue order: ${order.kode_produksi}`);
+        
+        updates.push(
+          supabase
+            .from('orders')
+            .update({ status: 'Telat' }) // Paksa update ke database
+            .eq('id', order.id)
+        );
+        hasUpdates = true;
+      }
+    }
+
+    // 3. Eksekusi update jika ada yang telat
+    if (hasUpdates && updates.length > 0) {
+      await Promise.all(updates);
+      console.log('Status telat berhasil diperbarui');
+      // Refresh ulang data agar tampilan berubah merah
+      fetchOrders(); 
+    }
+  };
+
   // --- DATA FETCHING FUNCTIONS ---
   const fetchOrders = async () => {
     const { data } = await supabase.from('orders').select('*').order('created_at', { ascending: false });
@@ -163,6 +196,12 @@ export default function ProductionApp() {
         kendala: Array.isArray(o.kendala) ? o.kendala : []
       }));
       setOrders(parsed);
+
+      // --- PANGGIL SCANNER SETELAH DATA DIAMBIL ---
+      // Delay 1 detik agar tidak memberatkan render awal
+      setTimeout(() => {
+        scanAndFixOverdueOrders(parsed);
+      }, 1000);
     }
   };
 
@@ -232,18 +271,45 @@ export default function ProductionApp() {
 
   const handleEditOrder = async (editedData: any) => {
     if (!selectedOrderId) return;
-    const { error } = await supabase.from('orders').update({
+
+    // 1. Ambil data order LAMA dulu untuk mendapatkan struktur lengkap (steps, kendala, dll)
+    const oldOrder = orders.find(o => o.id === selectedOrderId);
+    if (!oldOrder) return;
+
+    // 2. Siapkan data baru untuk diupdate ke database
+    const updates = {
       nama_pemesan: editedData.nama,
       no_hp: editedData.hp,
       jumlah: parseInt(editedData.jumlah),
-      deadline: editedData.deadline,
+      deadline: editedData.deadline, // <--- Deadline baru
       jenis_produksi: editedData.type
-    }).eq('id', selectedOrderId);
+    };
+
+    // 3. Lakukan Update ke Database
+    const { error } = await supabase.from('orders').update(updates).eq('id', selectedOrderId);
 
     if (!error) {
+      // --- PERBAIKAN UTAMA DI SINI ---
+      
+      // Kita buat object bayangan yang menggabungkan data lama + data baru (terutama deadline baru)
+      // Ini agar fungsi checkAutoStatus menghitung berdasarkan Deadline TERBARU, bukan yang lama.
+      const mergedOrderForCheck = {
+          ...oldOrder,
+          ...updates, 
+          // Pastikan deadline menggunakan yang baru diedit
+          deadline: editedData.deadline 
+      };
+
+      // 4. Paksa hitung ulang status saat itu juga
+      // Karena deadline sudah mundur, logika di checkAutoStatus akan melihat:
+      // "Oh, deadline > hari ini, berarti TIDAK TELAT".
+      // Maka status akan dikembalikan ke 'Pesanan Masuk' / 'On Process' / 'Finishing'
+      await checkAutoStatus(mergedOrderForCheck);
+
+      // 5. Refresh tampilan
       await fetchOrders();
       setView('detail');
-      showAlert('Sukses', 'Data berhasil diupdate');
+      showAlert('Sukses', 'Data berhasil diupdate dan Status diperbarui otomatis');
     } else {
       showAlert('Error', error.message, 'error');
     }
@@ -326,15 +392,13 @@ export default function ProductionApp() {
 
   const checkAutoStatus = async (orderData: Order) => {
     // 1. Cek apakah ada kendala yang BELUM selesai
-    // (Jika array kendala kosong/null, dianggap aman)
     const hasUnresolvedKendala = Array.isArray(orderData.kendala) && 
                                  orderData.kendala.some((k: any) => !k.isResolved);
 
-    // 2. Hitung Status Normal (Jika tidak ada masalah)
+    // 2. Hitung Status Normal (Berdasarkan progres langkah-langkah)
     let normalStatus = 'Pesanan Masuk';
     
     const hasApproval = !!orderData.link_approval?.link;
-    // Pastikan steps ada sebelum dicek
     const steps = orderData.jenis_produksi === 'manual' ? orderData.steps_manual : orderData.steps_dtf;
     const productionDone = Array.isArray(steps) && steps.every((s: any) => s.isCompleted);
 
@@ -350,16 +414,28 @@ export default function ProductionApp() {
         normalStatus = 'Selesai';
     }
 
-    // 3. Tentukan Status Akhir
-    // Jika ada kendala aktif -> Paksa 'Ada Kendala'
-    // Jika bersih -> Gunakan status normal sesuai progres
-    const finalStatus = hasUnresolvedKendala ? 'Ada Kendala' : normalStatus;
+    // 3. Cek Status Telat (LOGIKA BARU & PERBAIKAN)
+    const today = new Date().toISOString().split('T')[0]; // Format: YYYY-MM-DD
+    const isLate = orderData.deadline && orderData.deadline < today;
+    const isFinished = ['Kirim', 'Selesai'].includes(normalStatus);
+    
 
-    // 4. SELALU UPDATE DATABASE
-    // Kita hapus pengecekan "if status changed" agar data kendala baru tetap tersimpan
+    // 4. Tentukan Status Akhir dengan Prioritas
+    let finalStatus = normalStatus;
+
+    if (hasUnresolvedKendala) {
+        // Prioritas 1: Ada Kendala
+        finalStatus = 'Ada Kendala';
+    } else if (isLate && !isFinished) {
+        // Prioritas 2: Telat (dan belum selesai)
+        finalStatus = 'Telat';
+    } 
+    // Prioritas 3: Gunakan status normal
+
+    // 5. UPDATE DATABASE
     const { error } = await supabase.from('orders').update({
-      ...orderData,      // Simpan semua data (termasuk array kendala baru)
-      status: finalStatus // Simpan status hasil kalkulasi
+      ...orderData,      
+      status: finalStatus 
     }).eq('id', orderData.id);
 
     if (error) {
@@ -373,7 +449,7 @@ export default function ProductionApp() {
   const handleSaveUser = async (u: any) => {
     const payload: any = { name: u.name, role: u.role, username: u.username };
     
-    // UPDATE: Simpan Permissions Object (JSON)
+    // Simpan Permissions Object (JSON)
     if (u.permissions) {
         payload.permissions = u.permissions;
     }
@@ -479,7 +555,7 @@ export default function ProductionApp() {
                       onSelectOrder={(id: string) => { setSelectedOrderId(id); setView('detail'); }} 
                       onNewOrder={() => setView('create')}
                       onDeleteOrder={handleDeleteOrder}
-                      currentUser={currentUser} // <-- MENGIRIM DATA USER KE SINI
+                      currentUser={currentUser} 
                     />
                   )}
                   

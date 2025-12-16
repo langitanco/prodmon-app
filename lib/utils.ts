@@ -38,18 +38,22 @@ export const formatDate = (dateStr: string) => {
 };
 
 export const getDeadlineStatus = (deadlineStr: string, status: OrderStatus) => {
-  if (status === 'Selesai') return 'safe';
+  // Jika status sudah Selesai atau Kirim, tidak perlu dianggap overdue meskipun tanggal lewat
+  if (status === 'Selesai' || status === 'Kirim') return 'safe';
+  
   const deadline = new Date(deadlineStr);
   const today = new Date();
   today.setHours(0,0,0,0);
+  
   const diffTime = deadline.getTime() - today.getTime();
   const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)); 
+  
   if (diffDays < 0) return 'overdue';
   if (diffDays <= 2) return 'warning';
   return 'safe';
 };
 
-export const getStatusColor = (status: OrderStatus) => {
+export const getStatusColor = (status: OrderStatus | string) => { // Update type agar menerima string 'Telat'
   switch (status) {
     case 'Pesanan Masuk': return 'bg-gray-100 text-gray-800 border-gray-300';
     case 'On Process': return 'bg-blue-100 text-blue-800 border-blue-300';
@@ -58,6 +62,10 @@ export const getStatusColor = (status: OrderStatus) => {
     case 'Ada Kendala': return 'bg-orange-100 text-orange-800 border-orange-300';
     case 'Kirim': return 'bg-cyan-100 text-cyan-800 border-cyan-300';
     case 'Selesai': return 'bg-emerald-100 text-emerald-800 border-emerald-300';
+    
+    // --- TAMBAHAN UNTUK STATUS TELAT ---
+    case 'Telat': return 'bg-red-100 text-red-800 border-red-300'; 
+    
     default: return 'bg-gray-100 text-gray-800';
   }
 };

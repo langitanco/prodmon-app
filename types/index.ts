@@ -2,22 +2,78 @@
 
 export type UserRole = 'admin' | 'produksi' | 'qc' | 'manager' | 'supervisor';
 
-export interface MenuPermission {
-  view: boolean;
-  create?: boolean;
-  edit?: boolean;
-  delete?: boolean;       // Izin Hapus PESANAN (Global)
-  delete_files?: boolean; // Izin Hapus BUKTI UPLOAD (Spesifik)
+// --- UPDATE: DEFINISI MATRIX HAK AKSES ---
+export interface UserPermissions {
+  // 1. Akses Halaman (Menu Sidebar)
+  // (Jika config_harga=true, maka user BISA LIHAT)
+  pages: {
+    dashboard: boolean;
+    orders: boolean;
+    kalkulator: boolean;
+    settings: boolean;
+    trash: boolean;
+    config_harga: boolean; 
+    about: boolean;
+  };
+  
+  // 2. Akses Global Order
+  orders: {
+    create: boolean;  
+    edit: boolean;    
+    delete: boolean;  
+    restore: boolean; 
+    permanent_delete: boolean; 
+  };
+
+  // 3. Produksi MANUAL
+  prod_manual: {
+    step_process: boolean; 
+    upload_approval: boolean;
+    access_files: boolean; 
+    delete_files: boolean; 
+  };
+
+  // 4. Produksi DTF
+  prod_dtf: {
+    step_process: boolean; 
+    upload_approval: boolean;
+    access_files: boolean;
+    delete_files: boolean;
+  };
+
+  // 5. Finishing & QC
+  finishing: {
+    qc_check: boolean; 
+    qc_reset: boolean; 
+    packing_update: boolean; 
+    shipping_update: boolean; 
+    delete_files: boolean; 
+  };
+
+  // 6. KHUSUS HARGA (BARU)
+  price_config: {
+    edit: boolean; // Jika false = Read Only (Cuma lihat)
+  };
 }
+
+// Default Permissions
+export const DEFAULT_PERMISSIONS: UserPermissions = {
+  pages: { dashboard: true, orders: true, kalkulator: true, settings: false, trash: false, config_harga: false, about: true },
+  orders: { create: false, edit: false, delete: false, restore: false, permanent_delete: false },
+  prod_manual: { step_process: false, upload_approval: false, access_files: true, delete_files: false },
+  prod_dtf: { step_process: false, upload_approval: false, access_files: true, delete_files: false },
+  finishing: { qc_check: false, qc_reset: false, packing_update: false, shipping_update: false, delete_files: false },
+  // Default: Tidak bisa edit harga
+  price_config: { edit: false } 
+};
 
 export interface UserData {
   id: string;
   username: string;
-  password: string; 
+  password?: string; 
   name: string;
   role: UserRole;
-  permissions?: Record<string, MenuPermission>; 
-  allowed_menus?: string[]; 
+  permissions: UserPermissions; 
 }
 
 export type OrderStatus =
@@ -27,8 +83,8 @@ export type OrderStatus =
   | 'Kirim'
   | 'Selesai'
   | 'Revisi'
-  | 'Ada Kendala';
-
+  | 'Ada Kendala'
+  | 'Telat'; 
 
 export interface Order {
   id: string;
@@ -40,7 +96,7 @@ export interface Order {
   tanggal_masuk: string;
   deadline: string;
   jenis_produksi: string;
-  status: 'Pesanan Masuk' | 'On Process' | 'Finishing' | 'Kirim' | 'Selesai' | 'Revisi' | 'Ada Kendala';
+  status: OrderStatus; 
   link_approval: { link: string | null; by: string | null; timestamp: string | null } | null;
   steps_manual: ProductionStep[];
   steps_dtf: ProductionStep[];
