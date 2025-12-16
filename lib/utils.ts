@@ -1,4 +1,6 @@
-import { OrderStatus, ProductionStep, UserData, ProductionTypeData } from "@/types";
+// app/lib/utils.ts
+
+import { OrderStatus, ProductionStep, UserData, ProductionTypeData, DEFAULT_PERMISSIONS } from "@/types";
 
 // --- CONSTANTS ---
 export const INITIAL_STEPS_MANUAL: ProductionStep[] = [
@@ -18,12 +20,48 @@ export const MONTHS = [
   'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'
 ];
 
+// --- PERBAIKAN DI SINI: MENAMBAHKAN permissions: DEFAULT_PERMISSIONS ---
 export const DEFAULT_USERS: UserData[] = [
-  { id: '1', username: 'supervisor', password: '123', name: 'Supervisor', role: 'supervisor' },
-  { id: '2', username: 'admin', password: '123', name: 'Admin Utama', role: 'admin' },
-  { id: '3', username: 'prod', password: '123', name: 'Staff Produksi', role: 'produksi' },
-  { id: '4', username: 'qc', password: '123', name: 'Staff QC', role: 'qc' },
-  { id: '5', username: 'manager', password: '123', name: 'Manager/CEO', role: 'manager' },
+  { 
+    id: '1', 
+    username: 'supervisor', 
+    password: '123', 
+    name: 'Supervisor', 
+    role: 'supervisor', 
+    permissions: DEFAULT_PERMISSIONS // <--- Wajib ada
+  },
+  { 
+    id: '2', 
+    username: 'admin', 
+    password: '123', 
+    name: 'Admin Utama', 
+    role: 'admin', 
+    permissions: DEFAULT_PERMISSIONS // <--- Wajib ada
+  },
+  { 
+    id: '3', 
+    username: 'prod', 
+    password: '123', 
+    name: 'Staff Produksi', 
+    role: 'produksi', 
+    permissions: DEFAULT_PERMISSIONS // <--- Wajib ada
+  },
+  { 
+    id: '4', 
+    username: 'qc', 
+    password: '123', 
+    name: 'Staff QC', 
+    role: 'qc', 
+    permissions: DEFAULT_PERMISSIONS // <--- Wajib ada
+  },
+  { 
+    id: '5', 
+    username: 'manager', 
+    password: '123', 
+    name: 'Manager/CEO', 
+    role: 'manager', 
+    permissions: DEFAULT_PERMISSIONS // <--- Wajib ada
+  },
 ];
 
 export const DEFAULT_PRODUCTION_TYPES: ProductionTypeData[] = [
@@ -53,7 +91,7 @@ export const getDeadlineStatus = (deadlineStr: string, status: OrderStatus) => {
   return 'safe';
 };
 
-export const getStatusColor = (status: OrderStatus | string) => { // Update type agar menerima string 'Telat'
+export const getStatusColor = (status: OrderStatus | string) => { 
   switch (status) {
     case 'Pesanan Masuk': return 'bg-gray-100 text-gray-800 border-gray-300';
     case 'On Process': return 'bg-blue-100 text-blue-800 border-blue-300';
@@ -62,10 +100,7 @@ export const getStatusColor = (status: OrderStatus | string) => { // Update type
     case 'Ada Kendala': return 'bg-orange-100 text-orange-800 border-orange-300';
     case 'Kirim': return 'bg-cyan-100 text-cyan-800 border-cyan-300';
     case 'Selesai': return 'bg-emerald-100 text-emerald-800 border-emerald-300';
-    
-    // --- TAMBAHAN UNTUK STATUS TELAT ---
     case 'Telat': return 'bg-red-100 text-red-800 border-red-300'; 
-    
     default: return 'bg-gray-100 text-gray-800';
   }
 };
