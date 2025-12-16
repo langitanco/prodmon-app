@@ -34,10 +34,14 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen, currentUser, acti
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
   );
 
-  // --- PERBAIKAN DI SINI ---
-  // Kita tidak lagi menggunakan fungsi 'canAccess(string)'
-  // Tapi kita ambil langsung objek 'pages' dari permissions
+  // --- LOGIKA HAK AKSES "SAFEGUARD" ---
+  // 1. Ambil permissions page
   const p = currentUser?.permissions?.pages;
+  
+  // 2. Cek apakah user adalah SUPERVISOR?
+  // Jika Supervisor, kita beri "Kartu Sakti" (TRUE) untuk semua menu.
+  // Ini mencegah sidebar hilang jika data permission di database belum update/kosong.
+  const isSuper = currentUser?.role === 'supervisor';
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
@@ -75,7 +79,7 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen, currentUser, acti
               SuperApp
             </p>
             <div className="inline-block bg-slate-800 text-slate-400 text-[10px] px-1.5 py-0.5 rounded mt-1.5 font-mono border border-slate-700">
-              V.6.5 Matrix
+              V.6.5
             </div>
           </div>
 
@@ -93,9 +97,9 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen, currentUser, acti
         {/* Menu Navigasi */}
         <nav className="flex-1 overflow-y-auto p-4 space-y-2 scrollbar-thin scrollbar-thumb-slate-700">
           
-          {/* LOGIKA BARU: Cek langsung ke p?.nama_menu */}
+          {/* LOGIKA: Tampilkan jika (Dia Supervisor) ATAU (Punya Izin Dashboard) */}
           
-          {p?.dashboard && (
+          {(isSuper || p?.dashboard) && (
             <button 
               onClick={() => handleNav('dashboard')}
               className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-xl transition font-medium ${activeTab === 'dashboard' ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/50' : 'text-slate-400 hover:bg-slate-800 hover:text-white'}`}
@@ -104,7 +108,7 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen, currentUser, acti
             </button>
           )}
           
-          {p?.orders && (
+          {(isSuper || p?.orders) && (
             <button 
               onClick={() => handleNav('orders')}
               className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-xl transition font-medium ${activeTab === 'orders' ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/50' : 'text-slate-400 hover:bg-slate-800 hover:text-white'}`}
@@ -113,7 +117,7 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen, currentUser, acti
             </button>
           )}
 
-          {p?.trash && (
+          {(isSuper || p?.trash) && (
             <button 
                 onClick={() => handleNav('trash')}
                 className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-xl transition font-medium ${activeTab === 'trash' ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/50' : 'text-slate-400 hover:bg-slate-800 hover:text-white'}`}
@@ -123,11 +127,11 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen, currentUser, acti
           )}
 
           {/* GROUP: APLIKASI LAIN */}
-          {(p?.kalkulator || p?.config_harga) && (
+          {(isSuper || p?.kalkulator || p?.config_harga) && (
             <div className="pt-4 mt-4 border-t border-slate-700">
               <p className="px-4 text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-2">Aplikasi Lain</p>
               
-              {p?.kalkulator && (
+              {(isSuper || p?.kalkulator) && (
                 <button 
                   onClick={() => handleNav('kalkulator')}
                   className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition font-medium text-left ${activeTab === 'kalkulator' ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/50' : 'text-slate-400 hover:bg-slate-800 hover:text-green-400'}`}
@@ -136,7 +140,7 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen, currentUser, acti
                 </button>
               )}
 
-              {p?.config_harga && (
+              {(isSuper || p?.config_harga) && (
                 <button 
                   onClick={() => handleNav('config_harga')}
                   className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition font-medium text-left ${activeTab === 'config_harga' ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/50' : 'text-slate-400 hover:bg-slate-800 hover:text-yellow-400'}`}
@@ -148,11 +152,11 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen, currentUser, acti
           )}
           
           {/* GROUP: SISTEM */}
-          {(p?.settings || p?.about) && (
+          {(isSuper || p?.settings || p?.about) && (
             <div className="pt-4 mt-4 border-t border-slate-700">
                 <p className="px-4 text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-2">Sistem</p>
 
-                {p?.settings && (
+                {(isSuper || p?.settings) && (
                     <button 
                       onClick={() => handleNav('settings')}
                       className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition font-medium text-left ${activeTab === 'settings' ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/50' : 'text-slate-400 hover:bg-slate-800 hover:text-white'}`}
@@ -161,7 +165,7 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen, currentUser, acti
                     </button>
                 )}
                 
-                {p?.about && (
+                {(isSuper || p?.about) && (
                   <button 
                     onClick={() => handleNav('about')}
                     className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition font-medium text-left ${activeTab === 'about' ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/50' : 'text-slate-400 hover:bg-slate-800 hover:text-white'}`}

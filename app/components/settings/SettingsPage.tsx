@@ -1,7 +1,8 @@
 // app/components/settings/SettingsPage.tsx
 
 import React, { useState } from 'react';
-import { Trash2, Save, UserPlus, Shield, Package, Pencil, X, CheckSquare, DollarSign } from 'lucide-react';
+// UPDATE IMPORT: Tambahkan Eye dan EyeOff
+import { Trash2, Save, UserPlus, Shield, Package, Pencil, X, CheckSquare, DollarSign, Eye, EyeOff } from 'lucide-react';
 import { UserData, ProductionTypeData, UserPermissions, DEFAULT_PERMISSIONS } from '@/types';
 
 interface SettingsPageProps {
@@ -20,6 +21,9 @@ export default function SettingsPage({ users, productionTypes, onSaveUser, onDel
   const [formData, setFormData] = useState<Partial<UserData>>({});
   const [permissions, setPermissions] = useState<UserPermissions>(DEFAULT_PERMISSIONS);
 
+  // STATE BARU: Untuk toggle password (lihat/sembunyi)
+  const [showPassword, setShowPassword] = useState(false);
+
   const [isTypeModalOpen, setIsTypeModalOpen] = useState(false);
   const [editingType, setEditingType] = useState<any>(null);
 
@@ -35,8 +39,10 @@ export default function SettingsPage({ users, productionTypes, onSaveUser, onDel
       password: u.password 
     });
 
+    // Reset view password saat buka modal
+    setShowPassword(false);
+
     // --- SMART MERGE LOGIC ---
-    // Agar permission baru (price_config) otomatis muncul walau user data lama
     const userPerms = u.permissions || {};
     
     const mergedPermissions: UserPermissions = {
@@ -45,7 +51,6 @@ export default function SettingsPage({ users, productionTypes, onSaveUser, onDel
         prod_manual: { ...DEFAULT_PERMISSIONS.prod_manual, ...(userPerms.prod_manual || {}) },
         prod_dtf: { ...DEFAULT_PERMISSIONS.prod_dtf, ...(userPerms.prod_dtf || {}) },
         finishing: { ...DEFAULT_PERMISSIONS.finishing, ...(userPerms.finishing || {}) },
-        // TAMBAHAN BARU:
         price_config: { ...DEFAULT_PERMISSIONS.price_config, ...(userPerms.price_config || {}) },
     };
 
@@ -62,7 +67,10 @@ export default function SettingsPage({ users, productionTypes, onSaveUser, onDel
       role: 'produksi', 
       password: '' 
     });
-    setPermissions(DEFAULT_PERMISSIONS); // Gunakan default fresh
+    // Reset view password
+    setShowPassword(false);
+    
+    setPermissions(DEFAULT_PERMISSIONS); 
     setIsUserModalOpen(true);
   };
 
@@ -125,6 +133,10 @@ export default function SettingsPage({ users, productionTypes, onSaveUser, onDel
       </div>
     </div>
   );
+
+  // --- CLASS UNTUK INPUT FIELD ---
+  const inputClassName = "w-full border border-slate-300 rounded-lg px-3 py-2 text-sm font-medium text-slate-800 mt-1 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none bg-white transition shadow-sm";
+  const labelClassName = "text-xs font-bold text-slate-700 uppercase tracking-wide";
 
   return (
     <div className="space-y-8 pb-24">
@@ -228,25 +240,55 @@ export default function SettingsPage({ users, productionTypes, onSaveUser, onDel
               <div className="flex-1 overflow-y-auto p-5 space-y-6">
                   
                   {/* Form Data Diri */}
-                  <div className="bg-blue-50/50 p-4 rounded-xl border border-blue-100 space-y-3">
-                      <div className="text-xs font-bold text-blue-800 uppercase mb-2 flex items-center gap-1"><UserPlus className="w-3 h-3"/> Data Akun</div>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <div className="bg-blue-50/50 p-5 rounded-xl border border-blue-100 space-y-4">
+                      <div className="text-sm font-bold text-blue-800 uppercase mb-2 flex items-center gap-2 border-b border-blue-200 pb-2">
+                        <UserPlus className="w-4 h-4"/> Data Akun
+                      </div>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                          <div>
-                            <label className="text-[10px] font-bold text-slate-500 uppercase">Nama Lengkap</label>
-                            <input className="w-full border border-slate-300 rounded-lg p-2 text-sm font-bold mt-1 focus:ring-2 focus:ring-blue-500 outline-none" value={formData.name || ''} onChange={e=>setFormData({...formData, name: e.target.value})} placeholder="Nama"/>
+                            <label className={labelClassName}>Nama Lengkap</label>
+                            <input 
+                              className={inputClassName}
+                              value={formData.name || ''} 
+                              onChange={e=>setFormData({...formData, name: e.target.value})} 
+                              placeholder="Contoh: Budi Santoso"
+                            />
                          </div>
                          <div>
-                            <label className="text-[10px] font-bold text-slate-500 uppercase">Username</label>
-                            <input className="w-full border border-slate-300 rounded-lg p-2 text-sm font-bold mt-1 focus:ring-2 focus:ring-blue-500 outline-none" value={formData.username || ''} onChange={e=>setFormData({...formData, username: e.target.value})} placeholder="User"/>
+                            <label className={labelClassName}>Username</label>
+                            <input 
+                              className={inputClassName}
+                              value={formData.username || ''} 
+                              onChange={e=>setFormData({...formData, username: e.target.value})} 
+                              placeholder="Contoh: budi.s"
+                            />
                          </div>
+                         
+                         {/* --- BAGIAN PASSWORD (UPDATE: ADA TOMBOL MATA) --- */}
                          <div>
-                            <label className="text-[10px] font-bold text-slate-500 uppercase">Password</label>
-                            <input className="w-full border border-slate-300 rounded-lg p-2 text-sm font-bold mt-1 focus:ring-2 focus:ring-blue-500 outline-none" value={formData.password || ''} onChange={e=>setFormData({...formData, password: e.target.value})} placeholder="***"/>
+                            <label className={labelClassName}>Password</label>
+                            <div className="relative">
+                                <input 
+                                  type={showPassword ? "text" : "password"} // Type dinamis
+                                  className={`${inputClassName} pr-10`} // Tambah padding kanan supaya tidak tertutup icon
+                                  value={formData.password || ''} 
+                                  onChange={e=>setFormData({...formData, password: e.target.value})} 
+                                  placeholder="Isi untuk mengubah password"
+                                />
+                                <button
+                                  type="button"
+                                  onClick={() => setShowPassword(!showPassword)}
+                                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-blue-600 transition"
+                                >
+                                    {showPassword ? <EyeOff size={16}/> : <Eye size={16}/>}
+                                </button>
+                            </div>
                          </div>
+                         
                          <div>
-                            <label className="text-[10px] font-bold text-slate-500 uppercase">Role / Jabatan</label>
+                            <label className={labelClassName}>Role / Jabatan</label>
                             <select 
-                                className="w-full border border-slate-300 rounded-lg p-2 text-sm font-bold mt-1 focus:ring-2 focus:ring-blue-500 outline-none bg-white" 
+                                className={inputClassName} 
                                 value={formData.role || 'produksi'} 
                                 onChange={e => setFormData({...formData, role: e.target.value as any})}
                             >
@@ -262,7 +304,9 @@ export default function SettingsPage({ users, productionTypes, onSaveUser, onDel
 
                   {/* Matrix Checkboxes */}
                   <div>
-                      <div className="text-xs font-bold text-slate-800 uppercase mb-3 flex items-center gap-1"><Shield className="w-3 h-3"/> Matrix Izin Akses</div>
+                      <div className="text-sm font-bold text-slate-800 uppercase mb-3 flex items-center gap-2 border-b border-slate-200 pb-2">
+                        <Shield className="w-4 h-4"/> Matrix Izin Akses
+                      </div>
                       
                       <RenderPermissionSection 
                           title="1. Akses Menu / Halaman" 
@@ -324,7 +368,6 @@ export default function SettingsPage({ users, productionTypes, onSaveUser, onDel
                           }} 
                       />
                       
-                      {/* --- BAGIAN BARU: KONFIGURASI HARGA --- */}
                       <RenderPermissionSection 
                           title="6. Konfigurasi Harga" 
                           category="price_config" 

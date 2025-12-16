@@ -1,3 +1,5 @@
+// app/components/orders/OrderDetail.tsx
+
 import React, { useState } from 'react';
 import { formatDate, getStatusColor, openWA } from '@/lib/utils';
 import { Order, UserData, KendalaNote } from '@/types';
@@ -22,28 +24,36 @@ export default function OrderDetail({ currentUser, order, onBack, onEdit, onTrig
   const [kendalaNote, setKendalaNote] = useState('');
   const [showKendalaForm, setShowKendalaForm] = useState(false);
   
-  // --- LOGIKA HAK AKSES BARU (BY PERMISSIONS) ---
-  const role = currentUser.role as string;
+  // --- LOGIKA HAK AKSES MATRIX (FIXED) ---
   const userName = currentUser.name; 
+  const perms = currentUser.permissions;
+
+  // 1. Cek Jenis Produksi (Manual vs DTF)
+  const isManual = ['manual', 'sablon'].includes(order.jenis_produksi.toLowerCase());
+
+  // 2. Ambil Izin Produksi yang Sesuai
+  // Gunakan optional chaining (?.) agar aman jika data null
+  const prodPerms = isManual ? perms?.prod_manual : perms?.prod_dtf;
+
+  // 3. Mapping Permission Variables
   
-  // Ambil izin spesifik dari object permissions
-  const orderPerms = currentUser.permissions?.orders;
+  // A. Izin Global Order
+  const canEditOrderInfo = perms?.orders?.edit;    
+  const canDeleteOrder   = perms?.orders?.delete;  
 
-  // 1. Cek Permission Global (Supervisor selalu sakti)
-  const isSupervisor = role === 'supervisor';
+  // B. Izin Produksi (Step 1 & 2)
+  const canUploadApproval     = prodPerms?.upload_approval;
+  const canDeleteApprovalFile = prodPerms?.delete_files; // <--- INI YANG BENAR
+  
+  const canUpdateStep     = prodPerms?.step_process; 
+  const canDeleteStepFile = prodPerms?.delete_files;     // <--- INI YANG BENAR
 
-  // 2. Izin Edit Data (Tombol Edit)
-  const hasEditAccess = isSupervisor || orderPerms?.edit === true;
-  const canEditApproval = hasEditAccess; 
-  const canEditProduction = role === 'produksi' || hasEditAccess;
-  const canEditQC = role === 'qc' || hasEditAccess;
-  const canEditShipping = hasEditAccess;
-
-  // 3. Izin Hapus PESANAN (Tombol Merah Besar)
-  const canDeleteOrder = isSupervisor || orderPerms?.delete === true;
-
-  // 4. Izin Hapus FILE/BUKTI (Icon Tong Sampah Kecil di samping file)
-  const canDeleteFile = isSupervisor || orderPerms?.delete_files === true;
+  // C. Izin Finishing & QC (Step 3 & 4)
+  const canCheckQC           = perms?.finishing?.qc_check;      
+  const canResetQC           = perms?.finishing?.qc_reset;      
+  const canUpdatePacking     = perms?.finishing?.packing_update; 
+  const canUpdateShipping    = perms?.finishing?.shipping_update;
+  const canDeleteFinishingFile = perms?.finishing?.delete_files; // <--- INI YANG BENAR
 
   // ---------------------------------------------
 
@@ -160,6 +170,7 @@ export default function OrderDetail({ currentUser, order, onBack, onEdit, onTrig
 
   return (
     <div className="space-y-4 md:space-y-6 pb-24">
+      {/* Header & Navigasi */}
       <div className="flex items-center justify-between flex-wrap gap-3">
         <button onClick={onBack} className="text-xs md:text-sm text-slate-500 hover:text-blue-600 flex items-center gap-2 font-bold transition p-2 -ml-2 rounded-lg hover:bg-slate-100 w-fit">
           <ChevronRight className="w-4 h-4 md:w-5 md:h-5 rotate-180"/> Kembali
@@ -167,13 +178,13 @@ export default function OrderDetail({ currentUser, order, onBack, onEdit, onTrig
         <div className="flex gap-2">
           
           {/* TOMBOL EDIT */}
-          {hasEditAccess && (
+          {canEditOrderInfo && (
             <button onClick={onEdit} className="bg-blue-600 text-white px-3 py-1.5 md:px-4 md:py-2 rounded-lg text-xs md:text-sm font-bold flex items-center gap-2 hover:bg-blue-700 transition shadow-sm">
               <Pencil className="w-3 h-3 md:w-4 md:h-4"/> Edit
             </button>
           )}
 
-          {/* TOMBOL HAPUS PESANAN (Menggunakan canDeleteOrder) */}
+          {/* TOMBOL HAPUS PESANAN */}
           {canDeleteOrder && (
             <button onClick={() => onDelete(order.id)} className="bg-red-600 text-white px-3 py-1.5 md:px-4 md:py-2 rounded-lg text-xs md:text-sm font-bold flex items-center gap-2 hover:bg-red-700 transition shadow-sm">
               <Trash2 className="w-3 h-3 md:w-4 md:h-4"/> Hapus
@@ -183,6 +194,7 @@ export default function OrderDetail({ currentUser, order, onBack, onEdit, onTrig
         </div>
       </div>
       
+      {/* Judul & Status Header */}
       <div className="bg-white p-3 md:p-6 rounded-2xl border shadow-sm flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 md:gap-4">
         <div className="flex-1">
             <h1 className="text-lg md:text-2xl font-extrabold text-slate-800 mb-1 md:mb-2">{order.nama_pemesan}</h1>
@@ -198,6 +210,7 @@ export default function OrderDetail({ currentUser, order, onBack, onEdit, onTrig
         <div className={`px-2 py-1 md:px-4 md:py-2 rounded-lg font-extrabold text-[10px] md:text-sm border uppercase tracking-wide whitespace-nowrap ${getStatusColor(order.status)}`}>{order.status}</div>
       </div>
 
+      {/* Block Revisi */}
       {order.status === 'Revisi' && order.finishing_qc.notes && (
         <div className="bg-yellow-50 border-2 border-yellow-300 p-3 md:p-5 rounded-2xl">
           <div className="flex items-start justify-between gap-4">
@@ -210,7 +223,8 @@ export default function OrderDetail({ currentUser, order, onBack, onEdit, onTrig
               <div className="text-[10px] md:text-xs text-yellow-700 mt-2">Dicek oleh: {order.finishing_qc.checkedBy} | {order.finishing_qc.timestamp}</div>
             </div>
           </div>
-          {canEditProduction && (
+          {/* Tombol Revisi Selesai (Dianggap Update Step) */}
+          {canUpdateStep && (
             <button onClick={handleRevisiSelesai} className="mt-3 md:mt-4 bg-blue-600 text-white px-3 py-2 md:px-4 md:py-2.5 rounded-lg text-xs md:text-sm font-bold hover:bg-blue-700 transition shadow-lg w-full sm:w-auto">
               Revisi Selesai - Lanjut Produksi
             </button>
@@ -235,12 +249,12 @@ export default function OrderDetail({ currentUser, order, onBack, onEdit, onTrig
                   )}
               </div>
               
-              {/* TOMBOL HAPUS FILE (Menggunakan canDeleteFile) */}
-              {canDeleteFile && <button onClick={() => handleFileDelete('approval')} className="text-red-500 bg-white border border-red-200 px-2 py-1 md:px-3 md:py-1.5 rounded-lg text-[10px] md:text-xs font-bold hover:bg-red-50 mt-2 sm:mt-0">Hapus</button>}
+              {/* TOMBOL HAPUS APPROVAL: Pakai canDeleteApprovalFile */}
+              {canDeleteApprovalFile && <button onClick={() => handleFileDelete('approval')} className="text-red-500 bg-white border border-red-200 px-2 py-1 md:px-3 md:py-1.5 rounded-lg text-[10px] md:text-xs font-bold hover:bg-red-50 mt-2 sm:mt-0">Hapus</button>}
             
             </div>
           ) : (
-            (canEditApproval) ? <button onClick={() => onTriggerUpload('approval')} className="w-full border-2 border-dashed border-blue-200 p-4 md:p-6 text-xs md:text-sm text-blue-600 rounded-xl bg-blue-50 hover:bg-blue-100 transition font-bold flex flex-col items-center gap-2"><Upload className="w-5 h-5 md:w-6 md:h-6"/> Upload File Approval</button> : <div className="text-xs md:text-sm italic text-slate-400 text-center py-4 bg-slate-50 rounded-xl">Menunggu Admin upload approval...</div>
+            (canUploadApproval) ? <button onClick={() => onTriggerUpload('approval')} className="w-full border-2 border-dashed border-blue-200 p-4 md:p-6 text-xs md:text-sm text-blue-600 rounded-xl bg-blue-50 hover:bg-blue-100 transition font-bold flex flex-col items-center gap-2"><Upload className="w-5 h-5 md:w-6 md:h-6"/> Upload File Approval</button> : <div className="text-xs md:text-sm italic text-slate-400 text-center py-4 bg-slate-50 rounded-xl">Menunggu Admin upload approval...</div>
           )}
       </div>
 
@@ -251,7 +265,9 @@ export default function OrderDetail({ currentUser, order, onBack, onEdit, onTrig
               <div className="bg-slate-100 w-6 h-6 md:w-8 md:h-8 rounded-full flex items-center justify-center text-xs md:text-sm">2</div> 
               Produksi ({order.jenis_produksi})
             </h3>
-            {canEditProduction && (order.status === 'On Process' || order.status === 'Revisi' || order.status === 'Ada Kendala') && (
+            
+            {/* LAPOR KENDALA: Pakai canUpdateStep */}
+            {canUpdateStep && (order.status === 'On Process' || order.status === 'Revisi' || order.status === 'Ada Kendala') && (
               <button onClick={() => setShowKendalaForm(!showKendalaForm)} className="text-[10px] md:text-xs bg-orange-600 text-white px-2 py-1 md:px-3 md:py-1.5 rounded-lg font-bold hover:bg-orange-700 transition flex items-center gap-1.5 shadow-sm">
                 <MessageSquare className="w-3 h-3 md:w-3.5 md:h-3.5"/> Lapor Kendala
               </button>
@@ -269,6 +285,7 @@ export default function OrderDetail({ currentUser, order, onBack, onEdit, onTrig
             </div>
           )}
 
+          {/* LIST KENDALA */}
           {order.kendala && order.kendala.length > 0 && (
             <div className="mb-4 md:mb-5 space-y-2">
               <div className="text-[10px] md:text-xs font-bold uppercase text-slate-500 mb-2 md:mb-3 flex items-center gap-2">
@@ -287,15 +304,17 @@ export default function OrderDetail({ currentUser, order, onBack, onEdit, onTrig
                       {k.buktiFile && <a href={k.buktiFile} target="_blank" className="text-[10px] md:text-xs text-blue-600 font-bold hover:underline flex items-center gap-1 mt-1"><Eye className="w-3 h-3"/> Lihat Bukti Penanganan</a>}
                     </div>
                     <div className="flex gap-1">
-                      {!k.isResolved && (canEditProduction) && (
+                      
+                      {/* UPDATE KENDALA (Upload/Resolve) */}
+                      {!k.isResolved && (canUpdateStep) && (
                         <>
                           <button onClick={() => onTriggerUpload('kendala_bukti', undefined, k.id)} className="text-blue-600 hover:bg-blue-50 p-1.5 rounded-lg transition" title="Upload Bukti"><Upload className="w-3 h-3 md:w-4 md:h-4"/></button>
                           <button onClick={() => handleResolveKendala(k.id)} className="text-green-600 hover:bg-green-50 p-1.5 rounded-lg transition" title="Tandai Selesai"><CheckCircle className="w-3 h-3 md:w-4 md:h-4"/></button>
                         </>
                       )}
                       
-                      {/* LOGIKA HAPUS KENDALA: BISA HAPUS JIKA YANG LAPOR ATAU PUNYA IZIN EDIT */}
-                      {(canEditProduction || k.reportedBy === userName) && (
+                      {/* HAPUS KENDALA */}
+                      {(canUpdateStep || k.reportedBy === userName) && (
                         <button onClick={() => handleDeleteKendala(k.id)} className="text-red-500 hover:bg-red-50 p-1.5 rounded-lg transition" title="Hapus"><Trash2 className="w-3 h-3 md:w-4 md:h-4"/></button>
                       )}
                     </div>
@@ -318,12 +337,13 @@ export default function OrderDetail({ currentUser, order, onBack, onEdit, onTrig
                       <CheckCircle className="w-4 h-4 md:w-5 md:h-5 text-green-600"/>
                       <span className="text-[10px] md:text-xs font-bold text-green-700">Selesai</span>
                       
-                      {/* TOMBOL HAPUS FILE STEP (Menggunakan canDeleteFile) */}
-                      {canDeleteFile && <button onClick={() => handleFileDelete('step', true, step.id)} className="text-red-400 hover:text-red-600 ml-1 md:ml-2"><Trash2 className="w-3 h-3 md:w-4 md:h-4"/></button>}
+                      {/* HAPUS FILE STEP: Pakai canDeleteStepFile */}
+                      {canDeleteStepFile && <button onClick={() => handleFileDelete('step', true, step.id)} className="text-red-400 hover:text-red-600 ml-1 md:ml-2"><Trash2 className="w-3 h-3 md:w-4 md:h-4"/></button>}
                     
                     </div>
                   ) : (
-                    (canEditProduction && (order.status === 'On Process' || order.status === 'Revisi' || order.status === 'Ada Kendala')) && (
+                    // UPDATE STATUS STEP: Pakai canUpdateStep
+                    (canUpdateStep && (order.status === 'On Process' || order.status === 'Revisi' || order.status === 'Ada Kendala')) && (
                       step.type === 'status_update' 
                       ? <button onClick={() => handleStatusStep(step.id)} className="bg-blue-600 text-white text-[10px] md:text-xs px-3 py-1.5 md:px-4 md:py-2 rounded-lg font-bold hover:bg-blue-700 transition w-full sm:w-auto">Tandai Selesai</button>
                       : <button onClick={() => onTriggerUpload('step', step.id)} className="border-2 border-slate-200 px-3 py-1.5 md:px-4 md:py-2 rounded-lg text-[10px] md:text-xs font-bold text-slate-600 hover:bg-slate-50 transition w-full sm:w-auto flex items-center justify-center gap-2"><Camera className="w-3 h-3 md:w-4 md:h-4"/> Upload Bukti</button>
@@ -348,7 +368,8 @@ export default function OrderDetail({ currentUser, order, onBack, onEdit, onTrig
                              {order.finishing_qc.isPassed ? <CheckCircle className="w-4 h-4 md:w-5 md:h-5"/> : <X className="w-4 h-4 md:w-5 md:h-5"/>}
                              {order.finishing_qc.isPassed ? 'Lolos QC' : 'Revisi QC'}
                          </div>
-                         {canEditQC && (
+                         {/* RESET QC: Pakai canResetQC */}
+                         {canResetQC && (
                            <button onClick={handleDeleteQC} className="bg-white/50 hover:bg-white p-1 rounded text-red-600 hover:text-red-800 transition"><Trash2 className="w-3 h-3 md:w-4 md:h-4"/></button>
                          )}
                       </div>
@@ -358,7 +379,8 @@ export default function OrderDetail({ currentUser, order, onBack, onEdit, onTrig
                       {!order.finishing_qc.isPassed && <div className="text-[10px] italic">"{order.finishing_qc.notes}"</div>}
                   </div>
                 ) : (
-                (canEditQC && order.status === 'Finishing' ? (
+                // UPDATE QC: Pakai canCheckQC
+                (canCheckQC && order.status === 'Finishing' ? (
                   <div className="space-y-2 md:space-y-3">
                     <textarea placeholder="Catatan revisi (wajib diisi jika revisi)..." className="w-full text-xs md:text-sm p-2 md:p-3 border-2 border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none text-slate-800 placeholder-slate-400" value={qcNote} onChange={e=>setQcNote(e.target.value)} rows={3}/>
                     <div className="flex gap-2">
@@ -380,8 +402,8 @@ export default function OrderDetail({ currentUser, order, onBack, onEdit, onTrig
                            <Package className="w-4 h-4 md:w-5 md:h-5"/> Sudah Dipacking
                         </div>
                         
-                        {/* TOMBOL HAPUS FILE PACKING (Menggunakan canDeleteFile) */}
-                        {canDeleteFile && (
+                        {/* HAPUS PACKING: Pakai canDeleteFinishingFile */}
+                        {canDeleteFinishingFile && (
                             <button onClick={() => handleFileDelete('packing')} className="bg-white/50 hover:bg-white p-1 rounded text-red-600 hover:text-red-800 transition"><Trash2 className="w-3 h-3 md:w-4 md:h-4"/></button>
                         )}
 
@@ -396,7 +418,8 @@ export default function OrderDetail({ currentUser, order, onBack, onEdit, onTrig
                     )}
                 </div>
                ) : (
-                (canEditQC && order.status === 'Finishing' && order.finishing_qc.isPassed ? <button onClick={()=>onTriggerUpload('packing')} className="bg-purple-600 text-white text-xs md:text-sm w-full py-2 md:py-3 rounded-xl font-bold hover:bg-purple-700 flex items-center justify-center gap-2 shadow-lg"><Camera className="w-3 h-3 md:w-4 md:h-4"/> Foto Packing</button> : <div className="text-[10px] md:text-xs text-slate-400 italic py-2">Menunggu QC Lolos...</div>)
+                // UPDATE PACKING: Pakai canUpdatePacking
+                (canUpdatePacking && order.status === 'Finishing' && order.finishing_qc.isPassed ? <button onClick={()=>onTriggerUpload('packing')} className="bg-purple-600 text-white text-xs md:text-sm w-full py-2 md:py-3 rounded-xl font-bold hover:bg-purple-700 flex items-center justify-center gap-2 shadow-lg"><Camera className="w-3 h-3 md:w-4 md:h-4"/> Foto Packing</button> : <div className="text-[10px] md:text-xs text-slate-400 italic py-2">Menunggu QC Lolos...</div>)
               )}
             </div>
          </div>
@@ -414,14 +437,15 @@ export default function OrderDetail({ currentUser, order, onBack, onEdit, onTrig
                      <div className="flex items-center gap-2">
                         <a href={order.shipping.bukti_kirim} target="_blank" className="text-green-600 font-bold underline hover:text-green-800">Lihat Bukti</a>
                         
-                        {/* TOMBOL HAPUS RESI (Menggunakan canDeleteFile) */}
-                        {canDeleteFile && (
+                        {/* HAPUS RESI: Pakai canDeleteFinishingFile */}
+                        {canDeleteFinishingFile && (
                             <button onClick={() => handleFileDelete('shipping_kirim')} className="bg-red-50 text-red-500 p-1 rounded hover:bg-red-100 border border-red-200 ml-2"><Trash2 className="w-3 h-3"/></button>
                         )}
 
                      </div>
                  ) : (
-                     (canEditShipping && (order.status === 'Kirim' || order.status === 'Selesai') ? <button onClick={()=>onTriggerUpload('shipping_kirim')} className="text-[10px] md:text-xs bg-blue-600 text-white px-3 py-1.5 rounded-lg font-bold hover:bg-blue-700 shadow-sm">Upload</button> : <span className="text-slate-300 font-bold">-</span>)
+                     // UPLOAD RESI: Pakai canUpdateShipping
+                     (canUpdateShipping && (order.status === 'Kirim' || order.status === 'Selesai') ? <button onClick={()=>onTriggerUpload('shipping_kirim')} className="text-[10px] md:text-xs bg-blue-600 text-white px-3 py-1.5 rounded-lg font-bold hover:bg-blue-700 shadow-sm">Upload</button> : <span className="text-slate-300 font-bold">-</span>)
                  )}
              </div>
              {order.shipping.uploaded_by_kirim && (
@@ -437,14 +461,15 @@ export default function OrderDetail({ currentUser, order, onBack, onEdit, onTrig
                      <div className="flex items-center gap-2">
                         <a href={order.shipping.bukti_terima} target="_blank" className="text-green-600 font-bold underline hover:text-green-800">Lihat Bukti</a>
                         
-                        {/* TOMBOL HAPUS BUKTI TERIMA (Menggunakan canDeleteFile) */}
-                        {canDeleteFile && (
+                        {/* HAPUS BUKTI TERIMA: Pakai canDeleteFinishingFile */}
+                        {canDeleteFinishingFile && (
                             <button onClick={() => handleFileDelete('shipping_terima')} className="bg-red-50 text-red-500 p-1 rounded hover:bg-red-100 border border-red-200 ml-2"><Trash2 className="w-3 h-3"/></button>
                         )}
                         
                      </div>
                  ) : (
-                     (canEditShipping && (order.status === 'Kirim' || order.status === 'Selesai') ? <button onClick={()=>onTriggerUpload('shipping_terima')} className="text-[10px] md:text-xs bg-orange-600 text-white px-3 py-1.5 rounded-lg font-bold hover:bg-orange-700 shadow-sm">Upload</button> : <span className="text-slate-300 font-bold">-</span>)
+                     // UPLOAD BUKTI TERIMA: Pakai canUpdateShipping
+                     (canUpdateShipping && (order.status === 'Kirim' || order.status === 'Selesai') ? <button onClick={()=>onTriggerUpload('shipping_terima')} className="text-[10px] md:text-xs bg-orange-600 text-white px-3 py-1.5 rounded-lg font-bold hover:bg-orange-700 shadow-sm">Upload</button> : <span className="text-slate-300 font-bold">-</span>)
                  )}
              </div>
              {order.shipping.uploaded_by_terima && (
