@@ -1,9 +1,9 @@
-//app/components/OrderList.tsx
+// app/components/orders/OrderList.tsx
 
 import React, { useState } from 'react';
 import { formatDate, getDeadlineStatus, getStatusColor, MONTHS } from '@/lib/utils';
 import { Order, ProductionTypeData, UserData } from '@/types';
-import { AlertTriangle, BarChart3, Calendar, ClipboardList, Clock, FileText, Trash2 } from 'lucide-react';
+import { BarChart3, Calendar, ClipboardList, Clock, FileText, Trash2 } from 'lucide-react';
 
 interface OrderListProps {
   role: string;
@@ -20,23 +20,25 @@ export default function OrderList({ role, orders, productionTypes, onSelectOrder
   const [monthFilter, setMonthFilter] = useState<string>('all');
   const [typeFilter, setTypeFilter] = useState<string>('all');
 
+  // --- PERBAIKAN LOGIKA IZIN ---
+  // 1. Izin Hapus (Delete)
   const canDeleteOrder = role === 'supervisor' || currentUser?.permissions?.orders?.delete === true;
+  
+  // 2. Izin Buat Baru (Create) -> INI YANG TADI KURANG
+  const canCreateOrder = role === 'supervisor' || currentUser?.permissions?.orders?.create === true;
 
   const filteredOrders = orders.filter((o) => {
     let statusMatch = true;
     
-    // --- PERBAIKAN LOGIKA FILTER ---
     if (statusFilter === 'process') {
         statusMatch = o.status === 'On Process' || o.status === 'Finishing' || o.status === 'Pesanan Masuk';
     } 
     else if (statusFilter === 'overdue') {
-        // Cek jika status DATABASE 'Telat' ATAU hitungan tanggal memang telat
         statusMatch = o.status === 'Telat' || getDeadlineStatus(o.deadline, o.status) === 'overdue';
     } 
     else if (statusFilter === 'completed') {
         statusMatch = o.status === 'Selesai' || o.status === 'Kirim';
     }
-    // -------------------------------
 
     let monthMatch = true;
     if (monthFilter !== 'all') {
@@ -55,6 +57,8 @@ export default function OrderList({ role, orders, productionTypes, onSelectOrder
 
   return (
     <div className="space-y-4 md:space-y-6">
+       
+       {/* HEADER & FILTER */}
        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-3 md:gap-4">
         <div>
           <h2 className="text-xl md:text-2xl font-bold text-slate-800">Daftar Pesanan</h2>
@@ -84,7 +88,8 @@ export default function OrderList({ role, orders, productionTypes, onSelectOrder
             ))}
           </select>
 
-          {(role === 'admin' || role === 'supervisor') && (
+          {/* TOMBOL TAMBAH (Menggunakan logic canCreateOrder) */}
+          {canCreateOrder && (
             <button onClick={onNewOrder} className="bg-blue-600 text-white px-3 py-2 md:px-4 md:py-2.5 rounded-lg text-[10px] md:text-sm font-bold flex items-center justify-center gap-2 hover:bg-blue-700 transition shadow-sm active:scale-95 whitespace-nowrap ml-auto md:ml-0">
               <ClipboardList className="w-3 h-3 md:w-4 md:h-4"/> Tambah
             </button>
@@ -92,6 +97,7 @@ export default function OrderList({ role, orders, productionTypes, onSelectOrder
         </div>
       </div>
 
+      {/* FILTER BUTTONS */}
       <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
         {[
           { id: null, label: 'Semua' },
@@ -109,37 +115,27 @@ export default function OrderList({ role, orders, productionTypes, onSelectOrder
         ))}
       </div>
 
+      {/* ORDER CARDS */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 md:gap-4">
           {filteredOrders.map((order) => {
-             // --- PERBAIKAN LOGIKA STATUS DISPLAY ---
-             // Cek kalkulasi tanggal
              const calculatedStatus = getDeadlineStatus(order.deadline, order.status);
-             // Cek apakah status di DB memang 'Telat'
              const isExplicitlyOverdue = order.status === 'Telat';
-             
-             // Gabungkan keduanya: Jika kalkulasi overdue ATAU status di DB 'Telat' -> Tampilkan Merah
              const showOverdueBadge = calculatedStatus === 'overdue' || isExplicitlyOverdue;
-             // ---------------------------------------
 
-             const hasUnresolvedKendala = order.kendala && order.kendala.some(k => !k.isResolved);
-             
              return (
               <div 
                 key={order.id} 
                 onClick={() => onSelectOrder(order.id)} 
-                // Ganti logika border merah menggunakan variabel showOverdueBadge
                 className={`bg-white rounded-2xl shadow-sm border p-3 md:p-5 cursor-pointer hover:shadow-md transition relative overflow-hidden active:scale-[0.98] ${showOverdueBadge ? 'border-red-300 ring-1 ring-red-100' : 'border-slate-200'}`}
               >
-                {/* Badge Merah Pojok Kanan Atas */}
-                {showOverdueBadge && <div className="absolute top-0 right-0 bg-red-500 text-white text-[8px] md:text-[10px] px-2 py-0.5 font-bold rounded-bl-lg z-10">TELAT</div>}
-                
-                {hasUnresolvedKendala && <div className="absolute top-0 left-0 bg-orange-500 text-white text-[8px] md:text-[10px] px-2 py-0.5 font-bold rounded-br-lg z-10 flex items-center gap-1"><AlertTriangle className="w-3 h-3"/>KENDALA</div>}
                 
                 <div className="flex justify-between items-start mb-1 md:mb-4 mt-1">
                   <span className="text-[10px] md:text-xs font-mono font-bold text-slate-500 bg-slate-100 px-1.5 py-0.5 md:px-2 md:py-1 rounded-md">#{order.kode_produksi}</span>
-                  {/* Status Pill */}
-                  <span className={`text-[9px] md:text-[10px] font-extrabold px-2 py-0.5 md:px-2.5 md:py-1 rounded-full border uppercase tracking-wide whitespace-nowrap ${getStatusColor(order.status)}`}>{order.status}</span>
+                  <span className={`text-[9px] md:text-[10px] font-extrabold px-2 py-0.5 md:px-2.5 md:py-1 rounded-full border uppercase tracking-wide whitespace-nowrap ${getStatusColor(order.status)}`}>
+                    {order.status}
+                  </span>
                 </div>
+                
                 <h3 className="font-bold text-sm md:text-lg text-slate-800 line-clamp-1 mb-0.5 md:mb-1 leading-tight">{order.nama_pemesan}</h3>
                 <div className="text-[10px] md:text-xs text-slate-500 mb-2 md:mb-4 font-medium flex items-center gap-1">
                    <Calendar className="w-3 h-3"/> {formatDate(order.tanggal_masuk)}
@@ -159,7 +155,6 @@ export default function OrderList({ role, orders, productionTypes, onSelectOrder
                   <div className="flex flex-col md:flex-row md:items-center md:justify-between text-[10px] md:text-sm border-l md:border-l-0 border-slate-100 pl-2 md:pl-0">
                     <span className="text-slate-500 flex items-center gap-1.5 font-medium hidden md:flex"><Clock className="w-4 h-4"/> Deadline</span>
                     <span className="text-slate-500 text-[8px] md:hidden uppercase font-bold">Deadline</span>
-                    {/* Warna teks tanggal deadline juga merah jika telat */}
                     <span className={`font-bold ${showOverdueBadge ? 'text-red-600' : 'text-slate-800'}`}>{formatDate(order.deadline)}</span>
                   </div>
                 </div>
@@ -178,6 +173,7 @@ export default function OrderList({ role, orders, productionTypes, onSelectOrder
               </div>
              );
           })}
+          
           {filteredOrders.length === 0 && <div className="col-span-full text-center text-slate-400 py-12 border-2 border-dashed border-slate-200 rounded-xl bg-slate-50 text-xs">Tidak ada pesanan sesuai filter</div>}
       </div>
     </div>

@@ -1,7 +1,6 @@
 // app/components/settings/SettingsPage.tsx
 
 import React, { useState } from 'react';
-// UPDATE IMPORT: Tambahkan Eye dan EyeOff
 import { Trash2, Save, UserPlus, Shield, Package, Pencil, X, CheckSquare, DollarSign, Eye, EyeOff } from 'lucide-react';
 import { UserData, ProductionTypeData, UserPermissions, DEFAULT_PERMISSIONS } from '@/types';
 
@@ -20,16 +19,13 @@ export default function SettingsPage({ users, productionTypes, onSaveUser, onDel
   const [isUserModalOpen, setIsUserModalOpen] = useState(false);
   const [formData, setFormData] = useState<Partial<UserData>>({});
   const [permissions, setPermissions] = useState<UserPermissions>(DEFAULT_PERMISSIONS);
-
-  // STATE BARU: Untuk toggle password (lihat/sembunyi)
   const [showPassword, setShowPassword] = useState(false);
-
+  
   const [isTypeModalOpen, setIsTypeModalOpen] = useState(false);
   const [editingType, setEditingType] = useState<any>(null);
 
   // --- LOGIC: USER MANAGEMENT ---
 
-  // 1. EDIT USER (DENGAN SMART MERGE)
   const handleEditUser = (u: UserData) => {
     setFormData({ 
       id: u.id, 
@@ -38,13 +34,10 @@ export default function SettingsPage({ users, productionTypes, onSaveUser, onDel
       role: u.role, 
       password: u.password 
     });
-
-    // Reset view password saat buka modal
     setShowPassword(false);
 
-    // --- SMART MERGE LOGIC ---
+    // Smart Merge
     const userPerms = u.permissions || {};
-    
     const mergedPermissions: UserPermissions = {
         pages: { ...DEFAULT_PERMISSIONS.pages, ...(userPerms.pages || {}) },
         orders: { ...DEFAULT_PERMISSIONS.orders, ...(userPerms.orders || {}) },
@@ -53,28 +46,17 @@ export default function SettingsPage({ users, productionTypes, onSaveUser, onDel
         finishing: { ...DEFAULT_PERMISSIONS.finishing, ...(userPerms.finishing || {}) },
         price_config: { ...DEFAULT_PERMISSIONS.price_config, ...(userPerms.price_config || {}) },
     };
-
     setPermissions(mergedPermissions);
     setIsUserModalOpen(true);
   };
 
-  // 2. CREATE NEW USER
   const handleCreateNewUser = () => {
-    setFormData({ 
-      id: '', 
-      name: '', 
-      username: '', 
-      role: 'produksi', 
-      password: '' 
-    });
-    // Reset view password
+    setFormData({ id: '', name: '', username: '', role: 'produksi', password: '' });
     setShowPassword(false);
-    
     setPermissions(DEFAULT_PERMISSIONS); 
     setIsUserModalOpen(true);
   };
 
-  // 3. HANDLE KLIK CHECKBOX
   const handlePermissionChange = (category: keyof UserPermissions, key: string, value: boolean) => {
     setPermissions(prev => ({
       ...prev,
@@ -85,15 +67,10 @@ export default function SettingsPage({ users, productionTypes, onSaveUser, onDel
     }));
   };
 
-  // 4. SAVE
   const handleSubmitUser = () => {
-    onSaveUser({
-      ...formData,
-      permissions: permissions 
-    });
+    onSaveUser({ ...formData, permissions: permissions });
     setIsUserModalOpen(false);
   };
-
 
   // --- LOGIC: PRODUCTION TYPE ---
   const openTypeModal = (type?: ProductionTypeData) => {
@@ -108,40 +85,47 @@ export default function SettingsPage({ users, productionTypes, onSaveUser, onDel
   };
 
   // --- UI HELPER: Component Checkbox Group ---
+  // PERBAIKAN DI SINI: Kita meloop berdasarkan 'labels', bukan berdasarkan 'permissions'.
+  // Ini mencegah "Ghost Keys" (data lama yang tidak terpakai) muncul di tampilan.
   const RenderPermissionSection = ({ title, category, labels, icon: Icon = Shield }: { title: string, category: keyof UserPermissions, labels: Record<string, string>, icon?: any }) => (
     <div className="mb-4 border border-slate-200 rounded-xl overflow-hidden shadow-sm">
       <div className="bg-slate-100 px-4 py-3 border-b border-slate-200 font-bold text-slate-700 text-xs md:text-sm flex items-center gap-2">
         <Icon className="w-3.5 h-3.5 text-blue-600"/> {title}
       </div>
       <div className="p-3 grid grid-cols-1 sm:grid-cols-2 gap-2 bg-white">
-        {Object.entries(permissions[category] || {}).map(([key, val]) => (
-          <div 
-             key={key} 
-             onClick={() => handlePermissionChange(category, key, !val)}
-             className="flex items-center gap-3 cursor-pointer hover:bg-slate-50 p-2 rounded-lg transition border border-transparent hover:border-slate-100 select-none"
-          >
+        {Object.keys(labels).map((key) => {
+          // Ambil nilai dari state permissions, jika tidak ada anggap false
+          // @ts-ignore
+          const val = permissions[category] ? permissions[category][key] : false;
+
+          return (
             <div 
-               className={`w-5 h-5 rounded border flex items-center justify-center transition-all ${val ? 'bg-blue-600 border-blue-600 scale-105 shadow-sm' : 'bg-white border-slate-300'}`}
+               key={key} 
+               onClick={() => handlePermissionChange(category, key, !val)}
+               className="flex items-center gap-3 cursor-pointer hover:bg-slate-50 p-2 rounded-lg transition border border-transparent hover:border-slate-100 select-none"
             >
-               {val && <CheckSquare className="w-3.5 h-3.5 text-white"/>}
+              <div 
+                 className={`w-5 h-5 rounded border flex items-center justify-center transition-all ${val ? 'bg-blue-600 border-blue-600 scale-105 shadow-sm' : 'bg-white border-slate-300'}`}
+              >
+                 {val && <CheckSquare className="w-3.5 h-3.5 text-white"/>}
+              </div>
+              <span className="text-[11px] md:text-xs text-slate-700 font-medium leading-tight">
+                {labels[key]}
+              </span>
             </div>
-            <span className="text-[11px] md:text-xs text-slate-700 font-medium leading-tight">
-              {labels[key] || key.replace(/_/g, ' ')}
-            </span>
-          </div>
-        ))}
+          );
+        })}
       </div>
     </div>
   );
 
-  // --- CLASS UNTUK INPUT FIELD ---
   const inputClassName = "w-full border border-slate-300 rounded-lg px-3 py-2 text-sm font-medium text-slate-800 mt-1 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none bg-white transition shadow-sm";
   const labelClassName = "text-xs font-bold text-slate-700 uppercase tracking-wide";
 
   return (
     <div className="space-y-8 pb-24">
       
-      {/* --- BAGIAN 1: JENIS PRODUKSI --- */}
+      {/* BAGIAN 1: JENIS PRODUKSI */}
       <div className="space-y-4">
         <div className="flex justify-between items-center bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
            <div>
@@ -171,7 +155,7 @@ export default function SettingsPage({ users, productionTypes, onSaveUser, onDel
 
       <hr className="border-slate-200"/>
 
-      {/* --- BAGIAN 2: DAFTAR USER --- */}
+      {/* BAGIAN 2: DAFTAR USER */}
       <div className="space-y-4">
          <div className="flex justify-between items-center bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
            <div>
@@ -218,14 +202,11 @@ export default function SettingsPage({ users, productionTypes, onSaveUser, onDel
         </div>
       </div>
 
-
-      {/* --- MODAL EDIT/ADD USER (FULL POPUP) --- */}
+      {/* MODAL USER (FULL POPUP) */}
       {isUserModalOpen && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[99] flex items-center justify-center p-4">
-           {/* Container Modal Responsive */}
            <div className="bg-white w-full max-w-2xl max-h-[90vh] rounded-2xl shadow-2xl flex flex-col overflow-hidden animate-in fade-in zoom-in duration-200">
               
-              {/* Header Modal */}
               <div className="px-5 py-4 border-b border-slate-100 bg-slate-50 flex justify-between items-center">
                   <div>
                     <h3 className="font-bold text-lg text-slate-800">{formData.id ? 'Edit User & Hak Akses' : 'Buat User Baru'}</h3>
@@ -236,7 +217,6 @@ export default function SettingsPage({ users, productionTypes, onSaveUser, onDel
                   </button>
               </div>
 
-              {/* Body Scrollable */}
               <div className="flex-1 overflow-y-auto p-5 space-y-6">
                   
                   {/* Form Data Diri */}
@@ -247,51 +227,30 @@ export default function SettingsPage({ users, productionTypes, onSaveUser, onDel
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                          <div>
                             <label className={labelClassName}>Nama Lengkap</label>
-                            <input 
-                              className={inputClassName}
-                              value={formData.name || ''} 
-                              onChange={e=>setFormData({...formData, name: e.target.value})} 
-                              placeholder="Contoh: Budi Santoso"
-                            />
+                            <input className={inputClassName} value={formData.name || ''} onChange={e=>setFormData({...formData, name: e.target.value})} placeholder="Nama"/>
                          </div>
                          <div>
                             <label className={labelClassName}>Username</label>
-                            <input 
-                              className={inputClassName}
-                              value={formData.username || ''} 
-                              onChange={e=>setFormData({...formData, username: e.target.value})} 
-                              placeholder="Contoh: budi.s"
-                            />
+                            <input className={inputClassName} value={formData.username || ''} onChange={e=>setFormData({...formData, username: e.target.value})} placeholder="User"/>
                          </div>
-                         
-                         {/* --- BAGIAN PASSWORD (UPDATE: ADA TOMBOL MATA) --- */}
                          <div>
                             <label className={labelClassName}>Password</label>
                             <div className="relative">
                                 <input 
-                                  type={showPassword ? "text" : "password"} // Type dinamis
-                                  className={`${inputClassName} pr-10`} // Tambah padding kanan supaya tidak tertutup icon
+                                  type={showPassword ? "text" : "password"}
+                                  className={`${inputClassName} pr-10`} 
                                   value={formData.password || ''} 
                                   onChange={e=>setFormData({...formData, password: e.target.value})} 
-                                  placeholder="Isi untuk mengubah password"
+                                  placeholder="Password"
                                 />
-                                <button
-                                  type="button"
-                                  onClick={() => setShowPassword(!showPassword)}
-                                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-blue-600 transition"
-                                >
+                                <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-blue-600">
                                     {showPassword ? <EyeOff size={16}/> : <Eye size={16}/>}
                                 </button>
                             </div>
                          </div>
-                         
                          <div>
                             <label className={labelClassName}>Role / Jabatan</label>
-                            <select 
-                                className={inputClassName} 
-                                value={formData.role || 'produksi'} 
-                                onChange={e => setFormData({...formData, role: e.target.value as any})}
-                            >
+                            <select className={inputClassName} value={formData.role || 'produksi'} onChange={e => setFormData({...formData, role: e.target.value as any})}>
                                 <option value="supervisor">Supervisor</option>
                                 <option value="admin">Admin</option>
                                 <option value="produksi">Produksi</option>
@@ -377,21 +336,18 @@ export default function SettingsPage({ users, productionTypes, onSaveUser, onDel
                           }} 
                       />
                   </div>
-
               </div>
 
-              {/* Footer Modal */}
               <div className="p-4 border-t border-slate-100 bg-slate-50 flex justify-end gap-3">
-                  <button onClick={() => setIsUserModalOpen(false)} className="px-5 py-2.5 rounded-xl border border-slate-300 font-bold text-slate-600 text-sm hover:bg-slate-100 transition">Batal</button>
-                  <button onClick={handleSubmitUser} className="px-6 py-2.5 rounded-xl bg-blue-600 text-white font-bold text-sm hover:bg-blue-700 transition shadow-lg shadow-blue-200">Simpan Perubahan</button>
+                  <button onClick={() => setIsUserModalOpen(false)} className="px-5 py-2.5 rounded-xl border border-slate-300 font-bold text-slate-600 text-sm hover:bg-slate-100">Batal</button>
+                  <button onClick={handleSubmitUser} className="px-6 py-2.5 rounded-xl bg-blue-600 text-white font-bold text-sm hover:bg-blue-700 shadow-lg shadow-blue-200">Simpan Perubahan</button>
               </div>
 
            </div>
         </div>
       )}
 
-
-      {/* --- MODAL EDIT TYPE (POPUP KECIL) --- */}
+      {/* MODAL EDIT TYPE */}
       {isTypeModalOpen && editingType && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[99] flex items-center justify-center p-4">
            <div className="bg-white p-6 rounded-2xl w-full max-w-sm shadow-2xl animate-in zoom-in duration-200">
