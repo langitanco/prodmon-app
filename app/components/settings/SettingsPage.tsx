@@ -1,7 +1,7 @@
 // app/components/settings/SettingsPage.tsx
 
 import React, { useState } from 'react';
-import { Trash2, Save, UserPlus, Shield, Package, Pencil, X, CheckSquare, DollarSign, Eye, EyeOff } from 'lucide-react';
+import { Trash2, UserPlus, Shield, Package, Pencil, X, CheckSquare, DollarSign, Eye, EyeOff } from 'lucide-react';
 import { UserData, ProductionTypeData, UserPermissions, DEFAULT_PERMISSIONS } from '@/types';
 
 interface SettingsPageProps {
@@ -84,9 +84,7 @@ export default function SettingsPage({ users, productionTypes, onSaveUser, onDel
     setIsTypeModalOpen(false);
   };
 
-  // --- UI HELPER: Component Checkbox Group ---
-  // PERBAIKAN DI SINI: Kita meloop berdasarkan 'labels', bukan berdasarkan 'permissions'.
-  // Ini mencegah "Ghost Keys" (data lama yang tidak terpakai) muncul di tampilan.
+  // --- UI HELPER ---
   const RenderPermissionSection = ({ title, category, labels, icon: Icon = Shield }: { title: string, category: keyof UserPermissions, labels: Record<string, string>, icon?: any }) => (
     <div className="mb-4 border border-slate-200 rounded-xl overflow-hidden shadow-sm">
       <div className="bg-slate-100 px-4 py-3 border-b border-slate-200 font-bold text-slate-700 text-xs md:text-sm flex items-center gap-2">
@@ -94,7 +92,6 @@ export default function SettingsPage({ users, productionTypes, onSaveUser, onDel
       </div>
       <div className="p-3 grid grid-cols-1 sm:grid-cols-2 gap-2 bg-white">
         {Object.keys(labels).map((key) => {
-          // Ambil nilai dari state permissions, jika tidak ada anggap false
           // @ts-ignore
           const val = permissions[category] ? permissions[category][key] : false;
 
@@ -155,7 +152,7 @@ export default function SettingsPage({ users, productionTypes, onSaveUser, onDel
 
       <hr className="border-slate-200"/>
 
-      {/* BAGIAN 2: DAFTAR USER */}
+      {/* BAGIAN 2: DAFTAR USER (LAYOUT BARU: LIST VIEW, BUKAN TABLE) */}
       <div className="space-y-4">
          <div className="flex justify-between items-center bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
            <div>
@@ -167,38 +164,51 @@ export default function SettingsPage({ users, productionTypes, onSaveUser, onDel
            </button>
         </div>
 
+        {/* CONTAINER LIST (Ganti Table dengan UL agar Responsif) */}
         <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-          <table className="w-full text-left text-sm">
-            <thead className="bg-slate-50 text-[10px] uppercase font-bold text-slate-500 border-b border-slate-200">
-              <tr>
-                <th className="px-4 py-3">Nama</th>
-                <th className="px-4 py-3 hidden md:table-cell">Role</th>
-                <th className="px-4 py-3 text-right">Aksi</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
+            <ul className="divide-y divide-slate-100">
               {users.map((u) => (
-                <tr key={u.id} className="hover:bg-slate-50 transition">
-                  <td className="px-4 py-3">
-                    <div className="font-bold text-slate-800">{u.name}</div>
-                    <div className="text-[10px] text-slate-400 font-mono">@{u.username}</div>
-                    <div className="md:hidden text-[9px] bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded w-fit mt-1 uppercase font-bold">{u.role}</div>
-                  </td>
-                  <td className="px-4 py-3 hidden md:table-cell">
-                    <span className="bg-slate-100 text-slate-600 px-2 py-1 rounded text-[10px] font-bold uppercase">{u.role}</span>
-                  </td>
-                  <td className="px-4 py-3 text-right">
-                    <button onClick={() => handleEditUser(u)} className="inline-flex items-center gap-1 bg-blue-50 text-blue-600 px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-blue-100 transition mr-2">
-                       <Pencil className="w-3.5 h-3.5"/> <span className="hidden sm:inline">Edit Akses</span>
-                    </button>
-                    <button onClick={() => onDeleteUser(u.id)} className="inline-flex items-center gap-1 bg-red-50 text-red-600 px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-red-100 transition">
-                       <Trash2 className="w-3.5 h-3.5"/>
-                    </button>
-                  </td>
-                </tr>
+                <li key={u.id} className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4 hover:bg-slate-50 transition">
+                    
+                    {/* KIRI: INFO USER */}
+                    <div className="flex items-center gap-3 md:gap-4">
+                        <div className="bg-slate-100 w-10 h-10 md:w-12 md:h-12 rounded-full flex items-center justify-center text-slate-500 font-bold text-sm md:text-base border border-slate-200 shadow-sm">
+                            {u.name.charAt(0).toUpperCase()}
+                        </div>
+                        <div>
+                            <div className="font-bold text-slate-800 text-sm md:text-base">{u.name}</div>
+                            <div className="flex items-center gap-2 mt-1">
+                                <span className="text-[10px] md:text-xs text-slate-400 font-mono">@{u.username}</span>
+                                <span className="text-[9px] md:text-[10px] font-bold px-2 py-0.5 rounded bg-blue-50 text-blue-600 border border-blue-100 uppercase tracking-wide">
+                                    {u.role}
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* KANAN: TOMBOL AKSI (RESPONSIF) */}
+                    {/* Pada mode HP (default): ada border-t (garis atas) dan padding-top */}
+                    {/* Pada mode SM (Laptop): border hilang, padding hilang */}
+                    <div className="flex items-center justify-end gap-2 sm:gap-3 border-t sm:border-t-0 border-slate-100 pt-3 sm:pt-0">
+                        <button 
+                            onClick={() => handleEditUser(u)}
+                            className="flex-1 sm:flex-none justify-center px-4 py-2 rounded-lg border border-slate-200 text-slate-600 hover:bg-blue-50 hover:text-blue-600 hover:border-blue-200 transition text-xs font-bold flex items-center gap-2 shadow-sm"
+                        >
+                            <Pencil className="w-3.5 h-3.5"/> 
+                            <span>Edit Akses</span>
+                        </button>
+                        
+                        <button 
+                            onClick={() => onDeleteUser(u.id)}
+                            className="px-3 py-2 rounded-lg border border-red-100 text-red-500 hover:bg-red-50 hover:border-red-200 transition flex items-center justify-center shadow-sm"
+                            title="Hapus User"
+                        >
+                            <Trash2 className="w-4 h-4"/>
+                        </button>
+                    </div>
+                </li>
               ))}
-            </tbody>
-          </table>
+            </ul>
         </div>
       </div>
 

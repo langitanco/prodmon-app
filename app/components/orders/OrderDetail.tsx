@@ -5,8 +5,7 @@ import { formatDate, getStatusColor, openWA, getDeadlineStatus } from '@/lib/uti
 import { Order, UserData, KendalaNote } from '@/types';
 import { 
   AlertTriangle, Camera, CheckCircle, ChevronRight, Eye, MessageSquare, 
-  Package, Pencil, Phone, Trash2, Upload, X, Clock, User, Send,
-  ClipboardCheck, Box
+  Package, Pencil, Phone, Trash2, Upload, X, Clock, User, Send
 } from 'lucide-react';
 
 interface OrderDetailProps {
@@ -36,15 +35,10 @@ export default function OrderDetail({ currentUser, order, onBack, onEdit, onTrig
 
   // --- LOGIKA STATUS & KONDISI ---
   const currentStatus = order.status;
-  
-  // TELAT: Murni hasil hitungan Waktu (Tidak ambil dari database status)
-  // Logic: Jika tanggal sekarang > deadline DAN status belum Selesai/Kirim
   const isLate = getDeadlineStatus(order.deadline, order.status) === 'overdue';
-  
   const isRevisi = currentStatus === 'Revisi';
   
   const currentSteps = isManual ? order.steps_manual : order.steps_dtf;
-  // Produksi dianggap beres jika semua checkbox terisi
   const isProductionFinished = currentSteps && currentSteps.length > 0 && currentSteps.every(s => s.isCompleted);
 
   // --- IZIN TOMBOL ---
@@ -61,8 +55,7 @@ export default function OrderDetail({ currentUser, order, onBack, onEdit, onTrig
   const canResetQC = isSupervisor || perms?.finishing?.qc_reset;
   const canDeleteFinishingFile = isSupervisor || perms?.finishing?.delete_files;
 
-  // --- HANDLERS (LOGIKA INTI) ---
-
+  // --- HANDLERS ---
   const handleStatusStep = (stepId: string) => {
     const updated = JSON.parse(JSON.stringify(order));
     const steps = isManual ? updated.steps_manual : updated.steps_dtf;
@@ -72,28 +65,15 @@ export default function OrderDetail({ currentUser, order, onBack, onEdit, onTrig
       steps[idx].uploadedBy = currentUser.name; 
       steps[idx].timestamp = new Date().toLocaleString(); 
     }
-    
-    // Auto-switch ke Finishing jika semua checkbox selesai
-    // Pastikan JANGAN pernah set ke 'Telat', harus 'Finishing'
     const allDone = steps.every((s: any) => s.isCompleted);
-    if (allDone && updated.status === 'On Process') {
-        updated.status = 'Finishing';
-    }
-
+    if (allDone && updated.status === 'On Process') { updated.status = 'Finishing'; }
     onUpdateOrder(updated);
   };
 
   const handleQC = (pass: boolean) => {
     const updated = JSON.parse(JSON.stringify(order));
-    updated.finishing_qc = { 
-      isPassed: pass, 
-      notes: pass ? 'Lolos QC' : qcNote, 
-      checkedBy: currentUser.name, 
-      timestamp: new Date().toLocaleString() 
-    };
-    // Jika tidak lolos -> Revisi, Jika lolos -> Tetap Finishing (menunggu packing)
+    updated.finishing_qc = { isPassed: pass, notes: pass ? 'Lolos QC' : qcNote, checkedBy: currentUser.name, timestamp: new Date().toLocaleString() };
     if (!pass) updated.status = 'Revisi';
-    
     onUpdateOrder(updated); 
   };
 
@@ -110,7 +90,7 @@ export default function OrderDetail({ currentUser, order, onBack, onEdit, onTrig
     if (!onConfirm) return;
     onConfirm('Selesaikan Revisi?', 'Status akan kembali ke On Process.', () => {
         const updated = JSON.parse(JSON.stringify(order));
-        updated.status = 'On Process'; // KEMBALI KE ON PROCESS
+        updated.status = 'On Process'; 
         updated.finishing_qc.isPassed = false; 
         onUpdateOrder(updated);
     });
@@ -120,14 +100,8 @@ export default function OrderDetail({ currentUser, order, onBack, onEdit, onTrig
     if (!kendalaNote.trim()) return;
     const updated = JSON.parse(JSON.stringify(order));
     if (!updated.kendala) updated.kendala = [];
-    updated.kendala.push({
-      id: Date.now().toString(),
-      notes: kendalaNote,
-      reportedBy: currentUser.name,
-      timestamp: new Date().toLocaleString(),
-      isResolved: false
-    });
-    updated.status = 'Ada Kendala'; // SET KE ADA KENDALA
+    updated.kendala.push({ id: Date.now().toString(), notes: kendalaNote, reportedBy: currentUser.name, timestamp: new Date().toLocaleString(), isResolved: false });
+    updated.status = 'Ada Kendala'; 
     onUpdateOrder(updated);
     setKendalaNote('');
     setShowKendalaForm(false);
@@ -141,16 +115,10 @@ export default function OrderDetail({ currentUser, order, onBack, onEdit, onTrig
       updated.kendala[idx].resolvedBy = currentUser.name;
       updated.kendala[idx].resolvedTimestamp = new Date().toLocaleString();
     }
-    
-    // CEK APAKAH KENDALA SUDAH HABIS?
     const stillHasKendala = updated.kendala.some((k: any) => !k.isResolved);
     if (!stillHasKendala) {
-        // KEMBALIKAN KE STATUS WORKFLOW YANG BENAR
-        // Cek apakah step produksi sudah selesai semua?
         const steps = isManual ? updated.steps_manual : updated.steps_dtf;
         const allStepsDone = steps && steps.every((s:any) => s.isCompleted);
-        
-        // PENTING: Set ke 'Finishing' atau 'On Process'. JANGAN 'Telat'.
         updated.status = allStepsDone ? 'Finishing' : 'On Process';
     }
     onUpdateOrder(updated);
@@ -161,10 +129,8 @@ export default function OrderDetail({ currentUser, order, onBack, onEdit, onTrig
       onConfirm('Hapus Laporan?', 'Laporan kendala ini akan dihapus permanen.', () => {
         const updated = JSON.parse(JSON.stringify(order));
         updated.kendala = updated.kendala.filter((k: KendalaNote) => k.id !== kendalaId);
-        
         if (updated.kendala.length === 0 || updated.kendala.every((k:any) => k.isResolved)) {
             if (updated.status === 'Ada Kendala') {
-                 // Balik ke workflow normal
                  const steps = isManual ? updated.steps_manual : updated.steps_dtf;
                  const allStepsDone = steps && steps.every((s:any) => s.isCompleted);
                  updated.status = allStepsDone ? 'Finishing' : 'On Process';
@@ -217,12 +183,9 @@ export default function OrderDetail({ currentUser, order, onBack, onEdit, onTrig
         </div>
 
         <div className="flex flex-col gap-2 items-end w-full md:w-auto">
-            {/* 1. STATUS UTAMA: Murni dari Database (Workflow: On Process, Finishing, etc) */}
             <div className={`px-4 py-2 rounded-xl font-black text-xs md:text-sm border uppercase tracking-wider text-center w-full md:w-auto shadow-sm ${getStatusColor(order.status)}`}>
                {order.status}
             </div>
-            
-            {/* 2. BADGE TELAT: Murni Hitungan Waktu (Tidak Masuk Database) */}
             {isLate && (
                <div className="px-4 py-2 rounded-xl font-black text-xs md:text-sm border border-red-200 bg-red-100 text-red-700 uppercase tracking-wider text-center w-full md:w-auto">
                   TELAT DEADLINE
@@ -231,22 +194,63 @@ export default function OrderDetail({ currentUser, order, onBack, onEdit, onTrig
         </div>
       </div>
 
-      {/* --- STEP 1: APPROVAL --- */}
+      {/* --- STEP 1: APPROVAL DESAIN (Redesain: Menyamakan dengan Step Produksi) --- */}
       <div className="bg-white p-4 md:p-6 rounded-2xl border shadow-sm">
-          <h3 className="font-bold text-slate-800 mb-4 flex items-center gap-2 text-sm md:text-lg"> <div className="bg-blue-100 text-blue-700 w-8 h-8 rounded-full flex items-center justify-center text-sm">1</div> Approval Desain</h3>
-          {order.link_approval?.link ? (
-            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between bg-green-50 p-4 rounded-xl border border-green-200 gap-3">
-              <div className="flex-1">
-                  <div className="flex items-center gap-2 text-green-800 font-bold text-xs md:text-sm mb-1">
-                    <Eye className="w-4 h-4 md:w-5 md:h-5"/> <a href={order.link_approval.link} target="_blank" className="underline hover:text-green-900">Lihat File Approval</a>
-                  </div>
-                  <div className="text-[10px] text-green-700">Oleh: <span className="font-bold">{order.link_approval.by}</span> | {order.link_approval.timestamp}</div>
+          <h3 className="font-bold text-slate-800 mb-4 flex items-center gap-2 text-sm md:text-lg"> 
+            <div className="bg-blue-100 text-blue-700 w-8 h-8 rounded-full flex items-center justify-center text-sm">1</div> Approval Desain
+          </h3>
+          
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-slate-100 pb-4 last:border-0 gap-3">
+              {/* BAGIAN KIRI: Info & Link */}
+              <div>
+                 {order.link_approval?.link ? (
+                    <>
+                       <div className="font-bold text-sm md:text-base text-slate-800">File Desain Terupload</div>
+                       <div className="text-[10px] text-slate-500">Oleh: {order.link_approval.by} | {order.link_approval.timestamp}</div>
+                       <a href={order.link_approval.link} target="_blank" className="text-[10px] text-blue-600 font-bold flex items-center gap-1 mt-1 hover:underline">
+                          <Eye className="w-3.5 h-3.5"/> Lihat File
+                       </a>
+                    </>
+                 ) : (
+                    <>
+                       <div className="font-bold text-sm md:text-base text-slate-400">File Desain</div>
+                       <div className="text-[10px] text-slate-400 italic">Belum ada file yang diupload...</div>
+                    </>
+                 )}
               </div>
-              {canDeleteApprovalFile && <button onClick={() => handleFileDelete('approval')} className="text-red-500 bg-white border border-red-100 px-3 py-1 rounded-lg text-xs font-bold hover:bg-red-50">Hapus</button>}
-            </div>
-          ) : (
-            canUploadApproval ? <button onClick={() => onTriggerUpload('approval')} className="w-full border-2 border-dashed border-blue-200 p-6 text-sm text-blue-600 rounded-xl bg-blue-50 font-bold flex flex-col items-center gap-2 hover:bg-blue-100 transition"><Upload className="w-6 h-6"/> Upload File Approval</button> : <div className="text-xs md:text-sm italic text-slate-400 text-center py-6 bg-slate-50 rounded-xl border border-dashed">Menunggu upload desain...</div>
-          )}
+
+              {/* BAGIAN KANAN: Tombol Aksi */}
+              <div className="flex items-center gap-2">
+                 {order.link_approval?.link ? (
+                    // KONDISI: SUDAH ADA FILE (Tampil Badge Selesai + Hapus)
+                    <>
+                       <div className="flex items-center gap-2 bg-green-50 px-3 py-1.5 rounded-lg border border-green-100">
+                          <CheckCircle className="w-4 h-4 text-green-600"/> 
+                          <span className="text-[10px] font-bold text-green-700 uppercase">SELESAI</span>
+                       </div>
+                       {canDeleteApprovalFile && (
+                          <button 
+                             onClick={() => handleFileDelete('approval')} 
+                             className="text-red-400 hover:text-red-600 transition ml-1 p-1"
+                             title="Hapus File"
+                          >
+                             <Trash2 className="w-4 h-4"/>
+                          </button>
+                       )}
+                    </>
+                 ) : (
+                    // KONDISI: BELUM ADA FILE (Tampil Tombol Upload)
+                    canUploadApproval && (
+                       <button 
+                          onClick={() => onTriggerUpload('approval')} 
+                          className="bg-white border-2 border-slate-200 px-4 py-2 rounded-lg text-xs font-bold text-slate-600 flex items-center justify-center gap-2 hover:bg-slate-50 transition w-full sm:w-auto"
+                       >
+                          <Upload className="w-4 h-4"/> Upload File
+                       </button>
+                    )
+                 )}
+              </div>
+          </div>
       </div>
 
       {/* --- STEP 2: PRODUKSI --- */}
@@ -277,32 +281,41 @@ export default function OrderDetail({ currentUser, order, onBack, onEdit, onTrig
             </div>
           )}
 
-          {/* DAFTAR KENDALA (LIST CARD) */}
+          {/* DAFTAR KENDALA */}
           {order.kendala && order.kendala.some(k => !k.isResolved) && (
              <div className="mb-6 space-y-3">
                 {order.kendala.filter(k => !k.isResolved).map((k) => (
-                   <div key={k.id} className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm flex justify-between items-start gap-3">
-                      <div className="flex items-start gap-3">
-                          <div className="bg-orange-100 p-2 rounded-full">
+                   <div key={k.id} className="bg-white border border-slate-200 rounded-xl p-3 md:p-4 shadow-sm flex flex-col sm:flex-row gap-3">
+                      
+                      {/* WRAPPER KONTEN (ATAS DI HP, KIRI DI LAPTOP) */}
+                      <div className="flex items-start gap-3 flex-1">
+                          <div className="bg-orange-100 p-2 rounded-full flex-shrink-0">
                              <AlertTriangle className="w-4 h-4 text-orange-600"/>
                           </div>
                           <div>
                              <p className="font-bold text-slate-800 text-sm mb-1">{k.notes}</p>
-                             <div className="flex items-center gap-3 text-[10px] text-slate-500">
+                             <div className="flex flex-wrap items-center gap-3 text-[10px] text-slate-500">
                                 <span className="flex items-center gap-1"><User className="w-3 h-3"/> {k.reportedBy}</span>
                                 <span className="flex items-center gap-1"><Clock className="w-3 h-3"/> {k.timestamp}</span>
                              </div>
                           </div>
                       </div>
 
-                      <div className="flex items-center gap-2">
+                      {/* WRAPPER TOMBOL (BAWAH DI HP, KANAN DI LAPTOP) */}
+                      <div className="flex items-center justify-end gap-2 w-full sm:w-auto border-t sm:border-t-0 border-slate-100 pt-2 sm:pt-0 mt-1 sm:mt-0">
                          {canUpdateStep && (
                             <button onClick={() => handleResolveKendala(k.id)} className="bg-green-50 text-green-700 border border-green-200 text-[10px] px-3 py-1.5 rounded-lg font-bold hover:bg-green-100 transition whitespace-nowrap">
                                 ✓ Selesaikan
                             </button>
                          )}
                          {isSupervisor && (
-                            <button onClick={() => handleDeleteKendala(k.id)} className="text-slate-400 hover:text-red-500 p-1.5"><Trash2 className="w-4 h-4"/></button>
+                            <button 
+                                onClick={() => handleDeleteKendala(k.id)} 
+                                className="text-slate-400 hover:text-red-500 hover:bg-red-50 p-1.5 rounded-lg transition"
+                                title="Hapus Kendala"
+                            >
+                                <Trash2 className="w-4 h-4"/>
+                            </button>
                          )}
                       </div>
                    </div>
@@ -336,7 +349,7 @@ export default function OrderDetail({ currentUser, order, onBack, onEdit, onTrig
           </div>
       </div>
 
-       {/* --- STEP 3: QC & PACKING (NEW LAYOUT) --- */}
+       {/* --- STEP 3: QC & PACKING --- */}
        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
            {/* KIRI: AREA QC */}
            <div className="bg-white p-4 md:p-6 rounded-2xl border shadow-sm flex flex-col h-full">
@@ -345,7 +358,6 @@ export default function OrderDetail({ currentUser, order, onBack, onEdit, onTrig
                 <h3 className="font-bold text-slate-800 text-sm md:text-base">Quality Control</h3>
              </div>
 
-             {/* INFO REVISI */}
              {isRevisi && order.finishing_qc.notes && (
                 <div className="bg-red-50 border border-red-200 p-4 rounded-xl mb-4">
                   <p className="text-[10px] font-bold text-red-700 uppercase mb-1 flex items-center gap-1"> <AlertTriangle className="w-3 h-3"/> Alasan Revisi:</p>
@@ -353,14 +365,12 @@ export default function OrderDetail({ currentUser, order, onBack, onEdit, onTrig
                 </div>
              )}
              
-             {/* KONFIRMASI REVISI */}
              {isRevisi && canUpdateStep && (
                  <button onClick={handleRevisiSelesai} className="w-full bg-white border-2 border-red-100 text-red-600 py-3 rounded-xl font-bold text-xs uppercase hover:bg-red-50 transition mb-4 shadow-sm">
                     ✓ Konfirmasi Revisi Selesai
                  </button>
              )}
 
-             {/* HASIL QC */}
              {order.finishing_qc.isPassed ? (
                 <div className="flex-1 flex flex-col items-center justify-center p-6 bg-green-50 rounded-2xl border-2 border-dashed border-green-200 text-center min-h-[160px]">
                     <div className="bg-green-100 p-3 rounded-full mb-2"><CheckCircle className="w-8 h-8 text-green-600"/></div>
