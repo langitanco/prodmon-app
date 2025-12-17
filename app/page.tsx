@@ -1,3 +1,5 @@
+// app/page.tsx
+
 'use client';
 
 import React, { useState, useEffect } from 'react';
@@ -28,22 +30,13 @@ import TrashView from '@/app/components/orders/TrashView';
 import SettingsPage from '@/app/components/settings/SettingsPage'; 
 
 // Types & Helpers
-import { UserData, Order, ProductionTypeData } from '@/types';
+import { UserData, Order, ProductionTypeData, DEFAULT_PERMISSIONS } from '@/types';
 import { DEFAULT_PRODUCTION_TYPES } from '@/lib/utils';
 
-// --- DEFINISI TIPE UNTUK KOMPONEN SIDEBAR ---
+// --- DEFINISI TIPE ---
 interface CurrentUser extends UserData {
   id: string; 
 }
-
-interface SidebarProps {
-  sidebarOpen: boolean;
-  setSidebarOpen: (open: boolean) => void;
-  currentUser: UserData;
-  activeTab: 'dashboard' | 'orders' | 'settings' | 'trash' | 'kalkulator' | 'config_harga' | 'about'; 
-  handleNav: (tab: any) => void;
-}
-// ------------------------------------------
 
 export default function ProductionApp() {
   // State Management
@@ -92,7 +85,6 @@ export default function ProductionApp() {
       const { data: { session } } = await supabase.auth.getSession();
 
       if (session) {
-        // Fetch data user detail dari tabel public.users
         const { data: userData, error } = await supabase
           .from('users')
           .select('*') 
@@ -100,13 +92,19 @@ export default function ProductionApp() {
           .single();
 
         if (userData) {
+          let safePermissions = userData.permissions;
+          if (!safePermissions || !safePermissions.pages) {
+              console.warn("Format permission user jadul/kosong, menggunakan default sementara.");
+              safePermissions = DEFAULT_PERMISSIONS;
+          }
+
           setCurrentUser({
             id: session.user.id,
             username: userData.username || session.user.email || '',
             name: userData.name || session.user.email?.split('@')[0] || 'User',
-            role: userData.role || 'prod',
+            role: userData.role || 'produksi',
             password: '',
-            permissions: userData.permissions || {}, 
+            permissions: safePermissions,
           });
         } else {
           console.error("User login di Auth tapi tidak ada di tabel public.users");
@@ -142,7 +140,6 @@ export default function ProductionApp() {
 
     loadAppData();
 
-    // Realtime Subscription
     const channel = supabase.channel('realtime-global')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, fetchOrders)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'users' }, fetchUsers)
@@ -152,39 +149,32 @@ export default function ProductionApp() {
     return () => { supabase.removeChannel(channel); };
   }, [currentUser]);
 
-  // --- FITUR BARU: SCANNER OTOMATIS STATUS TELAT ---
+  // --- REVISI: MATIKAN SCANNER OTOMATIS STATUS TELAT ---
+  // Fungsi ini tadinya memaksa update status jadi 'Telat' saat halaman dibuka.
+  // Sekarang kita biarkan kosong atau hapus panggilannya.
   const scanAndFixOverdueOrders = async (currentOrders: Order[]) => {
-    const today = new Date().toISOString().split('T')[0]; // Format: YYYY-MM-DD
+    // MATIKAN FITUR INI AGAR DATABASE TIDAK BERUBAH JADI 'TELAT'
+    /* const today = new Date().toISOString().split('T')[0];
     const updates = [];
     let hasUpdates = false;
 
     for (const order of currentOrders) {
-      // 1. Lewati jika status sudah final atau memang sudah ditandai telat/kendala
       if (['Selesai', 'Kirim', 'Ada Kendala', 'Telat'].includes(order.status)) {
         continue;
       }
-
-      // 2. Cek apakah deadline sudah lewat hari ini
       if (order.deadline && order.deadline < today) {
-        console.log(`Auto-fixing overdue order: ${order.kode_produksi}`);
-        
         updates.push(
-          supabase
-            .from('orders')
-            .update({ status: 'Telat' }) // Paksa update ke database
-            .eq('id', order.id)
+          supabase.from('orders').update({ status: 'Telat' }).eq('id', order.id)
         );
         hasUpdates = true;
       }
     }
 
-    // 3. Eksekusi update jika ada yang telat
     if (hasUpdates && updates.length > 0) {
       await Promise.all(updates);
-      console.log('Status telat berhasil diperbarui');
-      // Refresh ulang data agar tampilan berubah merah
       fetchOrders(); 
     }
+    */
   };
 
   // --- DATA FETCHING FUNCTIONS ---
@@ -197,11 +187,9 @@ export default function ProductionApp() {
       }));
       setOrders(parsed);
 
-      // --- PANGGIL SCANNER SETELAH DATA DIAMBIL ---
-      // Delay 1 detik agar tidak memberatkan render awal
-      setTimeout(() => {
-        scanAndFixOverdueOrders(parsed);
-      }, 1000);
+      // setTimeout(() => {
+      //   scanAndFixOverdueOrders(parsed); // <--- INI SUDAH DIMATIKAN
+      // }, 1000);
     }
   };
 
@@ -271,45 +259,28 @@ export default function ProductionApp() {
 
   const handleEditOrder = async (editedData: any) => {
     if (!selectedOrderId) return;
-
-    // 1. Ambil data order LAMA dulu untuk mendapatkan struktur lengkap (steps, kendala, dll)
-    const oldOrder = orders.find(o => o.id === selectedOrderId);
-    if (!oldOrder) return;
-
-    // 2. Siapkan data baru untuk diupdate ke database
     const updates = {
       nama_pemesan: editedData.nama,
       no_hp: editedData.hp,
       jumlah: parseInt(editedData.jumlah),
-      deadline: editedData.deadline, // <--- Deadline baru
+      deadline: editedData.deadline, 
       jenis_produksi: editedData.type
     };
 
-    // 3. Lakukan Update ke Database
     const { error } = await supabase.from('orders').update(updates).eq('id', selectedOrderId);
 
     if (!error) {
-      // --- PERBAIKAN UTAMA DI SINI ---
-      
-      // Kita buat object bayangan yang menggabungkan data lama + data baru (terutama deadline baru)
-      // Ini agar fungsi checkAutoStatus menghitung berdasarkan Deadline TERBARU, bukan yang lama.
-      const mergedOrderForCheck = {
-          ...oldOrder,
-          ...updates, 
-          // Pastikan deadline menggunakan yang baru diedit
-          deadline: editedData.deadline 
-      };
+       // Kita panggil checkAutoStatus agar status disesuaikan dengan data baru
+       // (Misal ubah deadline jadi status telat hilang, atau ganti jenis prod)
+       const oldOrder = orders.find(o => o.id === selectedOrderId);
+       if(oldOrder) {
+          const mergedOrder = { ...oldOrder, ...updates };
+          await checkAutoStatus(mergedOrder);
+       }
 
-      // 4. Paksa hitung ulang status saat itu juga
-      // Karena deadline sudah mundur, logika di checkAutoStatus akan melihat:
-      // "Oh, deadline > hari ini, berarti TIDAK TELAT".
-      // Maka status akan dikembalikan ke 'Pesanan Masuk' / 'On Process' / 'Finishing'
-      await checkAutoStatus(mergedOrderForCheck);
-
-      // 5. Refresh tampilan
       await fetchOrders();
       setView('detail');
-      showAlert('Sukses', 'Data berhasil diupdate dan Status diperbarui otomatis');
+      showAlert('Sukses', 'Data berhasil diupdate');
     } else {
       showAlert('Error', error.message, 'error');
     }
@@ -390,12 +361,13 @@ export default function ProductionApp() {
     input.click();
   };
 
+  // --- REVISI: LOGIKA STATUS "TELAT" DIHAPUS DARI DATABASE ---
   const checkAutoStatus = async (orderData: Order) => {
-    // 1. Cek apakah ada kendala yang BELUM selesai
+    // 1. Cek Kendala
     const hasUnresolvedKendala = Array.isArray(orderData.kendala) && 
                                  orderData.kendala.some((k: any) => !k.isResolved);
 
-    // 2. Hitung Status Normal (Berdasarkan progres langkah-langkah)
+    // 2. Hitung Status Normal (Workflow)
     let normalStatus = 'Pesanan Masuk';
     
     const hasApproval = !!orderData.link_approval?.link;
@@ -407,32 +379,34 @@ export default function ProductionApp() {
     } else if (!productionDone) {
         normalStatus = 'On Process';
     } else if (!orderData.finishing_qc?.isPassed || !orderData.finishing_packing?.isPacked) {
+        // Jika QC belum lulus atau belum packing, anggap Finishing
+        // Note: Jika di OrderDetail ada logic Revisi, itu ditangani di UI, tapi secara umum tahap ini adalah Finishing
         normalStatus = 'Finishing';
+        // Khusus jika Revisi (Finishing QC gagal)
+        if (orderData.finishing_qc?.isPassed === false && orderData.finishing_qc?.notes) {
+            normalStatus = 'Revisi';
+        }
     } else if (!orderData.shipping?.bukti_terima) {
         normalStatus = 'Kirim';
     } else {
         normalStatus = 'Selesai';
     }
 
-    // 3. Cek Status Telat (LOGIKA BARU & PERBAIKAN)
-    const today = new Date().toISOString().split('T')[0]; // Format: YYYY-MM-DD
-    const isLate = orderData.deadline && orderData.deadline < today;
-    const isFinished = ['Kirim', 'Selesai'].includes(normalStatus);
-    
-
-    // 4. Tentukan Status Akhir dengan Prioritas
+    // 3. Status Akhir
     let finalStatus = normalStatus;
 
     if (hasUnresolvedKendala) {
-        // Prioritas 1: Ada Kendala
         finalStatus = 'Ada Kendala';
-    } else if (isLate && !isFinished) {
-        // Prioritas 2: Telat (dan belum selesai)
+    } 
+    // HAPUS LOGIKA INI! JANGAN BIARKAN DATABASE MENYIMPAN 'TELAT'
+    /*
+    else if (isLate && !isFinished) {
         finalStatus = 'Telat';
     } 
-    // Prioritas 3: Gunakan status normal
-
-    // 5. UPDATE DATABASE
+    */
+    
+    // 4. Update Database
+    // Pastikan status yang dikirim adalah ALUR KERJA (Bukan 'Telat')
     const { error } = await supabase.from('orders').update({
       ...orderData,      
       status: finalStatus 
@@ -448,18 +422,17 @@ export default function ProductionApp() {
   // --- LOGIC: SETTINGS & CONFIG ---
   const handleSaveUser = async (u: any) => {
     const payload: any = { name: u.name, role: u.role, username: u.username };
-    
-    // Simpan Permissions Object (JSON)
-    if (u.permissions) {
-        payload.permissions = u.permissions;
-    }
+    if (u.permissions) payload.permissions = u.permissions;
+    if (u.password && u.password.trim() !== '') payload.password = u.password;
     
     if (u.id) {
       const { error } = await supabase.from('users').update(payload).eq('id', u.id);
       if(!error) { fetchUsers(); showAlert('Sukses', 'User updated'); }
       else showAlert('Gagal', error.message, 'error');
     } else {
-      showAlert('Info', 'Fitur Create User baru harus via Signup Supabase.', 'error');
+      const { error } = await supabase.from('users').insert([payload]);
+      if(!error) { fetchUsers(); showAlert('Sukses', 'User baru dibuat'); }
+      else showAlert('Gagal', error.message, 'error');
     }
   };
 
@@ -489,9 +462,7 @@ export default function ProductionApp() {
     });
   };
 
-
   // --- MAIN RENDER ---
-
   if (loadingUser) {
       return (
         <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50">
@@ -537,7 +508,8 @@ export default function ProductionApp() {
         <main className="flex-1 overflow-y-auto px-4 py-6 md:p-8 pb-24">
            <div className="max-w-6xl mx-auto">
               
-              {activeTab === 'dashboard' && (
+              {/* DASHBOARD */}
+              {activeTab === 'dashboard' && currentUser.permissions?.pages?.dashboard && (
                   <Dashboard 
                     role={currentUser.role} 
                     orders={activeOrders} 
@@ -545,7 +517,8 @@ export default function ProductionApp() {
                   />
               )}
 
-              {activeTab === 'orders' && (
+              {/* ORDERS */}
+              {activeTab === 'orders' && currentUser.permissions?.pages?.orders && (
                 <>
                   {view === 'list' && (
                     <OrderList 
@@ -591,7 +564,8 @@ export default function ProductionApp() {
                 </>
               )}
 
-              {activeTab === 'trash' && currentUser.role === 'supervisor' && (
+              {/* TRASH */}
+              {activeTab === 'trash' && currentUser.permissions?.pages?.trash && (
                  <TrashView 
                     orders={orders.filter(o => o.deleted_at)} 
                     onRestore={handleRestoreOrder} 
@@ -599,7 +573,8 @@ export default function ProductionApp() {
                  />
               )}
 
-              {activeTab === 'settings' && currentUser.role === 'supervisor' && (
+              {/* SETTINGS */}
+              {activeTab === 'settings' && currentUser.permissions?.pages?.settings && (
                  <SettingsPage 
                     users={usersList} 
                     productionTypes={productionTypes} 
@@ -610,17 +585,10 @@ export default function ProductionApp() {
                  />
               )}
 
-              {activeTab === 'kalkulator' && (
-                 <CalculatorView />
-              )}
-
-              {activeTab === 'config_harga' && currentUser.role === 'supervisor' && (
-                 <ConfigPriceView />
-              )}
-              
-              {activeTab === 'about' && (
-                 <AboutView />
-              )}
+              {/* APPS */}
+              {activeTab === 'kalkulator' && currentUser.permissions?.pages?.kalkulator && <CalculatorView />}
+              {activeTab === 'config_harga' && currentUser.permissions?.pages?.config_harga && <ConfigPriceView />}
+              {activeTab === 'about' && <AboutView />}
 
            </div>
         </main>
