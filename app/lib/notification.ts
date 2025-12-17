@@ -5,7 +5,7 @@ import OneSignal from 'react-onesignal';
 // --- KONFIGURASI ---
 // Disarankan simpan ini di .env.local jika sudah production
 const ONESIGNAL_APP_ID = "444fb267-6840-46d2-b7b9-316f105b2ce9"; 
-const ONESIGNAL_API_KEY = "os_v2_app_irh3ez3iibdnfn5zgfxrawzm5et6awcimbnu3hmcwibjrkb7obdgz5yequlel5kz6mt7dsnumrswfnbfdlayzsbailg3gcb2b5i6xgy"; 
+const ONESIGNAL_API_KEY = "os_v2_app_irh3ez3iibdnfn5zgfxrawzm5hlfeypbzxfea6nskav54ifphtqwya3u5avp6u6f4bspbmm6uyulqhiq3q32uut5jnz7f7vowk25k2y"; 
 
 /**
  * Inisialisasi OneSignal (Dijalankan sekali saat aplikasi start)
