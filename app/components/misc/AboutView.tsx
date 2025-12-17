@@ -13,7 +13,7 @@ interface ChangelogEntry {
 
 const APP_INFO = {
   name: "LCO SuperApp",
-  version: "V.6.5",  // UPDATED KE V.6.5
+  version: "V.6.9",  // UPDATED KE V.6.9
   purpose: "Aplikasi produksi Sablon, Langitan.co.",
   creator: "Tim Developer Langitan.co",
   creationDate: "Desember 2025",
@@ -22,10 +22,21 @@ const APP_INFO = {
 // --- DATA RIWAYAT UPDATE ---
 const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "6.9",
+    date: "2025-12-17",
+    changes: [
+      "HD Share Ticket (Fitur Unggulan): Fitur berbagi laporan kini menghasilkan gambar 'Tiket' resolusi tinggi (HD) yang rapi dan profesional, bukan sekadar screenshot.",
+      "Smart Action Dashboard: Bagian 'Perlu Tindakan Segera' kini lebih cerdas. Satu pesanan bisa muncul 2x jika memiliki masalah berbeda (misal: Telat & Kendala), sehingga tidak ada isu yang terlewat.",
+      "Redesain Order Detail: Tampilan QC & Packing kini menggunakan layout Split View (Kiri-Kanan) yang simetris dan modern.",
+      "Logika Status 'Telat' (Frontend Override): Perbaikan permanen logika status. Status 'Telat' kini murni indikator waktu visual dan tidak lagi mengacaukan status alur produksi di database.",
+      "UI/UX Polish: Perbaikan konsistensi tombol, badge status (Pill Shape), dan kartu daftar pesanan yang kini tingginya seragam (simetris).",
+    ],
+  },
+  {
     version: "6.5",
     date: "2025-12-16",
     changes: [
-      "Matrix Hak Akses V2 (Granular): Sistem izin super detail. Kini Admin bisa mengatur siapa yang boleh Edit Harga, Hapus File Bukti, atau akses jenis produksi tertentu (Manual vs DTF).",
+      "Matrix Hak Akses V2 (Granular): Sistem izin super detail. Kini Admin bisa mengatur siapa yang boleh Edit Harga, Hapus File Bukti, atau akses jenis produksi tertentu.",
       "Mobile-First Settings UI: Tampilan 'Pengaturan User' dikembalikan ke mode Modal (Pop-up) agar nyaman diedit menggunakan Handphone.",
       "Smart Auto-Status: Perbaikan logika 'Telat'. Status kini otomatis dihitung ulang secara realtime saat tanggal deadline diedit.",
       "Data Safeguard: Penambahan fitur 'Smart Merge' untuk mencegah error pada data user lama saat ada update fitur baru.",

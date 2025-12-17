@@ -9,8 +9,10 @@ import {
   PieChart, Pie, Cell, Legend 
 } from 'recharts';
 import { TrendingUp, PieChart as PieIcon, AlertCircle, CheckCircle2, Package, AlertTriangle, Share2, Loader2, Clock } from 'lucide-react'; 
-import { getDeadlineStatus } from '@/lib/utils';
-import { toPng } from 'html-to-image'; 
+
+// --- PERBAIKAN DI SINI: Pastikan formatDate ada ---
+import { getDeadlineStatus, formatDate } from '@/lib/utils';
+import { toPng } from 'html-to-image';
 
 interface DashboardProps {
   role: string;
@@ -288,14 +290,15 @@ export default function Dashboard({ role, orders, onSelectOrder }: DashboardProp
 }
 
 // ==========================================
-// SUB-COMPONENT: ACTION ROW (Updated for ActionItem)
+// SUB-COMPONENT: ACTION ROW (Updated)
 // ==========================================
 function ActionRow({ item, onSelectOrder }: { item: ActionItem, onSelectOrder: (id: string) => void }) {
-    const ticketRef = useRef<HTMLDivElement>(null);
+    // Ref ini sekarang mengarah ke tiket tersembunyi, bukan tampilan baris
+    const hiddenTicketRef = useRef<HTMLDivElement>(null); 
     const [isSharing, setIsSharing] = useState(false);
     const { order, type, detail } = item;
 
-    // Tentukan Style Berdasarkan Tipe Masalah
+    // Tentukan Style Icon & Warna untuk Tampilan Baris Dashboard
     let indicatorColor = '';
     let badgeClass = '';
     let icon = null;
@@ -330,24 +333,29 @@ function ActionRow({ item, onSelectOrder }: { item: ActionItem, onSelectOrder: (
 
     const handleShare = async (e: React.MouseEvent) => {
         e.stopPropagation(); 
-        if (!ticketRef.current) return;
+        if (!hiddenTicketRef.current) return;
         
         setIsSharing(true);
         try {
-            const dataUrl = await toPng(ticketRef.current, { cacheBust: true, backgroundColor: '#ffffff', pixelRatio: 2 });
+            // pixelRatio: 3 membuat gambar 3x lebih tajam (HD)
+            const dataUrl = await toPng(hiddenTicketRef.current, { 
+                cacheBust: true, 
+                backgroundColor: '#ffffff', 
+                pixelRatio: 3 
+            });
             const blob = await (await fetch(dataUrl)).blob();
-            const file = new File([blob], `laporan-${type}-${order.kode_produksi}.png`, { type: 'image/png' });
+            const file = new File([blob], `Laporan-${type}-${order.kode_produksi}.png`, { type: 'image/png' });
 
             if (navigator.share) {
                 await navigator.share({
-                    title: `Action Required: ${type}`,
-                    text: `Mohon cek ${type} pada pesanan: ${order.nama_pemesan}`,
+                    title: `Laporan Produksi: ${type}`,
+                    text: `Detail laporan untuk pesanan ${order.nama_pemesan}`,
                     files: [file],
                 });
             } else {
                 const link = document.createElement('a');
                 link.href = dataUrl;
-                link.download = `laporan-${type}-${order.kode_produksi}.png`;
+                link.download = `Laporan-${type}-${order.kode_produksi}.png`;
                 link.click();
             }
         } catch (err) {
@@ -358,53 +366,155 @@ function ActionRow({ item, onSelectOrder }: { item: ActionItem, onSelectOrder: (
     };
 
     return (
-        <div 
-            className="group p-3 md:p-4 flex items-center justify-between hover:bg-slate-50 transition cursor-pointer relative" 
-            onClick={() => onSelectOrder(order.id)}
-        >
-            {/* AREA TIKET */}
+        <>
+            {/* 1. TAMPILAN BARIS (Visible di Dashboard) */}
             <div 
-                ref={ticketRef} 
-                className="flex flex-1 items-center gap-3 bg-white pr-4 py-2 rounded-md h-full"
+                className="group p-3 md:p-4 flex items-center justify-between hover:bg-slate-50 transition cursor-pointer relative" 
+                onClick={() => onSelectOrder(order.id)}
             >
-                {/* Indicator Bar */}
-                <div className={`w-1.5 self-stretch rounded-full ${indicatorColor} flex-shrink-0`}></div>
-                
-                {/* Konten Text */}
-                <div className="flex-1 min-w-0 py-1"> 
-                    <div className="flex items-center gap-2">
-                        <p className="font-bold text-slate-800 text-xs md:text-sm line-clamp-1">{order.nama_pemesan}</p>
-                        <span className="text-[10px] text-slate-400 font-mono hidden md:inline-block">#{order.kode_produksi}</span>
+                <div className="flex flex-1 items-center gap-3 bg-white pr-4 py-2 rounded-md h-full">
+                    <div className={`w-1.5 self-stretch rounded-full ${indicatorColor} flex-shrink-0`}></div>
+                    <div className="flex-1 min-w-0 py-1"> 
+                        <div className="flex items-center gap-2">
+                            <p className="font-bold text-slate-800 text-xs md:text-sm line-clamp-1">{order.nama_pemesan}</p>
+                            <span className="text-[10px] text-slate-400 font-mono hidden md:inline-block">#{order.kode_produksi}</span>
+                        </div>
+                        <div className={`flex items-start gap-1.5 mt-1 ${textColor}`}>
+                            {icon}
+                            <p className="text-[10px] md:text-xs font-semibold leading-relaxed break-words whitespace-normal">
+                                {type === 'KENDALA' ? `Kendala: ${detail}` : detail}
+                            </p>
+                        </div>
                     </div>
-                    
-                    {/* Detail Masalah */}
-                    <div className={`flex items-start gap-1.5 mt-1 ${textColor}`}>
-                         {icon}
-                         <p className="text-[10px] md:text-xs font-semibold leading-relaxed break-words whitespace-normal">
-                             {type === 'KENDALA' ? `Kendala: ${detail}` : detail}
-                         </p>
+                    <div className="text-right pl-2 flex-shrink-0 self-start">
+                        <span className={`text-[10px] md:text-xs font-bold px-2 py-1 rounded border shadow-sm ${badgeClass}`}>
+                            {type}
+                        </span>
+                        <p className="text-[9px] md:text-[10px] text-slate-400 mt-1.5 font-medium">Deadline: {new Date(order.deadline).toLocaleDateString('id-ID', {day: 'numeric', month: 'short'})}</p>
                     </div>
                 </div>
 
-                {/* Badge Status */}
-                <div className="text-right pl-2 flex-shrink-0 self-start">
-                    <span className={`text-[10px] md:text-xs font-bold px-2 py-1 rounded border shadow-sm ${badgeClass}`}>
-                        {type}
-                    </span>
-                    <p className="text-[9px] md:text-[10px] text-slate-400 mt-1.5 font-medium">Deadline: {new Date(order.deadline).toLocaleDateString('id-ID', {day: 'numeric', month: 'short'})}</p>
+                <button 
+                    onClick={handleShare}
+                    disabled={isSharing}
+                    className="ml-2 p-2 text-slate-300 hover:text-blue-600 hover:bg-blue-50 rounded-full transition-all flex-shrink-0 self-center"
+                >
+                    {isSharing ? <Loader2 className="w-5 h-5 animate-spin" /> : <Share2 className="w-5 h-5" />}
+                </button>
+            </div>
+
+            {/* 2. TIKET TERSEMBUNYI (Hidden Render untuk Share Image HD) */}
+            {/* Posisi absolute dan z-index minus membuatnya tidak terlihat user tapi bisa dirender */}
+            <div className="absolute -left-[9999px] top-0">
+                <ShareTicket ref={hiddenTicketRef} item={item} />
+            </div>
+        </>
+    );
+}
+
+// ==========================================
+// SUB-COMPONENT: SHARE TICKET (HD LAYOUT)
+// ==========================================
+// Komponen ini didesain khusus agar hasil gambarnya bagus, rapi, dan detail
+const ShareTicket = React.forwardRef<HTMLDivElement, { item: ActionItem }>(({ item }, ref) => {
+    const { order, type, detail } = item;
+    
+    // Warna tema berdasarkan tipe masalah
+    let themeColor = 'bg-slate-800';
+    let borderColor = 'border-slate-200';
+    let alertBg = 'bg-slate-50';
+    let alertText = 'text-slate-700';
+    let label = 'INFO';
+
+    switch (type) {
+        case 'KENDALA':
+            themeColor = 'bg-purple-600';
+            borderColor = 'border-purple-200';
+            alertBg = 'bg-purple-50';
+            alertText = 'text-purple-800';
+            label = 'KENDALA PRODUKSI';
+            break;
+        case 'REVISI':
+            themeColor = 'bg-rose-600';
+            borderColor = 'border-rose-200';
+            alertBg = 'bg-rose-50';
+            alertText = 'text-rose-800';
+            label = 'REVISI QC';
+            break;
+        case 'TELAT':
+            themeColor = 'bg-red-600';
+            borderColor = 'border-red-200';
+            alertBg = 'bg-red-50';
+            alertText = 'text-red-800';
+            label = 'TELAT DEADLINE';
+            break;
+        case 'URGENT':
+            themeColor = 'bg-orange-500';
+            borderColor = 'border-orange-200';
+            alertBg = 'bg-orange-50';
+            alertText = 'text-orange-800';
+            label = 'MENDESAK (URGENT)';
+            break;
+    }
+
+    return (
+        <div ref={ref} className="w-[600px] bg-white p-8 rounded-3xl border border-slate-200 shadow-xl font-sans">
+            {/* HEADER */}
+            <div className="flex justify-between items-start mb-6 border-b border-slate-100 pb-4">
+                <div>
+                    <div className="flex items-center gap-3 mb-1">
+                        <span className={`px-3 py-1 rounded text-white text-xs font-bold tracking-widest uppercase ${themeColor}`}>
+                            {label}
+                        </span>
+                        <span className="text-slate-400 font-mono text-sm">#{order.kode_produksi}</span>
+                    </div>
+                    <h1 className="text-3xl font-extrabold text-slate-800 mt-2">{order.nama_pemesan}</h1>
+                    <p className="text-slate-500 text-sm mt-1">Dibuat: {formatDate(order.tanggal_masuk)}</p>
+                </div>
+                {/* Brand / Logo Placeholder (Opsional) */}
+                <div className="text-right">
+                    <h2 className="text-lg font-bold text-slate-700">LCO Production</h2>
+                    <p className="text-xs text-slate-400">Production Control Card</p>
                 </div>
             </div>
 
-            <button 
-                onClick={handleShare}
-                disabled={isSharing}
-                className="ml-2 p-2 text-slate-300 hover:text-blue-600 hover:bg-blue-50 rounded-full transition-all flex-shrink-0 self-center"
-            >
-                {isSharing ? <Loader2 className="w-5 h-5 animate-spin" /> : <Share2 className="w-5 h-5" />}
-            </button>
+            {/* ORDER DETAILS GRID (Mirip OrderList Card tapi lebih rapi untuk cetak) */}
+            <div className="grid grid-cols-3 gap-4 mb-6">
+                <div className="bg-slate-50 p-4 rounded-xl border border-slate-100">
+                    <span className="text-xs text-slate-500 uppercase font-bold block mb-1">Jumlah</span>
+                    <span className="text-xl font-bold text-slate-800">{order.jumlah} Pcs</span>
+                </div>
+                <div className="bg-slate-50 p-4 rounded-xl border border-slate-100">
+                    <span className="text-xs text-slate-500 uppercase font-bold block mb-1">Tipe</span>
+                    <span className="text-xl font-bold text-slate-800 uppercase">{order.jenis_produksi}</span>
+                </div>
+                <div className={`p-4 rounded-xl border ${type === 'TELAT' ? 'bg-red-50 border-red-100' : 'bg-slate-50 border-slate-100'}`}>
+                    <span className={`text-xs uppercase font-bold block mb-1 ${type === 'TELAT' ? 'text-red-500' : 'text-slate-500'}`}>Deadline</span>
+                    <span className={`text-xl font-bold ${type === 'TELAT' ? 'text-red-700' : 'text-slate-800'}`}>{formatDate(order.deadline)}</span>
+                </div>
+            </div>
+
+            {/* ALERT / MESSAGE SECTION */}
+            <div className={`p-5 rounded-2xl border-2 border-dashed ${borderColor} ${alertBg}`}>
+                <div className="flex items-start gap-3">
+                    <div className={`p-2 rounded-full ${themeColor} text-white`}>
+                        <AlertCircle className="w-6 h-6" />
+                    </div>
+                    <div>
+                        <h3 className={`font-bold text-sm uppercase mb-1 ${alertText}`}>Catatan {type === 'KENDALA' ? 'Produksi' : 'Sistem'}:</h3>
+                        <p className={`text-lg font-bold leading-relaxed ${alertText}`}>
+                            {detail}
+                        </p>
+                        <p className="text-xs opacity-60 mt-2">
+                           Laporan dibuat pada: {new Date().toLocaleString('id-ID')}
+                        </p>
+                    </div>
+                </div>
+            </div>
         </div>
     );
-}
+});
+ShareTicket.displayName = 'ShareTicket';
 
 function PieChartIcon(props: any) {
     return <PieIcon {...props} />;

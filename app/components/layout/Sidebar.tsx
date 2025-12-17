@@ -79,7 +79,7 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen, currentUser, acti
               SuperApp
             </p>
             <div className="inline-block bg-slate-800 text-slate-400 text-[10px] px-1.5 py-0.5 rounded mt-1.5 font-mono border border-slate-700">
-              V.6.5
+              V.6.9
             </div>
           </div>
 
