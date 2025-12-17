@@ -1,6 +1,11 @@
+// app/layout.tsx
+
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
+
+// ✅ 1. IMPORT KOMPONEN FCM MANAGER DI SINI
+import FCMManager from "@/app/components/misc/FCMManager"; 
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -13,9 +18,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  // ✅ PERUBAHAN DI SINI: Mengubah judul tab browser
   title: "LCO SuperApps", 
-  // Opsional: Anda juga bisa memperbarui deskripsinya
   description: "Aplikasi Monitoring Produksi Sablon LCO.", 
 };
 
@@ -29,6 +32,9 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
+        {/* ✅ 2. PASANG KOMPONEN DI SINI AGAR BERJALAN OTOMATIS */}
+        <FCMManager />
+        
         {children}
       </body>
     </html>

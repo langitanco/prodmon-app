@@ -1,4 +1,4 @@
-// app/lib/utils.ts
+// lib/utils.ts
 
 import { OrderStatus, ProductionStep, UserData, ProductionTypeData, DEFAULT_PERMISSIONS } from "@/types";
 
@@ -20,7 +20,6 @@ export const MONTHS = [
   'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'
 ];
 
-// --- PERBAIKAN DI SINI: MENAMBAHKAN permissions: DEFAULT_PERMISSIONS ---
 export const DEFAULT_USERS: UserData[] = [
   { 
     id: '1', 
@@ -28,7 +27,7 @@ export const DEFAULT_USERS: UserData[] = [
     password: '123', 
     name: 'Supervisor', 
     role: 'supervisor', 
-    permissions: DEFAULT_PERMISSIONS // <--- Wajib ada
+    permissions: DEFAULT_PERMISSIONS 
   },
   { 
     id: '2', 
@@ -36,7 +35,7 @@ export const DEFAULT_USERS: UserData[] = [
     password: '123', 
     name: 'Admin Utama', 
     role: 'admin', 
-    permissions: DEFAULT_PERMISSIONS // <--- Wajib ada
+    permissions: DEFAULT_PERMISSIONS 
   },
   { 
     id: '3', 
@@ -44,7 +43,7 @@ export const DEFAULT_USERS: UserData[] = [
     password: '123', 
     name: 'Staff Produksi', 
     role: 'produksi', 
-    permissions: DEFAULT_PERMISSIONS // <--- Wajib ada
+    permissions: DEFAULT_PERMISSIONS 
   },
   { 
     id: '4', 
@@ -52,7 +51,7 @@ export const DEFAULT_USERS: UserData[] = [
     password: '123', 
     name: 'Staff QC', 
     role: 'qc', 
-    permissions: DEFAULT_PERMISSIONS // <--- Wajib ada
+    permissions: DEFAULT_PERMISSIONS 
   },
   { 
     id: '5', 
@@ -60,7 +59,7 @@ export const DEFAULT_USERS: UserData[] = [
     password: '123', 
     name: 'Manager/CEO', 
     role: 'manager', 
-    permissions: DEFAULT_PERMISSIONS // <--- Wajib ada
+    permissions: DEFAULT_PERMISSIONS 
   },
 ];
 

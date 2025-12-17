@@ -13,7 +13,7 @@ interface ChangelogEntry {
 
 const APP_INFO = {
   name: "LCO SuperApp",
-  version: "V.6.9",  // UPDATED KE V.6.9
+  version: "V.7.0",  // UPDATED KE V.7.0
   purpose: "Aplikasi produksi Sablon, Langitan.co.",
   creator: "Tim Developer Langitan.co",
   creationDate: "Desember 2025",
@@ -21,6 +21,17 @@ const APP_INFO = {
 
 // --- DATA RIWAYAT UPDATE ---
 const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: "7.0",
+    date: "2025-12-18",
+    changes: [
+      "Smart Push Notifications (Firebase Integration): Sistem kini mendukung notifikasi realtime ke HP/Laptop tanpa perlu membuka website.",
+      "Role-Based Notification Logic: Notifikasi dikirim secara pintar hanya ke role yang relevan (contoh: Revisi ke Produksi, Kendala ke Admin/Manager, dll).",
+      "Automated Morning Guard (Cron Job): Sistem otomatis mengecek pesanan telat setiap jam 09:00 pagi dan mengirim peringatan ke tim terkait.",
+      "FCM Token Management: Penambahan sistem penyimpanan token perangkat yang aman di database Supabase untuk memastikan pengiriman notifikasi tepat sasaran.",
+      "Stability Fixes: Perbaikan pada inisialisasi Firebase Messaging untuk mencegah tabrakan proses (Race Condition) di sisi client.",
+    ],
+  },
   {
     version: "6.9",
     date: "2025-12-17",

@@ -33,6 +33,9 @@ import SettingsPage from '@/app/components/settings/SettingsPage';
 import { UserData, Order, ProductionTypeData, DEFAULT_PERMISSIONS } from '@/types';
 import { DEFAULT_PRODUCTION_TYPES } from '@/lib/utils';
 
+// ✅ IMPORT BARU: Notifikasi Helper Canggih
+import { sendNotification, sendToRoles, sendToAllUsers } from '@/lib/notificationHelper';
+
 // --- DEFINISI TIPE ---
 interface CurrentUser extends UserData {
   id: string; 
@@ -149,34 +152,6 @@ export default function ProductionApp() {
     return () => { supabase.removeChannel(channel); };
   }, [currentUser]);
 
-  // --- REVISI: MATIKAN SCANNER OTOMATIS STATUS TELAT ---
-  // Fungsi ini tadinya memaksa update status jadi 'Telat' saat halaman dibuka.
-  // Sekarang kita biarkan kosong atau hapus panggilannya.
-  const scanAndFixOverdueOrders = async (currentOrders: Order[]) => {
-    // MATIKAN FITUR INI AGAR DATABASE TIDAK BERUBAH JADI 'TELAT'
-    /* const today = new Date().toISOString().split('T')[0];
-    const updates = [];
-    let hasUpdates = false;
-
-    for (const order of currentOrders) {
-      if (['Selesai', 'Kirim', 'Ada Kendala', 'Telat'].includes(order.status)) {
-        continue;
-      }
-      if (order.deadline && order.deadline < today) {
-        updates.push(
-          supabase.from('orders').update({ status: 'Telat' }).eq('id', order.id)
-        );
-        hasUpdates = true;
-      }
-    }
-
-    if (hasUpdates && updates.length > 0) {
-      await Promise.all(updates);
-      fetchOrders(); 
-    }
-    */
-  };
-
   // --- DATA FETCHING FUNCTIONS ---
   const fetchOrders = async () => {
     const { data } = await supabase.from('orders').select('*').order('created_at', { ascending: false });
@@ -186,10 +161,6 @@ export default function ProductionApp() {
         kendala: Array.isArray(o.kendala) ? o.kendala : []
       }));
       setOrders(parsed);
-
-      // setTimeout(() => {
-      //   scanAndFixOverdueOrders(parsed); // <--- INI SUDAH DIMATIKAN
-      // }, 1000);
     }
   };
 
@@ -230,7 +201,6 @@ export default function ProductionApp() {
       deadline: formData.deadline,
       jenis_produksi: formData.type,
       status: 'Pesanan Masuk',
-      // Default steps
       steps_manual: [
         { id: 'm1', name: 'Pecah Gambar (PDF)', type: 'upload_pdf', isCompleted: false },
         { id: 'm2', name: 'Print Film', type: 'upload_image', isCompleted: false },
@@ -252,6 +222,13 @@ export default function ProductionApp() {
       await fetchOrders();
       setView('list');
       showAlert('Sukses', 'Pesanan berhasil dibuat');
+
+      // ✅ 1. LOGIKA NOTIF: Pesanan Baru -> Muncul di SEMUA ROLE
+      await sendToAllUsers(
+        "Pesanan Baru Masuk!", 
+        `Order ${payload.kode_produksi} (${payload.nama_pemesan}) baru saja dibuat.`
+      );
+
     } else {
       showAlert('Error', error.message, 'error');
     }
@@ -270,14 +247,11 @@ export default function ProductionApp() {
     const { error } = await supabase.from('orders').update(updates).eq('id', selectedOrderId);
 
     if (!error) {
-       // Kita panggil checkAutoStatus agar status disesuaikan dengan data baru
-       // (Misal ubah deadline jadi status telat hilang, atau ganti jenis prod)
        const oldOrder = orders.find(o => o.id === selectedOrderId);
        if(oldOrder) {
           const mergedOrder = { ...oldOrder, ...updates };
           await checkAutoStatus(mergedOrder);
        }
-
       await fetchOrders();
       setView('detail');
       showAlert('Sukses', 'Data berhasil diupdate');
@@ -361,8 +335,9 @@ export default function ProductionApp() {
     input.click();
   };
 
-  // --- REVISI: LOGIKA STATUS "TELAT" DIHAPUS DARI DATABASE ---
   const checkAutoStatus = async (orderData: Order) => {
+    const oldStatus = orderData.status; // Simpan status lama untuk deteksi perubahan
+
     // 1. Cek Kendala
     const hasUnresolvedKendala = Array.isArray(orderData.kendala) && 
                                  orderData.kendala.some((k: any) => !k.isResolved);
@@ -379,8 +354,6 @@ export default function ProductionApp() {
     } else if (!productionDone) {
         normalStatus = 'On Process';
     } else if (!orderData.finishing_qc?.isPassed || !orderData.finishing_packing?.isPacked) {
-        // Jika QC belum lulus atau belum packing, anggap Finishing
-        // Note: Jika di OrderDetail ada logic Revisi, itu ditangani di UI, tapi secara umum tahap ini adalah Finishing
         normalStatus = 'Finishing';
         // Khusus jika Revisi (Finishing QC gagal)
         if (orderData.finishing_qc?.isPassed === false && orderData.finishing_qc?.notes) {
@@ -398,15 +371,8 @@ export default function ProductionApp() {
     if (hasUnresolvedKendala) {
         finalStatus = 'Ada Kendala';
     } 
-    // HAPUS LOGIKA INI! JANGAN BIARKAN DATABASE MENYIMPAN 'TELAT'
-    /*
-    else if (isLate && !isFinished) {
-        finalStatus = 'Telat';
-    } 
-    */
     
     // 4. Update Database
-    // Pastikan status yang dikirim adalah ALUR KERJA (Bukan 'Telat')
     const { error } = await supabase.from('orders').update({
       ...orderData,      
       status: finalStatus 
@@ -414,8 +380,56 @@ export default function ProductionApp() {
 
     if (error) {
         showAlert('Error Update', error.message, 'error');
+        return;
     } else {
         fetchOrders();
+    }
+
+    // --- 🔔 LOGIKA NOTIFIKASI OTOMATIS (Sesuai Permintaan) ---
+
+    const titleUpdate = `Status Update: ${orderData.kode_produksi}`;
+
+    // A. Notifikasi jika Status BERUBAH
+    if (oldStatus !== finalStatus) {
+      if (finalStatus === 'On Process') {
+         // Logika 2: On Proses -> Produksi & Supervisor
+         await sendToRoles(['produksi', 'supervisor'], titleUpdate, "Pesanan mulai diproses produksi.");
+      }
+      else if (finalStatus === 'Ada Kendala') {
+         // Logika 3: Kendala -> Admin, Supervisor, Manager
+         await sendToRoles(['admin', 'supervisor', 'manager'], "⚠️ Ada Kendala!", `Order ${orderData.kode_produksi} melaporkan kendala.`);
+      }
+      else if (finalStatus === 'Finishing') {
+         // Logika 4: Finishing -> QC & Supervisor
+         await sendToRoles(['qc', 'supervisor'], titleUpdate, "Pesanan masuk tahap Finishing & QC.");
+      }
+      else if (finalStatus === 'Revisi') {
+         // Logika 5: Revisi -> Produksi, Supervisor, Manager
+         await sendToRoles(['produksi', 'supervisor', 'manager'], "⚠️ REVISI QC", `QC Gagal: ${orderData.finishing_qc?.notes}`);
+      }
+      else if (finalStatus === 'Selesai') {
+         // Logika 6: Selesai -> SEMUA ROLE
+         await sendToAllUsers("✅ Pesanan Selesai", `Order ${orderData.kode_produksi} telah selesai sepenuhnya!`);
+      }
+    }
+
+    // B. Notifikasi Urgent / Mepet (Setiap kali ada update, cek deadline)
+    if (orderData.deadline && finalStatus !== 'Selesai' && finalStatus !== 'Kirim') {
+      const deadline = new Date(orderData.deadline);
+      const today = new Date();
+      const diffTime = deadline.getTime() - today.getTime();
+      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+      // Jika sisa waktu 2 hari atau kurang (dan belum telat parah)
+      if (diffDays <= 2 && diffDays >= 0) {
+         // Logika 7: Urgent -> Produksi, Admin, Supervisor
+         await sendToRoles(['produksi', 'admin', 'supervisor'], "🔥 URGENT / MEPET", `Order ${orderData.kode_produksi} deadline tinggal ${diffDays} hari!`);
+      }
+      // Jika sudah minus (Telat) - Trigger saat ada aktivitas update
+      else if (diffDays < 0) {
+         // Logika 8: Telat -> Produksi, Admin, Supervisor
+         await sendToRoles(['produksi', 'admin', 'supervisor'], "⛔ PESANAN TELAT", `Order ${orderData.kode_produksi} sudah melewati deadline!`);
+      }
     }
   };
 
@@ -505,7 +519,7 @@ export default function ProductionApp() {
             </div>
         </header>
 
-        <main className="flex-1 overflow-y-auto px-4 py-6 md:p-8 pb-24">
+        <main className="flex-1 overflow-y-auto px-4 py-6 md:p-8 pb-24 relative">
            <div className="max-w-6xl mx-auto">
               
               {/* DASHBOARD */}
