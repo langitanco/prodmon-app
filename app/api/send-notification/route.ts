@@ -37,7 +37,7 @@ export async function POST(request: Request) {
     const { data: userTokens, error } = await supabaseAdmin
       .from('user_fcm_tokens')
       .select('token')
-      .eq('id', userId); // Menggunakan ID untuk mencari user
+      .eq('user_id', userId);
 
     if (error || !userTokens || userTokens.length === 0) {
       return NextResponse.json({ error: 'User token not found' }, { status: 404 });
@@ -46,23 +46,22 @@ export async function POST(request: Request) {
     const tokens = userTokens.map((t) => t.token);
     const uniqueTokens = [...new Set(tokens)];
 
-    // Domain utama aplikasi Anda
-    const BASE_URL = "https://langitanco-superapp.vercel.app";
-
+    // Susun pesan yang efisien untuk mencegah duplikat
     const message = {
-      // Payload dasar
       notification: {
         title: title,
         body: body,
       },
-      // Konfigurasi khusus Web/Android untuk mencegah duplikat dan memperbaiki ikon
       webpush: {
+        headers: {
+          image: "https://langitanco-superapp.vercel.app/logo.png", // Pastikan URL logo ini publik dan benar
+        },
         notification: {
           title: title,
           body: body,
-          icon: `${BASE_URL}/logo.png`,      // Ikon besar (Berwarna)
-          badge: `${BASE_URL}/icon-badge.png`, // Ikon Status Bar (WAJIB Putih Transparan)
-          click_action: `${BASE_URL}/`,
+          icon: "https://langitanco-superapp.vercel.app/logo.png", // URL ikon absolut
+          badge: "https://langitanco-superapp.vercel.app/icon-bedge.png",
+          click_action: "https://langitanco-superapp.vercel.app/",
         },
       },
       tokens: uniqueTokens,
