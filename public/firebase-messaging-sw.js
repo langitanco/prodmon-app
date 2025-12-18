@@ -15,18 +15,8 @@ firebase.initializeApp(firebaseConfig);
 
 const messaging = firebase.messaging();
 
+// Cukup biarkan ini untuk menerima pesan di background. 
+// JANGAN panggil self.registration.showNotification di sini jika di API sudah ada payload 'notification'
 messaging.onBackgroundMessage((payload) => {
-  console.log('[firebase-messaging-sw.js] Received background message ', payload);
-  
-  const notificationTitle = payload.notification.title;
-  const notificationOptions = {
-    body: payload.notification.body,
-    icon: '/logo.png', // Logo utama yang muncul di samping teks
-    badge: '/logo.png', // Ikon kecil yang muncul di bar status HP
-    data: {
-      url: '/' // Halaman yang dibuka saat notif diklik
-    }
-  };
-
-  self.registration.showNotification(notificationTitle, notificationOptions);
+  console.log('[firebase-messaging-sw.js] Background message received ', payload);
 });
