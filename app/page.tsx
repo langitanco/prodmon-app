@@ -3,29 +3,37 @@
 
 import React, { useState, useEffect } from 'react';
 import { createBrowserClient } from '@supabase/ssr';
-import imageCompression from 'browser-image-compression';
+import { Menu } from 'lucide-react';
+import imageCompression from 'browser-image-compression'; // ✅ Import Library Kompresi
 
 // Layout & UI
 import Sidebar from '@/app/components/layout/Sidebar';
-import Header from '@/app/components/layout/Header'; 
 import CustomAlert from '@/app/components/ui/CustomAlert';
 import LoginScreen from '@/app/components/auth/LoginScreen';
 
-// Dashboard & Views
+// Dashboard
 import Dashboard from '@/app/components/dashboard/Dashboard'; 
+
+// Apps & Config
 import CalculatorView from '@/app/components/apps/CalculatorView';
 import ConfigPriceView from '@/app/components/apps/ConfigPriceView';
 import AboutView from '@/app/components/misc/AboutView'; 
+
+// ORDERS 
 import OrderList from '@/app/components/orders/OrderList';
 import CreateOrder from '@/app/components/orders/CreateOrder';
 import EditOrder from '@/app/components/orders/EditOrder';
 import OrderDetail from '@/app/components/orders/OrderDetail';
 import TrashView from '@/app/components/orders/TrashView'; 
+
+// Settings
 import SettingsPage from '@/app/components/settings/SettingsPage'; 
 
 // Types & Helpers
 import { UserData, Order, ProductionTypeData, DEFAULT_PERMISSIONS, OrderStatus } from '@/types';
 import { DEFAULT_PRODUCTION_TYPES } from '@/lib/utils';
+
+// ✅ IMPORT LOGIKA PUSAT (Gunakan huruf kecil sesuai nama file orderLogic.ts)
 import { triggerOrderNotifications } from '@/lib/orderLogic';
 
 interface CurrentUser extends UserData {
@@ -33,7 +41,6 @@ interface CurrentUser extends UserData {
 }
 
 export default function ProductionApp() {
-  // --- STATES ---
   const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null);
   const [loadingUser, setLoadingUser] = useState(true);
   const [activeTab, setActiveTab] = useState<'dashboard' | 'orders' | 'settings' | 'trash' | 'kalkulator' | 'config_harga' | 'about'>('dashboard');
@@ -53,7 +60,6 @@ export default function ProductionApp() {
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
   );
 
-  // --- ALERTS & CONFIRMATIONS ---
   const showAlert = (title: string, message: string, type: 'success' | 'error' = 'success') => {
     setAlertState({ isOpen: true, title, message, type, onConfirm: undefined });
   };
@@ -62,20 +68,6 @@ export default function ProductionApp() {
   };
   const closeAlert = () => setAlertState(prev => ({ ...prev, isOpen: false }));
 
-  // --- LOGOUT LOGIC ---
-  const handleLogout = async () => {
-    showConfirm(
-      "Keluar Aplikasi?", 
-      "Sesi Anda akan berakhir. Pastikan semua pekerjaan telah disimpan.", 
-      async () => {
-        await supabase.auth.signOut();
-        setCurrentUser(null);
-        window.location.reload(); // Refresh total untuk membersihkan cache state
-      }
-    );
-  };
-
-  // --- AUTH SESSION ---
   useEffect(() => {
     const initSession = async () => {
       setLoadingUser(true);
@@ -98,11 +90,12 @@ export default function ProductionApp() {
     initSession();
   }, []);
 
-  // --- DATA FETCHING ---
   useEffect(() => {
     if (!currentUser) return;
     const loadAppData = async () => {
-      await Promise.all([fetchOrders(), fetchUsers(), fetchProductionTypes()]);
+      await fetchOrders();
+      await fetchUsers();
+      await fetchProductionTypes();
     };
     loadAppData();
   }, [currentUser]);
@@ -119,7 +112,8 @@ export default function ProductionApp() {
 
   const fetchProductionTypes = async () => {
     const { data } = await supabase.from('production_types').select('*').order('name');
-    if (data) setProductionTypes(data.length > 0 ? data : DEFAULT_PRODUCTION_TYPES);
+    if (data) setProductionTypes(data);
+    else if (productionTypes.length === 0) setProductionTypes(DEFAULT_PRODUCTION_TYPES);
   };
 
   const generateProductionCode = () => {
@@ -130,13 +124,13 @@ export default function ProductionApp() {
     return `${prefix}${String(max + 1).padStart(4, '0')}`;
   };
 
-  // --- ORDER HANDLERS ---
   const handleCreateOrder = async (formData: any) => {
-    const payload = {
+    const payload: any = {
       kode_produksi: generateProductionCode(),
       nama_pemesan: formData.nama,
       no_hp: formData.hp,
       jumlah: parseInt(formData.jumlah) || 0,
+      tanggal_masuk: new Date().toISOString().split('T')[0],
       deadline: formData.deadline,
       jenis_produksi: formData.type,
       status: 'Pesanan Masuk' as OrderStatus,
@@ -167,18 +161,40 @@ export default function ProductionApp() {
     }
   };
 
+  const handleEditOrder = async (editedData: any) => {
+    if (!selectedOrderId) return;
+    const updates = {
+      nama_pemesan: editedData.nama, no_hp: editedData.hp, jumlah: parseInt(editedData.jumlah),
+      deadline: editedData.deadline, jenis_produksi: editedData.type
+    };
+    const { error } = await supabase.from('orders').update(updates).eq('id', selectedOrderId);
+    if (!error) {
+       const oldOrder = orders.find(o => o.id === selectedOrderId);
+       if(oldOrder) await checkAutoStatus({ ...oldOrder, ...updates });
+      await fetchOrders(); setView('detail'); showAlert('Sukses', 'Data diupdate');
+    }
+  };
+
   const handleDeleteOrder = async (id: string) => {
-    showConfirm('Hapus Pesanan?', 'Data akan dipindahkan ke folder sampah.', async () => {
+    showConfirm('Hapus?', 'Data dipindah ke sampah.', async () => {
       const { error } = await supabase.from('orders').update({ deleted_at: new Date().toISOString() }).eq('id', id);
-      if (!error) { 
-        await fetchOrders(); 
-        setView('list'); 
-        showAlert('Sukses', 'Pesanan berhasil dihapus'); 
-      }
+      if (!error) { await fetchOrders(); setView('list'); showAlert('Sukses', 'Berhasil'); }
     });
   };
 
-  // --- UPLOAD & STATUS LOGIC ---
+  const handleRestoreOrder = async (id: string) => {
+    const { error } = await supabase.from('orders').update({ deleted_at: null }).eq('id', id);
+    if (!error) { fetchOrders(); showAlert('Sukses', 'Dipulihkan'); }
+  };
+
+  const handlePermanentDelete = async (id: string) => {
+    showConfirm('HAPUS PERMANEN?', 'Data tidak bisa kembali!', async () => {
+      const { error } = await supabase.from('orders').delete().eq('id', id);
+      if (!error) { fetchOrders(); showAlert('Sukses', 'Terhapus'); }
+    });
+  };
+
+  // --- LOGIC: UPLOADS DENGAN KOMPRESI OTOMATIS ---
   const triggerUpload = (targetType: string, stepId?: string, kendalaId?: string) => {
     const input = document.createElement('input');
     input.type = 'file';
@@ -187,18 +203,27 @@ export default function ProductionApp() {
       let file = e.target.files?.[0];
       if (!file || !selectedOrderId) return;
 
+      // ✅ LOGIKA KOMPRESI UNTUK FILE GAMBAR
       if (file.type.startsWith('image/')) {
-        try { 
-          file = await imageCompression(file, { maxSizeMB: 0.5, maxWidthOrHeight: 1280, useWebWorker: true }); 
-        } catch (err) { 
-          console.error("Kompresi gagal:", err); 
+        const options = {
+          maxSizeMB: 0.5,           // Maksimal 500KB
+          maxWidthOrHeight: 1280,  // Resolusi maksimal 1280px (Tetap tajam untuk detail sablon)
+          useWebWorker: true,
+          initialQuality: 0.8,     // Kualitas 80%
+        };
+
+        try {
+          const compressedFile = await imageCompression(file, options);
+          file = compressedFile; // Ganti file asli dengan yang sudah dikompres
+        } catch (error) {
+          console.error("Gagal kompres gambar, mengupload file asli:", error);
         }
       }
 
       const fileName = `${selectedOrderId}/${Date.now()}.${file.name.split('.').pop()}`;
       const { error: uploadError } = await supabase.storage.from('production-proofs').upload(fileName, file);
       
-      if (uploadError) return showAlert('Gagal', uploadError.message, 'error');
+      if (uploadError) { showAlert('Gagal', uploadError.message, 'error'); return; }
 
       const { data: urlData } = supabase.storage.from('production-proofs').getPublicUrl(fileName);
       const order = orders.find(o => o.id === selectedOrderId);
@@ -211,7 +236,7 @@ export default function ProductionApp() {
       else if (targetType === 'step' && stepId) {
          const steps = updatedOrder.jenis_produksi === 'manual' ? updatedOrder.steps_manual : updatedOrder.steps_dtf;
          const idx = steps.findIndex((s: any) => s.id === stepId);
-         if (idx >= 0) steps[idx] = { ...steps[idx], isCompleted: true, ...common };
+         if (idx >= 0) { steps[idx] = { ...steps[idx], isCompleted: true, ...common }; }
       } else if (targetType === 'packing') updatedOrder.finishing_packing = { isPacked: true, ...common };
       else if (targetType === 'shipping_kirim') updatedOrder.shipping.bukti_kirim = urlData.publicUrl;
       else if (targetType === 'shipping_terima') updatedOrder.shipping.bukti_terima = urlData.publicUrl;
@@ -227,7 +252,6 @@ export default function ProductionApp() {
   const checkAutoStatus = async (orderData: Order) => {
     const oldStatus = orderData.status as OrderStatus;
     const hasUnresolvedKendala = orderData.kendala?.some((k: any) => !k.isResolved);
-    
     let normalStatus = 'Pesanan Masuk';
     const steps = orderData.jenis_produksi === 'manual' ? orderData.steps_manual : orderData.steps_dtf;
     const productionDone = steps?.every((s: any) => s.isCompleted);
@@ -239,108 +263,75 @@ export default function ProductionApp() {
     } else if (!orderData.shipping?.bukti_terima) normalStatus = 'Kirim';
     else normalStatus = 'Selesai';
 
+    // ✅ FIX TYPE ERROR: Tambahkan 'as OrderStatus'
     const finalStatus = (hasUnresolvedKendala ? 'Ada Kendala' : normalStatus) as OrderStatus;
 
     const { error } = await supabase.from('orders').update({ ...orderData, status: finalStatus }).eq('id', orderData.id);
 
     if (!error) {
-        await fetchOrders();
+        fetchOrders();
         await triggerOrderNotifications({ ...orderData, status: finalStatus }, oldStatus);
     }
   };
 
-  // --- SETTINGS HANDLERS ---
   const handleSaveUser = async (u: any) => {
     const payload: any = { name: u.name, role: u.role, username: u.username };
     if (u.permissions) payload.permissions = u.permissions;
     if (u.password?.trim()) payload.password = u.password;
     const { error } = u.id ? await supabase.from('users').update(payload).eq('id', u.id) : await supabase.from('users').insert([payload]);
-    if(!error) { fetchUsers(); showAlert('Sukses', 'User berhasil diperbarui'); }
+    if(!error) { fetchUsers(); showAlert('Sukses', 'User tersimpan'); }
   };
 
-  // --- RENDER LOGIC ---
-  if (loadingUser) return <div className="min-h-screen flex flex-col items-center justify-center bg-white"><div className="w-10 h-10 border-2 border-slate-200 border-t-blue-600 rounded-full animate-spin"></div></div>;
+  const handleDeleteUser = async (id: string) => {
+    showConfirm('Hapus?', 'User dihapus.', async () => {
+      const { error } = await supabase.from('users').delete().eq('id', id);
+      if(!error) { fetchUsers(); showAlert('Sukses', 'Dihapus'); }
+    });
+  };
+
+  const handleSaveType = async (t: any) => {
+    const payload = { name: t.name, value: t.value };
+    const { error } = t.id ? await supabase.from('production_types').update(payload).eq('id', t.id) : await supabase.from('production_types').insert([payload]);
+    if(!error) { fetchProductionTypes(); showAlert('Sukses', 'Tipe tersimpan'); }
+  };
+
+  const handleDeleteType = async (id: string) => {
+    showConfirm('Hapus?', 'Yakin hapus tipe ini?', async () => {
+      const { error } = await supabase.from('production_types').delete().eq('id', id);
+      if(!error) { fetchProductionTypes(); showAlert('Sukses', 'Dihapus'); }
+    });
+  };
+
+  if (loadingUser) return <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50"><div className="w-12 h-12 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"></div></div>;
   if (!currentUser) return <LoginScreen />;
 
   const activeOrders = orders.filter(o => !o.deleted_at);
 
   return (
-    <div className="min-h-screen bg-slate-50 font-sans flex flex-col md:flex-row">
+    <div className="min-h-screen bg-gray-100 flex flex-col md:flex-row">
       <CustomAlert alertState={alertState} closeAlert={closeAlert} />
-      
-      <Sidebar 
-        sidebarOpen={sidebarOpen} 
-        setSidebarOpen={setSidebarOpen} 
-        currentUser={currentUser} 
-        activeTab={activeTab} 
-        handleNav={(tab: any) => { setActiveTab(tab); setView('list'); setSidebarOpen(false); }} 
-      />
-
+      <Sidebar sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} currentUser={currentUser} activeTab={activeTab} 
+        handleNav={(tab: any) => { setActiveTab(tab); setView('list'); setSidebarOpen(false); }} />
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
-        
-        {/* ✅ HEADER ELEGAN DENGAN DROPDOWN LOGOUT */}
-        <Header 
-          currentUser={currentUser} 
-          activeTab={activeTab} 
-          setSidebarOpen={setSidebarOpen} 
-          onLogout={handleLogout} // ✅ Fungsi dikirim ke Header
-        />
-
-        <main className="flex-1 overflow-y-auto px-4 py-6 md:p-8 pb-32">
-           <div className="max-w-7xl mx-auto">
-              {activeTab === 'dashboard' && currentUser.permissions?.pages?.dashboard && (
-                  <Dashboard 
-                    role={currentUser.role} 
-                    orders={activeOrders} 
-                    onSelectOrder={(id) => { setSelectedOrderId(id); setView('detail'); setActiveTab('orders'); }} 
-                  />
-              )}
+        <header className="md:hidden bg-white px-4 py-3 shadow-md flex items-center justify-between border-b">
+            <div className="flex items-center gap-3"><button onClick={() => setSidebarOpen(true)} className="p-2 bg-slate-100 rounded-lg"><Menu className="w-6 h-6"/></button><span className="font-bold">LCO Production</span></div>
+            <div className="text-[10px] font-bold bg-blue-600 text-white px-2 py-1 rounded">{currentUser.role}</div>
+        </header>
+        <main className="flex-1 overflow-y-auto px-4 py-6 md:p-8 pb-24 relative">
+           <div className="max-w-6xl mx-auto">
+              {activeTab === 'dashboard' && currentUser.permissions?.pages?.dashboard && <Dashboard role={currentUser.role} orders={activeOrders} onSelectOrder={(id) => { setSelectedOrderId(id); setView('detail'); setActiveTab('orders'); }} />}
               {activeTab === 'orders' && currentUser.permissions?.pages?.orders && (
                 <>
-                  {view === 'list' && (
-                    <OrderList 
-                      role={currentUser.role} 
-                      orders={activeOrders} 
-                      productionTypes={productionTypes} 
-                      onSelectOrder={(id) => { setSelectedOrderId(id); setView('detail'); }} 
-                      onNewOrder={() => setView('create')} 
-                      onDeleteOrder={handleDeleteOrder} 
-                      currentUser={currentUser} 
-                    />
-                  )}
-                  {view === 'create' && (
-                    <CreateOrder 
-                      productionTypes={productionTypes} 
-                      onCancel={() => setView('list')} 
-                      onSubmit={handleCreateOrder} 
-                    />
-                  )}
-                  {view === 'edit' && selectedOrderId && (
-                    <EditOrder 
-                      order={orders.find(o => o.id === selectedOrderId)!} 
-                      productionTypes={productionTypes} 
-                      onCancel={() => setView('detail')} 
-                      onSubmit={() => {}} 
-                    />
-                  )}
-                  {view === 'detail' && selectedOrderId && (
-                    <OrderDetail 
-                      currentUser={currentUser} 
-                      order={orders.find(o => o.id === selectedOrderId)!} 
-                      onBack={() => { setSelectedOrderId(null); setView('list'); }} 
-                      onEdit={() => setView('edit')} 
-                      onTriggerUpload={triggerUpload} 
-                      onUpdateOrder={checkAutoStatus} 
-                      onDelete={handleDeleteOrder} 
-                      onConfirm={showConfirm} 
-                    />
-                  )}
+                  {view === 'list' && <OrderList role={currentUser.role} orders={activeOrders} productionTypes={productionTypes} onSelectOrder={(id) => { setSelectedOrderId(id); setView('detail'); }} onNewOrder={() => setView('create')} onDeleteOrder={handleDeleteOrder} currentUser={currentUser} />}
+                  {view === 'create' && <CreateOrder productionTypes={productionTypes} onCancel={() => setView('list')} onSubmit={handleCreateOrder} />}
+                  {view === 'edit' && selectedOrderId && <EditOrder order={orders.find(o => o.id === selectedOrderId)!} productionTypes={productionTypes} onCancel={() => setView('detail')} onSubmit={handleEditOrder} />}
+                  {view === 'detail' && selectedOrderId && <OrderDetail currentUser={currentUser} order={orders.find(o => o.id === selectedOrderId)!} onBack={() => { setSelectedOrderId(null); setView('list'); }} onEdit={() => setView('edit')} onTriggerUpload={triggerUpload} onUpdateOrder={checkAutoStatus} onDelete={handleDeleteOrder} onConfirm={showConfirm} />}
                 </>
               )}
-              {activeTab === 'trash' && <TrashView orders={orders.filter(o => o.deleted_at)} onRestore={fetchOrders} onPermanentDelete={fetchOrders} />}
-              {activeTab === 'settings' && <SettingsPage users={usersList} productionTypes={productionTypes} onSaveUser={handleSaveUser} onDeleteUser={fetchUsers} onSaveProductionType={fetchProductionTypes} onDeleteProductionType={fetchProductionTypes} />}
-              {activeTab === 'kalkulator' && <CalculatorView />}
-              {activeTab === 'config_harga' && <ConfigPriceView />}
+              {activeTab === 'trash' && currentUser.permissions?.pages?.trash && <TrashView orders={orders.filter(o => o.deleted_at)} onRestore={handleRestoreOrder} onPermanentDelete={handlePermanentDelete} />}
+              {activeTab === 'settings' && currentUser.permissions?.pages?.settings && <SettingsPage users={usersList} productionTypes={productionTypes} onSaveUser={handleSaveUser} onDeleteUser={handleDeleteUser} onSaveProductionType={handleSaveType} onDeleteProductionType={handleDeleteType} />}
+              {activeTab === 'kalkulator' && currentUser.permissions?.pages?.kalkulator && <CalculatorView />}
+              {activeTab === 'config_harga' && currentUser.permissions?.pages?.config_harga && <ConfigPriceView />}
               {activeTab === 'about' && <AboutView />}
            </div>
         </main>

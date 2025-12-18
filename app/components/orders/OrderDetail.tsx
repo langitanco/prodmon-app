@@ -269,8 +269,8 @@ export default function OrderDetail({ currentUser, order, onBack, onEdit, onTrig
               <div className="flex gap-2">
                  <input 
                     type="text" 
-                    placeholder="Tulis detail kendala (misal: Mesin macet, bahan habis)..." 
-                    className="flex-1 text-sm px-3 py-2 border border-slate-300 rounded-lg outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 bg-white" 
+                    placeholder="Tulis detail kendala" 
+                    className="flex-1 text-sm px-3 py-2 text-slate-800 border border-slate-300 rounded-lg outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 bg-white" 
                     value={kendalaNote} 
                     onChange={e => setKendalaNote(e.target.value)} 
                  />
@@ -381,7 +381,7 @@ export default function OrderDetail({ currentUser, order, onBack, onEdit, onTrig
              ) : (
                 canCheckQC ? (
                   <div className="flex-1 flex flex-col">
-                     <textarea placeholder="Catatan QC (Wajib jika revisi)..." className="w-full text-sm p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-100 outline-none transition mb-3 resize-none h-32" value={qcNote} onChange={e=>setQcNote(e.target.value)}/>
+                     <textarea placeholder="Catatan QC (Wajib jika revisi)..." className="w-full text-sm p-3 text-slate-800 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-100 outline-none transition mb-3 resize-none h-32" value={qcNote} onChange={e=>setQcNote(e.target.value)}/>
                      <div className="grid grid-cols-2 gap-3 mt-auto">
                         <button onClick={()=>handleQC(false)} disabled={!qcNote.trim()} className="bg-white border-2 border-red-100 text-red-600 py-2.5 rounded-xl font-bold text-xs hover:bg-red-50 disabled:opacity-50 transition">
                            REVISI
