@@ -4,6 +4,7 @@
 import React, { useState, useEffect } from 'react';
 import { createBrowserClient } from '@supabase/ssr';
 import { Menu } from 'lucide-react';
+import imageCompression from 'browser-image-compression'; // ✅ Import Library Kompresi
 
 // Layout & UI
 import Sidebar from '@/app/components/layout/Sidebar';
@@ -32,7 +33,7 @@ import SettingsPage from '@/app/components/settings/SettingsPage';
 import { UserData, Order, ProductionTypeData, DEFAULT_PERMISSIONS, OrderStatus } from '@/types';
 import { DEFAULT_PRODUCTION_TYPES } from '@/lib/utils';
 
-// ✅ IMPORT LOGIKA PUSAT
+// ✅ IMPORT LOGIKA PUSAT (Gunakan huruf kecil sesuai nama file orderLogic.ts)
 import { triggerOrderNotifications } from '@/lib/orderLogic';
 
 interface CurrentUser extends UserData {
@@ -132,7 +133,7 @@ export default function ProductionApp() {
       tanggal_masuk: new Date().toISOString().split('T')[0],
       deadline: formData.deadline,
       jenis_produksi: formData.type,
-      status: 'Pesanan Masuk',
+      status: 'Pesanan Masuk' as OrderStatus,
       steps_manual: [
         { id: 'm1', name: 'Pecah Gambar (PDF)', type: 'upload_pdf', isCompleted: false },
         { id: 'm2', name: 'Print Film', type: 'upload_image', isCompleted: false },
@@ -193,19 +194,41 @@ export default function ProductionApp() {
     });
   };
 
+  // --- LOGIC: UPLOADS DENGAN KOMPRESI OTOMATIS ---
   const triggerUpload = (targetType: string, stepId?: string, kendalaId?: string) => {
     const input = document.createElement('input');
     input.type = 'file';
     input.accept = 'image/*,application/pdf';
     input.onchange = async (e: any) => {
-      const file = e.target.files?.[0];
+      let file = e.target.files?.[0];
       if (!file || !selectedOrderId) return;
+
+      // ✅ LOGIKA KOMPRESI UNTUK FILE GAMBAR
+      if (file.type.startsWith('image/')) {
+        const options = {
+          maxSizeMB: 0.5,           // Maksimal 500KB
+          maxWidthOrHeight: 1280,  // Resolusi maksimal 1280px (Tetap tajam untuk detail sablon)
+          useWebWorker: true,
+          initialQuality: 0.8,     // Kualitas 80%
+        };
+
+        try {
+          const compressedFile = await imageCompression(file, options);
+          file = compressedFile; // Ganti file asli dengan yang sudah dikompres
+        } catch (error) {
+          console.error("Gagal kompres gambar, mengupload file asli:", error);
+        }
+      }
+
       const fileName = `${selectedOrderId}/${Date.now()}.${file.name.split('.').pop()}`;
       const { error: uploadError } = await supabase.storage.from('production-proofs').upload(fileName, file);
+      
       if (uploadError) { showAlert('Gagal', uploadError.message, 'error'); return; }
+
       const { data: urlData } = supabase.storage.from('production-proofs').getPublicUrl(fileName);
       const order = orders.find(o => o.id === selectedOrderId);
       if (!order) return;
+
       let updatedOrder = JSON.parse(JSON.stringify(order));
       const common = { fileUrl: urlData.publicUrl, timestamp: new Date().toLocaleString(), uploadedBy: currentUser?.name };
       
@@ -240,7 +263,9 @@ export default function ProductionApp() {
     } else if (!orderData.shipping?.bukti_terima) normalStatus = 'Kirim';
     else normalStatus = 'Selesai';
 
+    // ✅ FIX TYPE ERROR: Tambahkan 'as OrderStatus'
     const finalStatus = (hasUnresolvedKendala ? 'Ada Kendala' : normalStatus) as OrderStatus;
+
     const { error } = await supabase.from('orders').update({ ...orderData, status: finalStatus }).eq('id', orderData.id);
 
     if (!error) {
