@@ -3,7 +3,7 @@
 import React, { useState } from 'react';
 import { formatDate, getDeadlineStatus, getStatusColor, MONTHS } from '@/lib/utils';
 import { Order, ProductionTypeData, UserData } from '@/types';
-import { BarChart3, Calendar, ClipboardList, Clock, FileText, Trash2 } from 'lucide-react';
+import { BarChart3, Calendar, ClipboardList, Clock, FileText, Trash2, User } from 'lucide-react'; // Tambah icon User
 
 interface OrderListProps {
   role: string;
@@ -23,6 +23,9 @@ export default function OrderList({ role, orders, productionTypes, onSelectOrder
   // --- LOGIKA IZIN ---
   const canDeleteOrder = role === 'supervisor' || currentUser?.permissions?.orders?.delete === true;
   const canCreateOrder = role === 'supervisor' || currentUser?.permissions?.orders?.create === true;
+
+  // Cek apakah user adalah Management (Bisa melihat semua PIC)
+  const isManagement = ['admin', 'manager', 'supervisor'].includes(role);
 
   const filteredOrders = orders.filter((o) => {
     let statusMatch = true;
@@ -112,8 +115,6 @@ export default function OrderList({ role, orders, productionTypes, onSelectOrder
       </div>
 
       {/* ORDER CARDS */}
-      {/* items-stretch: Memastikan semua kartu dalam satu baris memiliki tinggi yang sama 
-      */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 md:gap-4 items-stretch">
           {filteredOrders.map((order) => {
              const calculatedStatus = getDeadlineStatus(order.deadline, order.status);
@@ -123,15 +124,25 @@ export default function OrderList({ role, orders, productionTypes, onSelectOrder
               <div 
                 key={order.id} 
                 onClick={() => onSelectOrder(order.id)} 
-                // PERBAIKAN: h-full flex flex-col justify-between
-                // Ini membuat kartu mengisi tinggi penuh grid, dan isinya tersebar vertikal
                 className={`bg-white rounded-2xl shadow-sm border p-3 md:p-5 cursor-pointer hover:shadow-md transition relative overflow-hidden active:scale-[0.98] h-full flex flex-col justify-between ${showOverdueBadge ? 'border-red-300 ring-1 ring-red-100' : 'border-slate-200'}`}
               >
                 
                 {/* WRAPPER KONTEN ATAS (flex-1 akan mendorong tombol hapus ke bawah) */}
                 <div className="flex-1">
                     <div className="flex justify-between items-start mb-1 md:mb-4 mt-1">
-                      <span className="text-[10px] md:text-xs font-mono font-bold text-slate-500 bg-slate-100 px-1.5 py-0.5 md:px-2 md:py-1 rounded-md h-fit">#{order.kode_produksi}</span>
+                      <div className="flex flex-col gap-1">
+                          <span className="text-[10px] md:text-xs font-mono font-bold text-slate-500 bg-slate-100 px-1.5 py-0.5 md:px-2 md:py-1 rounded-md h-fit w-fit">#{order.kode_produksi}</span>
+                          
+                          {/* --- TAMBAHAN: BADGE PIC KHUSUS MANAGEMENT --- */}
+                          {isManagement && (
+                             <div className="flex items-center gap-1 bg-blue-50 text-blue-700 px-1.5 py-0.5 rounded border border-blue-100 w-fit">
+                                <User className="w-3 h-3"/>
+                                <span className="text-[10px] font-bold truncate max-w-[100px]">
+                                   {order.assigned_user?.name || 'No PIC'}
+                                </span>
+                             </div>
+                          )}
+                      </div>
                       
                       {/* STATUS WRAPPER */}
                       <div className="flex flex-col gap-1 items-end">

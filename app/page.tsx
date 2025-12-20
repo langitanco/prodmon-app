@@ -3,11 +3,11 @@
 
 import React, { useState, useEffect } from 'react';
 import { createBrowserClient } from '@supabase/ssr';
-import { Menu } from 'lucide-react';
-import imageCompression from 'browser-image-compression'; // ✅ Import Library Kompresi
+import imageCompression from 'browser-image-compression'; 
 
 // Layout & UI
 import Sidebar from '@/app/components/layout/Sidebar';
+import Header from '@/app/components/layout/Header'; // <--- IMPORT HEADER BARU
 import CustomAlert from '@/app/components/ui/CustomAlert';
 import LoginScreen from '@/app/components/auth/LoginScreen';
 
@@ -32,8 +32,6 @@ import SettingsPage from '@/app/components/settings/SettingsPage';
 // Types & Helpers
 import { UserData, Order, ProductionTypeData, DEFAULT_PERMISSIONS, OrderStatus } from '@/types';
 import { DEFAULT_PRODUCTION_TYPES } from '@/lib/utils';
-
-// ✅ IMPORT LOGIKA PUSAT (Gunakan huruf kecil sesuai nama file orderLogic.ts)
 import { triggerOrderNotifications } from '@/lib/orderLogic';
 
 interface CurrentUser extends UserData {
@@ -101,7 +99,14 @@ export default function ProductionApp() {
   }, [currentUser]);
 
   const fetchOrders = async () => {
-    const { data } = await supabase.from('orders').select('*').order('created_at', { ascending: false });
+    const { data } = await supabase
+      .from('orders')
+      .select(`
+        *,
+        assigned_user:users!assigned_to ( name ) 
+      `) 
+      .order('created_at', { ascending: false });
+      
     if (data) setOrders(data.map((o: any) => ({ ...o, kendala: Array.isArray(o.kendala) ? o.kendala : [] })));
   };
 
@@ -114,6 +119,15 @@ export default function ProductionApp() {
     const { data } = await supabase.from('production_types').select('*').order('name');
     if (data) setProductionTypes(data);
     else if (productionTypes.length === 0) setProductionTypes(DEFAULT_PRODUCTION_TYPES);
+  };
+
+  // --- LOGOUT HANDLER BARU ---
+  const handleLogout = async () => {
+    showConfirm('Logout', 'Apakah anda yakin ingin keluar?', async () => {
+        await supabase.auth.signOut();
+        setCurrentUser(null);
+        window.location.reload(); // Refresh agar bersih
+    });
   };
 
   const generateProductionCode = () => {
@@ -133,6 +147,7 @@ export default function ProductionApp() {
       tanggal_masuk: new Date().toISOString().split('T')[0],
       deadline: formData.deadline,
       jenis_produksi: formData.type,
+      assigned_to: formData.assigned_to || null, 
       status: 'Pesanan Masuk' as OrderStatus,
       steps_manual: [
         { id: 'm1', name: 'Pecah Gambar (PDF)', type: 'upload_pdf', isCompleted: false },
@@ -152,20 +167,16 @@ export default function ProductionApp() {
 
     const { data, error } = await supabase.from('orders').insert([payload]).select().single();
     if (!error && data) {
-      await fetchOrders();
-      setView('list');
-      showAlert('Sukses', 'Pesanan berhasil dibuat');
+      await fetchOrders(); setView('list'); showAlert('Sukses', 'Pesanan berhasil dibuat');
       await triggerOrderNotifications(data);
-    } else {
-      showAlert('Error', error?.message || 'Gagal', 'error');
-    }
+    } else { showAlert('Error', error?.message || 'Gagal', 'error'); }
   };
 
   const handleEditOrder = async (editedData: any) => {
     if (!selectedOrderId) return;
     const updates = {
       nama_pemesan: editedData.nama, no_hp: editedData.hp, jumlah: parseInt(editedData.jumlah),
-      deadline: editedData.deadline, jenis_produksi: editedData.type
+      deadline: editedData.deadline, jenis_produksi: editedData.type, assigned_to: editedData.assigned_to || null
     };
     const { error } = await supabase.from('orders').update(updates).eq('id', selectedOrderId);
     if (!error) {
@@ -194,56 +205,30 @@ export default function ProductionApp() {
     });
   };
 
-  // --- LOGIC: UPLOADS DENGAN KOMPRESI OTOMATIS ---
   const triggerUpload = (targetType: string, stepId?: string, kendalaId?: string) => {
-    const input = document.createElement('input');
-    input.type = 'file';
-    input.accept = 'image/*,application/pdf';
+    const input = document.createElement('input'); input.type = 'file'; input.accept = 'image/*,application/pdf';
     input.onchange = async (e: any) => {
-      let file = e.target.files?.[0];
-      if (!file || !selectedOrderId) return;
-
-      // ✅ LOGIKA KOMPRESI UNTUK FILE GAMBAR
+      let file = e.target.files?.[0]; if (!file || !selectedOrderId) return;
       if (file.type.startsWith('image/')) {
-        const options = {
-          maxSizeMB: 0.5,           // Maksimal 500KB
-          maxWidthOrHeight: 1280,  // Resolusi maksimal 1280px (Tetap tajam untuk detail sablon)
-          useWebWorker: true,
-          initialQuality: 0.8,     // Kualitas 80%
-        };
-
-        try {
-          const compressedFile = await imageCompression(file, options);
-          file = compressedFile; // Ganti file asli dengan yang sudah dikompres
-        } catch (error) {
-          console.error("Gagal kompres gambar, mengupload file asli:", error);
-        }
+        try { file = await imageCompression(file, { maxSizeMB: 0.5, maxWidthOrHeight: 1280, useWebWorker: true }); } 
+        catch (error) { console.error("Kompresi gagal:", error); }
       }
-
       const fileName = `${selectedOrderId}/${Date.now()}.${file.name.split('.').pop()}`;
       const { error: uploadError } = await supabase.storage.from('production-proofs').upload(fileName, file);
-      
       if (uploadError) { showAlert('Gagal', uploadError.message, 'error'); return; }
-
       const { data: urlData } = supabase.storage.from('production-proofs').getPublicUrl(fileName);
-      const order = orders.find(o => o.id === selectedOrderId);
-      if (!order) return;
-
+      const order = orders.find(o => o.id === selectedOrderId); if (!order) return;
       let updatedOrder = JSON.parse(JSON.stringify(order));
       const common = { fileUrl: urlData.publicUrl, timestamp: new Date().toLocaleString(), uploadedBy: currentUser?.name };
       
       if (targetType === 'approval') updatedOrder.link_approval = { link: urlData.publicUrl, by: currentUser?.name, timestamp: common.timestamp };
       else if (targetType === 'step' && stepId) {
          const steps = updatedOrder.jenis_produksi === 'manual' ? updatedOrder.steps_manual : updatedOrder.steps_dtf;
-         const idx = steps.findIndex((s: any) => s.id === stepId);
-         if (idx >= 0) { steps[idx] = { ...steps[idx], isCompleted: true, ...common }; }
+         const idx = steps.findIndex((s: any) => s.id === stepId); if (idx >= 0) steps[idx] = { ...steps[idx], isCompleted: true, ...common };
       } else if (targetType === 'packing') updatedOrder.finishing_packing = { isPacked: true, ...common };
       else if (targetType === 'shipping_kirim') updatedOrder.shipping.bukti_kirim = urlData.publicUrl;
       else if (targetType === 'shipping_terima') updatedOrder.shipping.bukti_terima = urlData.publicUrl;
-      else if (targetType === 'kendala_bukti' && kendalaId) {
-         const idx = updatedOrder.kendala.findIndex((k: any) => k.id === kendalaId);
-         if(idx >= 0) updatedOrder.kendala[idx].buktiFile = urlData.publicUrl;
-      }
+      else if (targetType === 'kendala_bukti' && kendalaId) { const idx = updatedOrder.kendala.findIndex((k: any) => k.id === kendalaId); if(idx >= 0) updatedOrder.kendala[idx].buktiFile = urlData.publicUrl; }
       checkAutoStatus(updatedOrder);
     };
     input.click();
@@ -255,52 +240,21 @@ export default function ProductionApp() {
     let normalStatus = 'Pesanan Masuk';
     const steps = orderData.jenis_produksi === 'manual' ? orderData.steps_manual : orderData.steps_dtf;
     const productionDone = steps?.every((s: any) => s.isCompleted);
-
-    if (!orderData.link_approval?.link) normalStatus = 'Pesanan Masuk';
-    else if (!productionDone) normalStatus = 'On Process';
-    else if (!orderData.finishing_qc?.isPassed || !orderData.finishing_packing?.isPacked) {
-        normalStatus = (orderData.finishing_qc?.isPassed === false && orderData.finishing_qc?.notes) ? 'Revisi' : 'Finishing';
-    } else if (!orderData.shipping?.bukti_terima) normalStatus = 'Kirim';
-    else normalStatus = 'Selesai';
-
-    // ✅ FIX TYPE ERROR: Tambahkan 'as OrderStatus'
+    if (!orderData.link_approval?.link) normalStatus = 'Pesanan Masuk'; else if (!productionDone) normalStatus = 'On Process';
+    else if (!orderData.finishing_qc?.isPassed || !orderData.finishing_packing?.isPacked) normalStatus = (orderData.finishing_qc?.isPassed === false && orderData.finishing_qc?.notes) ? 'Revisi' : 'Finishing';
+    else if (!orderData.shipping?.bukti_terima) normalStatus = 'Kirim'; else normalStatus = 'Selesai';
     const finalStatus = (hasUnresolvedKendala ? 'Ada Kendala' : normalStatus) as OrderStatus;
-
     const { error } = await supabase.from('orders').update({ ...orderData, status: finalStatus }).eq('id', orderData.id);
-
-    if (!error) {
-        fetchOrders();
-        await triggerOrderNotifications({ ...orderData, status: finalStatus }, oldStatus);
-    }
+    if (!error) { fetchOrders(); await triggerOrderNotifications({ ...orderData, status: finalStatus }, oldStatus); }
   };
 
   const handleSaveUser = async (u: any) => {
-    const payload: any = { name: u.name, role: u.role, username: u.username };
-    if (u.permissions) payload.permissions = u.permissions;
-    if (u.password?.trim()) payload.password = u.password;
-    const { error } = u.id ? await supabase.from('users').update(payload).eq('id', u.id) : await supabase.from('users').insert([payload]);
-    if(!error) { fetchUsers(); showAlert('Sukses', 'User tersimpan'); }
+    const payload: any = { name: u.name, role: u.role, username: u.username }; if (u.permissions) payload.permissions = u.permissions; if (u.password?.trim()) payload.password = u.password;
+    const { error } = u.id ? await supabase.from('users').update(payload).eq('id', u.id) : await supabase.from('users').insert([payload]); if(!error) { fetchUsers(); showAlert('Sukses', 'User tersimpan'); }
   };
-
-  const handleDeleteUser = async (id: string) => {
-    showConfirm('Hapus?', 'User dihapus.', async () => {
-      const { error } = await supabase.from('users').delete().eq('id', id);
-      if(!error) { fetchUsers(); showAlert('Sukses', 'Dihapus'); }
-    });
-  };
-
-  const handleSaveType = async (t: any) => {
-    const payload = { name: t.name, value: t.value };
-    const { error } = t.id ? await supabase.from('production_types').update(payload).eq('id', t.id) : await supabase.from('production_types').insert([payload]);
-    if(!error) { fetchProductionTypes(); showAlert('Sukses', 'Tipe tersimpan'); }
-  };
-
-  const handleDeleteType = async (id: string) => {
-    showConfirm('Hapus?', 'Yakin hapus tipe ini?', async () => {
-      const { error } = await supabase.from('production_types').delete().eq('id', id);
-      if(!error) { fetchProductionTypes(); showAlert('Sukses', 'Dihapus'); }
-    });
-  };
+  const handleDeleteUser = async (id: string) => { showConfirm('Hapus?', 'User dihapus.', async () => { const { error } = await supabase.from('users').delete().eq('id', id); if(!error) { fetchUsers(); showAlert('Sukses', 'Dihapus'); } }); };
+  const handleSaveType = async (t: any) => { const payload = { name: t.name, value: t.value }; const { error } = t.id ? await supabase.from('production_types').update(payload).eq('id', t.id) : await supabase.from('production_types').insert([payload]); if(!error) { fetchProductionTypes(); showAlert('Sukses', 'Tipe tersimpan'); } };
+  const handleDeleteType = async (id: string) => { showConfirm('Hapus?', 'Yakin hapus tipe ini?', async () => { const { error } = await supabase.from('production_types').delete().eq('id', id); if(!error) { fetchProductionTypes(); showAlert('Sukses', 'Dihapus'); } }); };
 
   if (loadingUser) return <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50"><div className="w-12 h-12 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"></div></div>;
   if (!currentUser) return <LoginScreen />;
@@ -308,23 +262,37 @@ export default function ProductionApp() {
   const activeOrders = orders.filter(o => !o.deleted_at);
 
   return (
-    <div className="min-h-screen bg-gray-100 flex flex-col md:flex-row">
+    <div className="min-h-screen bg-gray-50 flex flex-col md:flex-row">
       <CustomAlert alertState={alertState} closeAlert={closeAlert} />
-      <Sidebar sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} currentUser={currentUser} activeTab={activeTab} 
-        handleNav={(tab: any) => { setActiveTab(tab); setView('list'); setSidebarOpen(false); }} />
-      <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
-        <header className="md:hidden bg-white px-4 py-3 shadow-md flex items-center justify-between border-b">
-            <div className="flex items-center gap-3"><button onClick={() => setSidebarOpen(true)} className="p-2 bg-slate-100 rounded-lg"><Menu className="w-6 h-6"/></button><span className="font-bold">LCO Production</span></div>
-            <div className="text-[10px] font-bold bg-blue-600 text-white px-2 py-1 rounded">{currentUser.role}</div>
-        </header>
-        <main className="flex-1 overflow-y-auto px-4 py-6 md:p-8 pb-24 relative">
+      
+      {/* SIDEBAR */}
+      <Sidebar 
+        sidebarOpen={sidebarOpen} 
+        setSidebarOpen={setSidebarOpen} 
+        currentUser={currentUser} 
+        activeTab={activeTab} 
+        handleNav={(tab: any) => { setActiveTab(tab); setView('list'); setSidebarOpen(false); }} 
+      />
+      
+      {/* MAIN CONTENT AREA */}
+      <div className="flex-1 flex flex-col min-w-0 overflow-hidden h-screen">
+        
+        {/* HEADER BARU (Selalu Muncul) */}
+        <Header 
+            currentUser={currentUser} 
+            onToggleSidebar={() => setSidebarOpen(true)}
+            onLogout={handleLogout}
+        />
+
+        {/* SCROLLABLE CONTENT */}
+        <main className="flex-1 overflow-y-auto px-4 py-6 md:p-8 pb-24 relative bg-gray-100">
            <div className="max-w-6xl mx-auto">
               {activeTab === 'dashboard' && currentUser.permissions?.pages?.dashboard && <Dashboard role={currentUser.role} orders={activeOrders} onSelectOrder={(id) => { setSelectedOrderId(id); setView('detail'); setActiveTab('orders'); }} />}
               {activeTab === 'orders' && currentUser.permissions?.pages?.orders && (
                 <>
                   {view === 'list' && <OrderList role={currentUser.role} orders={activeOrders} productionTypes={productionTypes} onSelectOrder={(id) => { setSelectedOrderId(id); setView('detail'); }} onNewOrder={() => setView('create')} onDeleteOrder={handleDeleteOrder} currentUser={currentUser} />}
-                  {view === 'create' && <CreateOrder productionTypes={productionTypes} onCancel={() => setView('list')} onSubmit={handleCreateOrder} />}
-                  {view === 'edit' && selectedOrderId && <EditOrder order={orders.find(o => o.id === selectedOrderId)!} productionTypes={productionTypes} onCancel={() => setView('detail')} onSubmit={handleEditOrder} />}
+                  {view === 'create' && <CreateOrder users={usersList} productionTypes={productionTypes} onCancel={() => setView('list')} onSubmit={handleCreateOrder} />}
+                  {view === 'edit' && selectedOrderId && <EditOrder users={usersList} order={orders.find(o => o.id === selectedOrderId)!} productionTypes={productionTypes} onCancel={() => setView('detail')} onSubmit={handleEditOrder} />}
                   {view === 'detail' && selectedOrderId && <OrderDetail currentUser={currentUser} order={orders.find(o => o.id === selectedOrderId)!} onBack={() => { setSelectedOrderId(null); setView('list'); }} onEdit={() => setView('edit')} onTriggerUpload={triggerUpload} onUpdateOrder={checkAutoStatus} onDelete={handleDeleteOrder} onConfirm={showConfirm} />}
                 </>
               )}

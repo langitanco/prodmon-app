@@ -1,188 +1,120 @@
 // app/components/layout/Sidebar.tsx
-
 'use client';
 
 import React from 'react';
 import { 
+  Home, 
   ClipboardList, 
-  LayoutDashboard, 
   Settings, 
-  Trash2, 
-  LogOut, 
-  X, 
   Calculator, 
-  DollarSign,
-  Info 
+  Trash2, 
+  Info, 
+  X, 
+  DollarSign 
 } from 'lucide-react';
-import { createBrowserClient } from '@supabase/ssr';
-import { useRouter } from 'next/navigation';
-import { UserData } from '@/types'; 
+import { UserData } from '@/types';
 
 interface SidebarProps {
   sidebarOpen: boolean;
   setSidebarOpen: (open: boolean) => void;
   currentUser: UserData;
-  activeTab: 'dashboard' | 'orders' | 'settings' | 'trash' | 'kalkulator' | 'config_harga' | 'about'; 
+  activeTab: string;
   handleNav: (tab: any) => void;
 }
 
 export default function Sidebar({ sidebarOpen, setSidebarOpen, currentUser, activeTab, handleNav }: SidebarProps) {
   
-  const router = useRouter();
-  const supabase = createBrowserClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-  );
+  // Helper untuk mengecek izin akses menu
+  const canAccess = (page: string) => currentUser.permissions?.pages?.[page as keyof typeof currentUser.permissions.pages];
 
-  // --- LOGIKA HAK AKSES "SAFEGUARD" ---
-  // 1. Ambil permissions page
-  const p = currentUser?.permissions?.pages;
-  
-  // 2. Cek apakah user adalah SUPERVISOR?
-  // Jika Supervisor, kita beri "Kartu Sakti" (TRUE) untuk semua menu.
-  // Ini mencegah sidebar hilang jika data permission di database belum update/kosong.
-  const isSuper = currentUser?.role === 'supervisor';
-
-  const handleLogout = async () => {
-    await supabase.auth.signOut();
-    router.refresh(); 
-    router.push('/'); 
-  };
+  // Daftar Menu Utama (Bagian Atas)
+  const menuItems = [
+    { id: 'dashboard', label: 'Dashboard', icon: Home, visible: canAccess('dashboard') },
+    { id: 'orders', label: 'Pesanan', icon: ClipboardList, visible: canAccess('orders') },
+    { id: 'kalkulator', label: 'Kalkulator', icon: Calculator, visible: canAccess('kalkulator') },
+    { id: 'config_harga', label: 'Config Harga', icon: DollarSign, visible: canAccess('config_harga') },
+    { id: 'trash', label: 'Sampah', icon: Trash2, visible: canAccess('trash') },
+    { id: 'about', label: 'Tentang App', icon: Info, visible: true }, // Selalu muncul
+  ];
 
   return (
     <>
-      {/* Overlay Gelap saat Mobile */}
+      {/* OVERLAY GELAP (Hanya Mobile) */}
       {sidebarOpen && (
         <div 
-          className="fixed inset-0 bg-black/50 z-40 md:hidden backdrop-blur-sm transition-opacity"
+          className="fixed inset-0 z-20 bg-black/50 md:hidden transition-opacity"
           onClick={() => setSidebarOpen(false)}
         />
       )}
 
+      {/* SIDEBAR CONTAINER */}
       <aside className={`
-        fixed inset-y-0 left-0 z-50 w-72 bg-slate-900 text-white 
-        transform transition-transform duration-300 ease-in-out 
-        ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'} 
-        
-        md:translate-x-0 md:sticky md:top-0 md:h-screen md:flex-shrink-0
-        
-        flex flex-col shadow-2xl md:shadow-none
+        fixed md:static inset-y-0 left-0 z-30 w-64 bg-white border-r border-slate-200 transform transition-transform duration-300 ease-in-out flex flex-col
+        ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}
+        md:translate-x-0
       `}>
         
-        {/* Header Sidebar */}
-        <div className="p-6 border-b border-slate-800 flex justify-between items-start bg-slate-950 flex-shrink-0">
-          <div>
-            <h1 className="text-2xl font-extrabold tracking-tight text-white">
-              Langitan<span className="text-blue-500">.co</span>
-            </h1>
-            <p className="text-xs text-slate-300 mt-1 font-bold tracking-wide ">
-              SuperApp
-            </p>
-            <div className="inline-block bg-slate-800 text-slate-400 text-[10px] px-1.5 py-0.5 rounded mt-1.5 font-mono border border-slate-700">
-              V.7.0
-            </div>
+        {/* HEADER SIDEBAR (Logo & Tombol Close) */}
+        <div className="h-16 flex items-center justify-between px-6 border-b border-slate-100">
+          <div className="flex items-center gap-2 text-blue-600">
+            {/* Ikon Logo Sederhana */}
+            <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center text-white font-bold">L</div>
+            <span className="font-bold text-lg tracking-tight text-slate-800">LCO App</span>
           </div>
-
-          <button onClick={() => setSidebarOpen(false)} className="md:hidden text-slate-400 hover:text-white transition mt-1">
+          <button onClick={() => setSidebarOpen(false)} className="md:hidden text-slate-400 hover:text-slate-600">
             <X className="w-6 h-6" />
           </button>
         </div>
 
-        {/* User Info Kecil */}
-        <div className="px-6 py-4 bg-slate-800/50 border-b border-slate-800 flex-shrink-0">
-           <div className="text-sm font-bold text-white truncate">{currentUser.name}</div>
-           <div className="text-xs text-blue-400 font-mono mt-0.5 tracking-wider uppercase">{currentUser.role}</div>
+        {/* BAGIAN TENGAH: Menu Navigasi */}
+        <div className="flex-1 overflow-y-auto py-6 px-4 space-y-1">
+          
+          {/* --- BAGIAN PROFIL USER (Hanya Muncul di Mobile) --- */}
+          {/* Class 'md:hidden' membuatnya hilang saat layar lebar */}
+          <div className="mb-6 p-4 bg-slate-50 rounded-xl border border-slate-100 md:hidden">
+            <div className="text-sm font-bold text-slate-800">{currentUser.name}</div>
+            <div className="text-xs text-blue-600 font-bold uppercase tracking-wider mt-0.5">{currentUser.role}</div>
+          </div>
+          
+          {/* Render Menu Items */}
+          {menuItems.map((item) => (
+             item.visible && (
+              <button
+                key={item.id}
+                onClick={() => handleNav(item.id)}
+                className={`w-full flex items-center gap-3 px-4 py-3 text-sm font-bold rounded-xl transition-all duration-200 ${
+                  activeTab === item.id 
+                    ? 'bg-blue-50 text-blue-700 shadow-sm ring-1 ring-blue-100' 
+                    : 'text-slate-500 hover:bg-slate-50 hover:text-slate-900'
+                }`}
+              >
+                <item.icon className={`w-5 h-5 ${activeTab === item.id ? 'text-blue-600' : 'text-slate-400'}`} />
+                {item.label}
+              </button>
+             )
+          ))}
         </div>
 
-        {/* Menu Navigasi */}
-        <nav className="flex-1 overflow-y-auto p-4 space-y-2 scrollbar-thin scrollbar-thumb-slate-700">
-          
-          {/* LOGIKA: Tampilkan jika (Dia Supervisor) ATAU (Punya Izin Dashboard) */}
-          
-          {(isSuper || p?.dashboard) && (
-            <button 
-              onClick={() => handleNav('dashboard')}
-              className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-xl transition font-medium ${activeTab === 'dashboard' ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/50' : 'text-slate-400 hover:bg-slate-800 hover:text-white'}`}
+        {/* BAGIAN BAWAH (FOOTER): Tombol Pengaturan */}
+        <div className="p-4 border-t border-slate-100">
+          {canAccess('settings') ? (
+            <button
+              onClick={() => handleNav('settings')}
+              className={`w-full flex items-center gap-3 px-4 py-3 text-sm font-bold rounded-xl transition-all duration-200 ${
+                activeTab === 'settings'
+                  ? 'bg-slate-800 text-white shadow-md'
+                  : 'bg-slate-50 text-slate-600 hover:bg-slate-100 hover:text-slate-900 border border-slate-200'
+              }`}
             >
-              <LayoutDashboard className="w-5 h-5"/> Dashboard
+              <Settings className="w-5 h-5" />
+              Pengaturan
             </button>
-          )}
-          
-          {(isSuper || p?.orders) && (
-            <button 
-              onClick={() => handleNav('orders')}
-              className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-xl transition font-medium ${activeTab === 'orders' ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/50' : 'text-slate-400 hover:bg-slate-800 hover:text-white'}`}
-            >
-              <ClipboardList className="w-5 h-5"/> Daftar Pesanan
-            </button>
-          )}
-
-          {(isSuper || p?.trash) && (
-            <button 
-                onClick={() => handleNav('trash')}
-                className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-xl transition font-medium ${activeTab === 'trash' ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/50' : 'text-slate-400 hover:bg-slate-800 hover:text-white'}`}
-            >
-                <Trash2 className="w-5 h-5"/> Sampah
-            </button>
-          )}
-
-          {/* GROUP: APLIKASI LAIN */}
-          {(isSuper || p?.kalkulator || p?.config_harga) && (
-            <div className="pt-4 mt-4 border-t border-slate-700">
-              <p className="px-4 text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-2">Aplikasi Lain</p>
-              
-              {(isSuper || p?.kalkulator) && (
-                <button 
-                  onClick={() => handleNav('kalkulator')}
-                  className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition font-medium text-left ${activeTab === 'kalkulator' ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/50' : 'text-slate-400 hover:bg-slate-800 hover:text-green-400'}`}
-                >
-                  <Calculator className="w-5 h-5"/> Kalkulator HPP
-                </button>
-              )}
-
-              {(isSuper || p?.config_harga) && (
-                <button 
-                  onClick={() => handleNav('config_harga')}
-                  className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition font-medium text-left ${activeTab === 'config_harga' ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/50' : 'text-slate-400 hover:bg-slate-800 hover:text-yellow-400'}`}
-                >
-                  <DollarSign className="w-5 h-5"/> Pengaturan Harga
-                </button>
-              )}
+          ) : (
+            // Jika user tidak punya akses pengaturan, tampilkan copyright saja
+            <div className="text-center text-[10px] text-slate-300 font-medium py-2">
+              v1.0.0 Production
             </div>
           )}
-          
-          {/* GROUP: SISTEM */}
-          {(isSuper || p?.settings || p?.about) && (
-            <div className="pt-4 mt-4 border-t border-slate-700">
-                <p className="px-4 text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-2">Sistem</p>
-
-                {(isSuper || p?.settings) && (
-                    <button 
-                      onClick={() => handleNav('settings')}
-                      className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition font-medium text-left ${activeTab === 'settings' ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/50' : 'text-slate-400 hover:bg-slate-800 hover:text-white'}`}
-                    >
-                      <Settings className="w-5 h-5"/> User & Akses
-                    </button>
-                )}
-                
-                {(isSuper || p?.about) && (
-                  <button 
-                    onClick={() => handleNav('about')}
-                    className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition font-medium text-left ${activeTab === 'about' ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/50' : 'text-slate-400 hover:bg-slate-800 hover:text-white'}`}
-                  >
-                    <Info className="w-5 h-5"/> Tentang Aplikasi
-                  </button>
-                )}
-            </div>
-          )}
-
-        </nav>
-
-        {/* Tombol Logout - Fixed di bawah */}
-        <div className="p-4 border-t border-slate-800 bg-slate-950 flex-shrink-0">
-          <button onClick={handleLogout} className="w-full flex items-center gap-3 px-4 py-3 text-red-400 hover:bg-red-950/30 hover:text-red-300 rounded-xl transition font-bold">
-            <LogOut className="w-5 h-5"/> Keluar
-          </button>
         </div>
 
       </aside>
