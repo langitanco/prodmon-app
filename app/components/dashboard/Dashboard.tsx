@@ -10,7 +10,6 @@ import {
 } from 'recharts';
 import { TrendingUp, PieChart as PieIcon, AlertCircle, CheckCircle2, Package, AlertTriangle, Share2, Loader2, Clock } from 'lucide-react'; 
 
-// --- PERBAIKAN DI SINI: Pastikan formatDate ada ---
 import { getDeadlineStatus, formatDate } from '@/lib/utils';
 import { toPng } from 'html-to-image';
 
@@ -22,13 +21,12 @@ interface DashboardProps {
 
 const COLORS = ['#3b82f6', '#f59e0b', '#10b981', '#ef4444']; 
 
-// Tipe Data Baru untuk Item Tindakan
 type ActionItem = {
-    uniqueKey: string; // Kunci unik untuk React map (misal: orderId-tipe)
+    uniqueKey: string;
     order: Order;
     type: 'KENDALA' | 'REVISI' | 'TELAT' | 'URGENT';
     detail: string;
-    timestamp?: string; // Untuk sorting
+    timestamp?: string;
 };
 
 export default function Dashboard({ role, orders, onSelectOrder }: DashboardProps) {
@@ -85,20 +83,18 @@ export default function Dashboard({ role, orders, onSelectOrder }: DashboardProp
     totalPcs: orders.reduce((acc, curr) => acc + curr.jumlah, 0),
     warning: orders.filter(o => getDeadlineStatus(o.deadline, o.status) === 'warning').length,
     overdue: orders.filter(o => getDeadlineStatus(o.deadline, o.status) === 'overdue').length,
-    trouble: orders.filter(o => o.kendala && o.kendala.some(k => !k.isResolved)).length, // Hitung yang kendala aktif
+    trouble: orders.filter(o => o.kendala && o.kendala.some(k => !k.isResolved)).length,
   };
 
-  // --- D. LOGIKA LIST ACTION ITEMS (PENTING: SPLIT ORDER JADI MULTIPLE ITEMS) ---
+  // D. LOGIKA LIST ACTION ITEMS
   const actionItems: ActionItem[] = useMemo(() => {
     const items: ActionItem[] = [];
 
     orders.forEach(order => {
         const deadlineStatus = getDeadlineStatus(order.deadline, order.status);
         
-        // 1. Cek Kendala (Prioritas Tertinggi)
         const activeKendala = order.kendala ? order.kendala.filter(k => !k.isResolved) : [];
         if (activeKendala.length > 0) {
-            // Ambil kendala terbaru
             const latest = activeKendala.sort((a,b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())[0];
             items.push({
                 uniqueKey: `${order.id}-kendala`,
@@ -109,7 +105,6 @@ export default function Dashboard({ role, orders, onSelectOrder }: DashboardProp
             });
         }
 
-        // 2. Cek Revisi (QC Failed)
         if (order.status === 'Revisi') {
              items.push({
                 uniqueKey: `${order.id}-revisi`,
@@ -119,7 +114,6 @@ export default function Dashboard({ role, orders, onSelectOrder }: DashboardProp
             });
         }
 
-        // 3. Cek Telat (Overdue)
         if (deadlineStatus === 'overdue') {
              items.push({
                 uniqueKey: `${order.id}-telat`,
@@ -128,7 +122,6 @@ export default function Dashboard({ role, orders, onSelectOrder }: DashboardProp
                 detail: `Telat ${formatDateDiff(order.deadline)} hari`
             });
         }
-        // 4. Cek Urgent (Warning) - Hanya jika tidak telat (agar tidak duplikat info waktu)
         else if (deadlineStatus === 'warning') {
              items.push({
                 uniqueKey: `${order.id}-urgent`,
@@ -139,7 +132,6 @@ export default function Dashboard({ role, orders, onSelectOrder }: DashboardProp
         }
     });
 
-    // SORTING PRIORITAS: Kendala > Revisi > Telat > Urgent
     return items.sort((a, b) => {
         const priority = { 'KENDALA': 4, 'REVISI': 3, 'TELAT': 2, 'URGENT': 1 };
         return priority[b.type] - priority[a.type];
@@ -147,8 +139,6 @@ export default function Dashboard({ role, orders, onSelectOrder }: DashboardProp
 
   }, [orders]);
 
-
-  // --- LOGIKA TAMPILAN PIE CHART ---
   const activeItem = activeIndex !== null ? productionTypeData[activeIndex] : null;
   const centerValue = activeItem ? activeItem.value : stats.totalOrders;
   const centerLabel = activeItem ? activeItem.name : 'TOTAL ORDER';
@@ -157,41 +147,110 @@ export default function Dashboard({ role, orders, onSelectOrder }: DashboardProp
   return (
     <div className="space-y-4 md:space-y-6 pb-10">
       
-      {/* HEADER */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-3 md:gap-4">
-        <div>
-            <h2 className="text-xl md:text-2xl font-bold text-slate-800">Dashboard Produksi</h2>
-            <p className="text-slate-500 text-xs md:text-sm">Ringkasan performa dan analitik produksi.</p>
+      {/* ============================================ */}
+      {/* HERO SECTION dengan Background Image */}
+      {/* ============================================ */}
+      <div className="relative rounded-3xl overflow-hidden shadow-2xl">
+        
+        {/* Background Pattern Layer - Industrial/Production Theme */}
+        <div className="absolute inset-0 bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
+          {/* Geometric Pattern Overlay */}
+          <div className="absolute inset-0 opacity-10" style={{
+            backgroundImage: `
+              linear-gradient(30deg, #3b82f6 12%, transparent 12.5%, transparent 87%, #3b82f6 87.5%, #3b82f6),
+              linear-gradient(150deg, #3b82f6 12%, transparent 12.5%, transparent 87%, #3b82f6 87.5%, #3b82f6),
+              linear-gradient(30deg, #3b82f6 12%, transparent 12.5%, transparent 87%, #3b82f6 87.5%, #3b82f6),
+              linear-gradient(150deg, #3b82f6 12%, transparent 12.5%, transparent 87%, #3b82f6 87.5%, #3b82f6),
+              linear-gradient(60deg, #10b981 25%, transparent 25.5%, transparent 75%, #10b981 75%, #10b981),
+              linear-gradient(60deg, #10b981 25%, transparent 25.5%, transparent 75%, #10b981 75%, #10b981)
+            `,
+            backgroundSize: '80px 140px',
+            backgroundPosition: '0 0, 0 0, 40px 70px, 40px 70px, 0 0, 40px 70px'
+          }} />
+          
+          {/* Animated Glow Spots */}
+          <div className="absolute top-0 right-0 w-96 h-96 bg-blue-500/20 rounded-full blur-3xl animate-pulse" />
+          <div className="absolute bottom-0 left-0 w-96 h-96 bg-purple-500/20 rounded-full blur-3xl animate-pulse" style={{animationDelay: '1s'}} />
         </div>
         
-        {/* TAMPILAN STATUS */}
-        <div className="flex w-full md:w-auto gap-2 overflow-x-auto pb-2 md:pb-0 no-scrollbar">
-            {stats.trouble > 0 && (
-                <div className="flex-1 md:flex-none justify-center bg-purple-50 text-purple-700 px-3 py-2 rounded-lg text-xs font-bold border border-purple-100 flex items-center gap-1.5 shadow-sm md:shadow-none min-w-[100px] animate-pulse">
-                    <AlertTriangle className="w-3.5 h-3.5" /> {stats.trouble} Kendala
+        {/* Grid Lines Overlay */}
+        <div className="absolute inset-0 opacity-5" style={{
+          backgroundImage: 'linear-gradient(rgba(255,255,255,0.1) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.1) 1px, transparent 1px)',
+          backgroundSize: '50px 50px'
+        }} />
+        
+        {/* Content Layer */}
+        <div className="relative z-10 p-6 md:p-8 lg:p-10">
+          
+          {/* HEADER */}
+          <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6 md:mb-8">
+            <div>
+                <h2 className="text-2xl md:text-3xl lg:text-4xl font-bold text-white drop-shadow-lg">
+                  Dashboard Produksi
+                </h2>
+                <p className="text-slate-200 text-sm md:text-base mt-1 drop-shadow">
+                  Ringkasan performa dan analitik produksi
+                </p>
+            </div>
+            
+            {/* TAMPILAN STATUS dengan Glassmorphism */}
+            <div className="flex w-full md:w-auto gap-2 overflow-x-auto pb-2 md:pb-0 no-scrollbar">
+                {stats.trouble > 0 && (
+                    <div className="flex-1 md:flex-none justify-center bg-purple-500/90 backdrop-blur-sm text-white px-4 py-2.5 rounded-xl text-xs font-bold border border-purple-400/30 flex items-center gap-2 shadow-lg min-w-[100px]">
+                        <AlertTriangle className="w-4 h-4" /> {stats.trouble} Kendala
+                    </div>
+                )}
+                <div className="flex-1 md:flex-none justify-center bg-red-500/90 backdrop-blur-sm text-white px-4 py-2.5 rounded-xl text-xs font-bold border border-red-400/30 flex items-center gap-2 shadow-lg min-w-[90px]">
+                    <AlertCircle className="w-4 h-4" /> {stats.overdue} Telat
                 </div>
-            )}
-            <div className="flex-1 md:flex-none justify-center bg-red-50 text-red-700 px-3 py-2 rounded-lg text-xs font-bold border border-red-100 flex items-center gap-1.5 shadow-sm md:shadow-none min-w-[90px]">
-                <AlertCircle className="w-3.5 h-3.5" /> {stats.overdue} Telat
+                <div className="flex-1 md:flex-none justify-center bg-orange-500/90 backdrop-blur-sm text-white px-4 py-2.5 rounded-xl text-xs font-bold border border-orange-400/30 flex items-center gap-2 shadow-lg min-w-[90px]">
+                    <TrendingUp className="w-4 h-4" /> {stats.warning} Urgent
+                </div>
             </div>
-            <div className="flex-1 md:flex-none justify-center bg-orange-50 text-orange-700 px-3 py-2 rounded-lg text-xs font-bold border border-orange-100 flex items-center gap-1.5 shadow-sm md:shadow-none min-w-[90px]">
-                <TrendingUp className="w-3.5 h-3.5" /> {stats.warning} Urgent
-            </div>
+          </div>
+
+          {/* KARTU STATISTIK dengan Glassmorphism Effect */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
+            <HeroStatCard 
+              title="Total Pesanan" 
+              value={stats.totalOrders} 
+              label="Lifetime" 
+              icon={<Package className="w-5 h-5" />}
+              gradient="from-blue-500 to-blue-600"
+            />
+            <HeroStatCard 
+              title="Total PCS" 
+              value={stats.totalPcs} 
+              label="Produksi" 
+              icon={<TrendingUp className="w-5 h-5" />}
+              gradient="from-indigo-500 to-indigo-600"
+            />
+            <HeroStatCard 
+              title="On Process" 
+              value={orders.filter(o => o.status === 'On Process').length} 
+              label="Sedang Jalan" 
+              icon={<Clock className="w-5 h-5" />}
+              gradient="from-yellow-500 to-yellow-600"
+            />
+            <HeroStatCard 
+              title="Selesai" 
+              value={orders.filter(o => o.status === 'Selesai').length} 
+              label="Completed" 
+              icon={<CheckCircle2 className="w-5 h-5" />}
+              gradient="from-green-500 to-green-600"
+            />
+          </div>
+          
         </div>
       </div>
 
-      {/* SECTION 1: KARTU STATISTIK */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
-        <StatCard title="Total Pesanan" value={stats.totalOrders} label="Lifetime" color="bg-blue-50 text-blue-700 border-blue-100" />
-        <StatCard title="Total PCS" value={stats.totalPcs} label="Produksi" color="bg-indigo-50 text-indigo-700 border-indigo-100" />
-        <StatCard title="On Process" value={orders.filter(o => o.status === 'On Process').length} label="Sedang Jalan" color="bg-yellow-50 text-yellow-700 border-yellow-100" />
-        <StatCard title="Selesai" value={orders.filter(o => o.status === 'Selesai').length} label="Completed" color="bg-green-50 text-green-700 border-green-100" />
-      </div>
-
-      {/* SECTION 2: GRAFIK */}
+      {/* ============================================ */}
+      {/* SECTION 2: GRAFIK (Tidak Berubah) */}
+      {/* ============================================ */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-6">
+        
         {/* GRAFIK 1: TREN VOLUME PCS */}
-        <div className="lg:col-span-2 bg-white p-4 md:p-6 rounded-2xl shadow-sm border border-slate-200">
+        <div className="lg:col-span-2 bg-white p-4 md:p-6 rounded-2xl border border-slate-200">
             <div className="flex items-center justify-between mb-4 md:mb-6">
                 <div>
                     <h3 className="font-bold text-slate-800 text-base md:text-lg flex items-center gap-2">
@@ -218,7 +277,7 @@ export default function Dashboard({ role, orders, onSelectOrder }: DashboardProp
         </div>
 
         {/* GRAFIK 2: PIE CHART */}
-        <div className="bg-white p-4 md:p-6 rounded-2xl shadow-sm border border-slate-200 flex flex-col">
+        <div className="bg-white p-4 md:p-6 rounded-2xl border border-slate-200 flex flex-col">
             <div className="mb-2 md:mb-4">
                 <h3 className="font-bold text-slate-800 text-base md:text-lg flex items-center gap-2">
                     <PieChartIcon className="w-4 h-4 md:w-5 md:h-5 text-purple-600" /> Jenis Produksi
@@ -262,8 +321,10 @@ export default function Dashboard({ role, orders, onSelectOrder }: DashboardProp
         </div>
       </div>
 
-      {/* SECTION 3: LIST PERLU TINDAKAN (LOGIKA BARU) */}
-      <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+      {/* ============================================ */}
+      {/* SECTION 3: LIST PERLU TINDAKAN (Tidak Berubah) */}
+      {/* ============================================ */}
+      <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
         <div className="p-4 md:p-5 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
              <h3 className="font-bold text-slate-800 text-sm md:text-base flex items-center gap-2">
                 <AlertCircle className="w-4 h-4 text-red-500"/> Perlu Tindakan Segera
@@ -272,7 +333,6 @@ export default function Dashboard({ role, orders, onSelectOrder }: DashboardProp
         </div>
         
         <div className="divide-y divide-slate-50">
-             {/* RENDER ACTION ITEMS, BUKAN ORDERS */}
              {actionItems.slice(0, 10).map((item) => (
                 <ActionRow key={item.uniqueKey} item={item} onSelectOrder={onSelectOrder} />
              ))}
@@ -290,15 +350,62 @@ export default function Dashboard({ role, orders, onSelectOrder }: DashboardProp
 }
 
 // ==========================================
-// SUB-COMPONENT: ACTION ROW (Updated)
+// SUB-COMPONENT: HERO STAT CARD (BARU)
+// ==========================================
+function HeroStatCard({ 
+  title, 
+  value, 
+  label, 
+  icon, 
+  gradient 
+}: { 
+  title: string;
+  value: number;
+  label: string;
+  icon: React.ReactNode;
+  gradient: string;
+}) {
+    return (
+        <div className="group relative overflow-hidden rounded-2xl backdrop-blur-md bg-white/10 border border-white/20 p-4 md:p-5 hover:bg-white/20 transition-all duration-300 hover:scale-105 hover:shadow-2xl">
+            {/* Gradient Accent */}
+            <div className={`absolute inset-0 bg-gradient-to-br ${gradient} opacity-0 group-hover:opacity-20 transition-opacity duration-300`} />
+            
+            <div className="relative z-10">
+                <div className="flex items-center justify-between mb-3">
+                    <span className="text-xs md:text-sm text-white/80 font-semibold uppercase tracking-wider">
+                        {title}
+                    </span>
+                    <div className="text-white/60 group-hover:text-white/90 transition-colors">
+                        {icon}
+                    </div>
+                </div>
+                
+                <div className="space-y-1">
+                    <span className="text-3xl md:text-4xl lg:text-5xl font-extrabold text-white block drop-shadow-lg">
+                        {value}
+                    </span>
+                    <span className="text-xs md:text-sm text-white/70 font-medium">
+                        {label}
+                    </span>
+                </div>
+            </div>
+            
+            {/* Shine Effect on Hover */}
+            <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500">
+                <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000" />
+            </div>
+        </div>
+    );
+}
+
+// ==========================================
+// SUB-COMPONENT: ACTION ROW
 // ==========================================
 function ActionRow({ item, onSelectOrder }: { item: ActionItem, onSelectOrder: (id: string) => void }) {
-    // Ref ini sekarang mengarah ke tiket tersembunyi, bukan tampilan baris
     const hiddenTicketRef = useRef<HTMLDivElement>(null); 
     const [isSharing, setIsSharing] = useState(false);
     const { order, type, detail } = item;
 
-    // Tentukan Style Icon & Warna untuk Tampilan Baris Dashboard
     let indicatorColor = '';
     let badgeClass = '';
     let icon = null;
@@ -337,7 +444,6 @@ function ActionRow({ item, onSelectOrder }: { item: ActionItem, onSelectOrder: (
         
         setIsSharing(true);
         try {
-            // pixelRatio: 3 membuat gambar 3x lebih tajam (HD)
             const dataUrl = await toPng(hiddenTicketRef.current, { 
                 cacheBust: true, 
                 backgroundColor: '#ffffff', 
@@ -367,7 +473,6 @@ function ActionRow({ item, onSelectOrder }: { item: ActionItem, onSelectOrder: (
 
     return (
         <>
-            {/* 1. TAMPILAN BARIS (Visible di Dashboard) */}
             <div 
                 className="group p-3 md:p-4 flex items-center justify-between hover:bg-slate-50 transition cursor-pointer relative" 
                 onClick={() => onSelectOrder(order.id)}
@@ -387,7 +492,7 @@ function ActionRow({ item, onSelectOrder }: { item: ActionItem, onSelectOrder: (
                         </div>
                     </div>
                     <div className="text-right pl-2 flex-shrink-0 self-start">
-                        <span className={`text-[10px] md:text-xs font-bold px-2 py-1 rounded border shadow-sm ${badgeClass}`}>
+                        <span className={`text-[10px] md:text-xs font-bold px-2 py-1 rounded border ${badgeClass}`}>
                             {type}
                         </span>
                         <p className="text-[9px] md:text-[10px] text-slate-400 mt-1.5 font-medium">Deadline: {new Date(order.deadline).toLocaleDateString('id-ID', {day: 'numeric', month: 'short'})}</p>
@@ -403,8 +508,6 @@ function ActionRow({ item, onSelectOrder }: { item: ActionItem, onSelectOrder: (
                 </button>
             </div>
 
-            {/* 2. TIKET TERSEMBUNYI (Hidden Render untuk Share Image HD) */}
-            {/* Posisi absolute dan z-index minus membuatnya tidak terlihat user tapi bisa dirender */}
             <div className="absolute -left-[9999px] top-0">
                 <ShareTicket ref={hiddenTicketRef} item={item} />
             </div>
@@ -522,7 +625,7 @@ function PieChartIcon(props: any) {
 
 function StatCard({ title, value, label, color }: { title: string, value: number, label: string, color: string }) {
     return (
-        <div className={`p-3 md:p-4 rounded-xl border ${color} flex flex-col justify-between h-24 md:h-32 shadow-sm transition-transform active:scale-95 md:active:scale-100`}>
+        <div className={`p-3 md:p-4 rounded-xl border ${color} flex flex-col justify-between h-24 md:h-32  transition-transform active:scale-95 md:active:scale-100`}>
             <span className="text-[9px] md:text-[10px] uppercase font-bold opacity-70 tracking-wider truncate">{title}</span>
             <div>
                 <span className="text-2xl md:text-4xl font-extrabold block md:inline">{value}</span>

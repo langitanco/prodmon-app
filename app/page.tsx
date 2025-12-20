@@ -7,9 +7,10 @@ import imageCompression from 'browser-image-compression';
 
 // Layout & UI
 import Sidebar from '@/app/components/layout/Sidebar';
-import Header from '@/app/components/layout/Header'; // <--- IMPORT HEADER BARU
+import Header from '@/app/components/layout/Header'; 
 import CustomAlert from '@/app/components/ui/CustomAlert';
 import LoginScreen from '@/app/components/auth/LoginScreen';
+import ProfileModal from '@/app/components/ui/ProfileModal';
 
 // Dashboard
 import Dashboard from '@/app/components/dashboard/Dashboard'; 
@@ -48,6 +49,8 @@ export default function ProductionApp() {
   const [view, setView] = useState<'list' | 'detail' | 'create' | 'edit'>('list');
   const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [showProfileModal, setShowProfileModal] = useState(false);
+  const [notifications, setNotifications] = useState<any[]>([]);
 
   const [alertState, setAlertState] = useState<{
     isOpen: boolean; title: string; message: string; type: 'success' | 'error' | 'confirm'; onConfirm?: () => void;
@@ -66,6 +69,38 @@ export default function ProductionApp() {
   };
   const closeAlert = () => setAlertState(prev => ({ ...prev, isOpen: false }));
 
+  // Fetch Notifikasi
+  const fetchNotifications = async () => {
+    if (!currentUser) return;
+    
+    try {
+      const { data } = await supabase
+        .from('notifications')
+        .select('*')
+        .eq('user_id', currentUser.id)
+        .order('created_at', { ascending: false })
+        .limit(20);
+      
+      if (data) {
+        setNotifications(data.map((n: any) => ({
+          id: n.id,
+          title: n.title,
+          message: n.message,
+          time: new Date(n.created_at).toLocaleString('id-ID', { 
+            day: '2-digit', 
+            month: 'short',
+            year: 'numeric',
+            hour: '2-digit', 
+            minute: '2-digit' 
+          }),
+          isRead: n.is_read
+        })));
+      }
+    } catch (error) {
+      console.error('Error fetching notifications:', error);
+    }
+  };
+
   useEffect(() => {
     const initSession = async () => {
       setLoadingUser(true);
@@ -80,6 +115,9 @@ export default function ProductionApp() {
             role: userData.role || 'produksi',
             password: '',
             permissions: userData.permissions || DEFAULT_PERMISSIONS,
+            address: userData.address,
+            dob: userData.dob,
+            avatar_url: userData.avatar_url
           });
         }
       }
@@ -90,12 +128,18 @@ export default function ProductionApp() {
 
   useEffect(() => {
     if (!currentUser) return;
+    
     const loadAppData = async () => {
       await fetchOrders();
       await fetchUsers();
       await fetchProductionTypes();
+      await fetchNotifications();
     };
     loadAppData();
+
+    // Auto-refresh notifikasi setiap 30 detik
+    const interval = setInterval(fetchNotifications, 30000);
+    return () => clearInterval(interval);
   }, [currentUser]);
 
   const fetchOrders = async () => {
@@ -121,13 +165,31 @@ export default function ProductionApp() {
     else if (productionTypes.length === 0) setProductionTypes(DEFAULT_PRODUCTION_TYPES);
   };
 
-  // --- LOGOUT HANDLER BARU ---
   const handleLogout = async () => {
     showConfirm('Logout', 'Apakah anda yakin ingin keluar?', async () => {
         await supabase.auth.signOut();
         setCurrentUser(null);
-        window.location.reload(); // Refresh agar bersih
+        window.location.reload(); 
     });
+  };
+
+  const handleUpdateProfile = async (newData: any) => {
+    if (!currentUser) return;
+    
+    const { error } = await supabase.from('users').update({
+      name: newData.name,
+      address: newData.address,
+      dob: newData.dob,
+      avatar_url: newData.avatar_url
+    }).eq('id', currentUser.id);
+
+    if (!error) {
+      setCurrentUser({ ...currentUser, ...newData });
+      setShowProfileModal(false);
+      showAlert('Sukses', 'Profil berhasil diperbarui');
+    } else {
+      showAlert('Gagal', error.message, 'error');
+    }
   };
 
   const generateProductionCode = () => {
@@ -167,9 +229,14 @@ export default function ProductionApp() {
 
     const { data, error } = await supabase.from('orders').insert([payload]).select().single();
     if (!error && data) {
-      await fetchOrders(); setView('list'); showAlert('Sukses', 'Pesanan berhasil dibuat');
+      await fetchOrders(); 
+      setView('list'); 
+      showAlert('Sukses', 'Pesanan berhasil dibuat');
       await triggerOrderNotifications(data);
-    } else { showAlert('Error', error?.message || 'Gagal', 'error'); }
+      await fetchNotifications(); // Refresh notifikasi setelah create order
+    } else { 
+      showAlert('Error', error?.message || 'Gagal', 'error'); 
+    }
   };
 
   const handleEditOrder = async (editedData: any) => {
@@ -182,7 +249,9 @@ export default function ProductionApp() {
     if (!error) {
        const oldOrder = orders.find(o => o.id === selectedOrderId);
        if(oldOrder) await checkAutoStatus({ ...oldOrder, ...updates });
-      await fetchOrders(); setView('detail'); showAlert('Sukses', 'Data diupdate');
+      await fetchOrders(); 
+      setView('detail'); 
+      showAlert('Sukses', 'Data diupdate');
     }
   };
 
@@ -206,31 +275,57 @@ export default function ProductionApp() {
   };
 
   const triggerUpload = (targetType: string, stepId?: string, kendalaId?: string) => {
-    const input = document.createElement('input'); input.type = 'file'; input.accept = 'image/*,application/pdf';
+    const input = document.createElement('input'); 
+    input.type = 'file'; 
+    input.accept = 'image/*,application/pdf';
+    
     input.onchange = async (e: any) => {
-      let file = e.target.files?.[0]; if (!file || !selectedOrderId) return;
+      let file = e.target.files?.[0]; 
+      if (!file || !selectedOrderId) return;
+      
       if (file.type.startsWith('image/')) {
-        try { file = await imageCompression(file, { maxSizeMB: 0.5, maxWidthOrHeight: 1280, useWebWorker: true }); } 
-        catch (error) { console.error("Kompresi gagal:", error); }
+        try { 
+          file = await imageCompression(file, { maxSizeMB: 0.5, maxWidthOrHeight: 1280, useWebWorker: true }); 
+        } catch (error) { 
+          console.error("Kompresi gagal:", error); 
+        }
       }
+      
       const fileName = `${selectedOrderId}/${Date.now()}.${file.name.split('.').pop()}`;
       const { error: uploadError } = await supabase.storage.from('production-proofs').upload(fileName, file);
-      if (uploadError) { showAlert('Gagal', uploadError.message, 'error'); return; }
+      
+      if (uploadError) { 
+        showAlert('Gagal', uploadError.message, 'error'); 
+        return; 
+      }
+      
       const { data: urlData } = supabase.storage.from('production-proofs').getPublicUrl(fileName);
-      const order = orders.find(o => o.id === selectedOrderId); if (!order) return;
+      const order = orders.find(o => o.id === selectedOrderId); 
+      if (!order) return;
+      
       let updatedOrder = JSON.parse(JSON.stringify(order));
       const common = { fileUrl: urlData.publicUrl, timestamp: new Date().toLocaleString(), uploadedBy: currentUser?.name };
       
-      if (targetType === 'approval') updatedOrder.link_approval = { link: urlData.publicUrl, by: currentUser?.name, timestamp: common.timestamp };
-      else if (targetType === 'step' && stepId) {
+      if (targetType === 'approval') {
+        updatedOrder.link_approval = { link: urlData.publicUrl, by: currentUser?.name, timestamp: common.timestamp };
+      } else if (targetType === 'step' && stepId) {
          const steps = updatedOrder.jenis_produksi === 'manual' ? updatedOrder.steps_manual : updatedOrder.steps_dtf;
-         const idx = steps.findIndex((s: any) => s.id === stepId); if (idx >= 0) steps[idx] = { ...steps[idx], isCompleted: true, ...common };
-      } else if (targetType === 'packing') updatedOrder.finishing_packing = { isPacked: true, ...common };
-      else if (targetType === 'shipping_kirim') updatedOrder.shipping.bukti_kirim = urlData.publicUrl;
-      else if (targetType === 'shipping_terima') updatedOrder.shipping.bukti_terima = urlData.publicUrl;
-      else if (targetType === 'kendala_bukti' && kendalaId) { const idx = updatedOrder.kendala.findIndex((k: any) => k.id === kendalaId); if(idx >= 0) updatedOrder.kendala[idx].buktiFile = urlData.publicUrl; }
+         const idx = steps.findIndex((s: any) => s.id === stepId); 
+         if (idx >= 0) steps[idx] = { ...steps[idx], isCompleted: true, ...common };
+      } else if (targetType === 'packing') {
+        updatedOrder.finishing_packing = { isPacked: true, ...common };
+      } else if (targetType === 'shipping_kirim') {
+        updatedOrder.shipping.bukti_kirim = urlData.publicUrl;
+      } else if (targetType === 'shipping_terima') {
+        updatedOrder.shipping.bukti_terima = urlData.publicUrl;
+      } else if (targetType === 'kendala_bukti' && kendalaId) { 
+        const idx = updatedOrder.kendala.findIndex((k: any) => k.id === kendalaId); 
+        if(idx >= 0) updatedOrder.kendala[idx].buktiFile = urlData.publicUrl; 
+      }
+      
       checkAutoStatus(updatedOrder);
     };
+    
     input.click();
   };
 
@@ -240,70 +335,195 @@ export default function ProductionApp() {
     let normalStatus = 'Pesanan Masuk';
     const steps = orderData.jenis_produksi === 'manual' ? orderData.steps_manual : orderData.steps_dtf;
     const productionDone = steps?.every((s: any) => s.isCompleted);
-    if (!orderData.link_approval?.link) normalStatus = 'Pesanan Masuk'; else if (!productionDone) normalStatus = 'On Process';
-    else if (!orderData.finishing_qc?.isPassed || !orderData.finishing_packing?.isPacked) normalStatus = (orderData.finishing_qc?.isPassed === false && orderData.finishing_qc?.notes) ? 'Revisi' : 'Finishing';
-    else if (!orderData.shipping?.bukti_terima) normalStatus = 'Kirim'; else normalStatus = 'Selesai';
+    
+    if (!orderData.link_approval?.link) {
+      normalStatus = 'Pesanan Masuk';
+    } else if (!productionDone) {
+      normalStatus = 'On Process';
+    } else if (!orderData.finishing_qc?.isPassed || !orderData.finishing_packing?.isPacked) {
+      normalStatus = (orderData.finishing_qc?.isPassed === false && orderData.finishing_qc?.notes) ? 'Revisi' : 'Finishing';
+    } else if (!orderData.shipping?.bukti_terima) {
+      normalStatus = 'Kirim';
+    } else {
+      normalStatus = 'Selesai';
+    }
+    
     const finalStatus = (hasUnresolvedKendala ? 'Ada Kendala' : normalStatus) as OrderStatus;
     const { error } = await supabase.from('orders').update({ ...orderData, status: finalStatus }).eq('id', orderData.id);
-    if (!error) { fetchOrders(); await triggerOrderNotifications({ ...orderData, status: finalStatus }, oldStatus); }
+    
+    if (!error) { 
+      fetchOrders(); 
+      await triggerOrderNotifications({ ...orderData, status: finalStatus }, oldStatus);
+      await fetchNotifications(); // Refresh notifikasi setelah status berubah
+    }
   };
 
   const handleSaveUser = async (u: any) => {
-    const payload: any = { name: u.name, role: u.role, username: u.username }; if (u.permissions) payload.permissions = u.permissions; if (u.password?.trim()) payload.password = u.password;
-    const { error } = u.id ? await supabase.from('users').update(payload).eq('id', u.id) : await supabase.from('users').insert([payload]); if(!error) { fetchUsers(); showAlert('Sukses', 'User tersimpan'); }
+    const payload: any = { name: u.name, role: u.role, username: u.username }; 
+    if (u.permissions) payload.permissions = u.permissions; 
+    if (u.password?.trim()) payload.password = u.password;
+    
+    const { error } = u.id 
+      ? await supabase.from('users').update(payload).eq('id', u.id) 
+      : await supabase.from('users').insert([payload]); 
+      
+    if(!error) { fetchUsers(); showAlert('Sukses', 'User tersimpan'); }
   };
-  const handleDeleteUser = async (id: string) => { showConfirm('Hapus?', 'User dihapus.', async () => { const { error } = await supabase.from('users').delete().eq('id', id); if(!error) { fetchUsers(); showAlert('Sukses', 'Dihapus'); } }); };
-  const handleSaveType = async (t: any) => { const payload = { name: t.name, value: t.value }; const { error } = t.id ? await supabase.from('production_types').update(payload).eq('id', t.id) : await supabase.from('production_types').insert([payload]); if(!error) { fetchProductionTypes(); showAlert('Sukses', 'Tipe tersimpan'); } };
-  const handleDeleteType = async (id: string) => { showConfirm('Hapus?', 'Yakin hapus tipe ini?', async () => { const { error } = await supabase.from('production_types').delete().eq('id', id); if(!error) { fetchProductionTypes(); showAlert('Sukses', 'Dihapus'); } }); };
 
-  if (loadingUser) return <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50"><div className="w-12 h-12 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"></div></div>;
+  const handleDeleteUser = async (id: string) => { 
+    showConfirm('Hapus?', 'User dihapus.', async () => { 
+      const { error } = await supabase.from('users').delete().eq('id', id); 
+      if(!error) { fetchUsers(); showAlert('Sukses', 'Dihapus'); } 
+    }); 
+  };
+
+  const handleSaveType = async (t: any) => { 
+    const payload = { name: t.name, value: t.value }; 
+    const { error } = t.id 
+      ? await supabase.from('production_types').update(payload).eq('id', t.id) 
+      : await supabase.from('production_types').insert([payload]); 
+      
+    if(!error) { fetchProductionTypes(); showAlert('Sukses', 'Tipe tersimpan'); } 
+  };
+
+  const handleDeleteType = async (id: string) => { 
+    showConfirm('Hapus?', 'Yakin hapus tipe ini?', async () => { 
+      const { error } = await supabase.from('production_types').delete().eq('id', id); 
+      if(!error) { fetchProductionTypes(); showAlert('Sukses', 'Dihapus'); } 
+    }); 
+  };
+
+  if (loadingUser) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50">
+        <div className="w-12 h-12 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+      </div>
+    );
+  }
+
   if (!currentUser) return <LoginScreen />;
 
   const activeOrders = orders.filter(o => !o.deleted_at);
 
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col md:flex-row">
-      <CustomAlert alertState={alertState} closeAlert={closeAlert} />
-      
-      {/* SIDEBAR */}
-      <Sidebar 
-        sidebarOpen={sidebarOpen} 
-        setSidebarOpen={setSidebarOpen} 
-        currentUser={currentUser} 
-        activeTab={activeTab} 
-        handleNav={(tab: any) => { setActiveTab(tab); setView('list'); setSidebarOpen(false); }} 
-      />
-      
-      {/* MAIN CONTENT AREA */}
-      <div className="flex-1 flex flex-col min-w-0 overflow-hidden h-screen">
-        
-        {/* HEADER BARU (Selalu Muncul) */}
-        <Header 
-            currentUser={currentUser} 
-            onToggleSidebar={() => setSidebarOpen(true)}
-            onLogout={handleLogout}
-        />
+    <div className="h-screen overflow-hidden bg-gray-100 flex flex-col md:flex-row font-sans text-slate-800">
+       <CustomAlert alertState={alertState} closeAlert={closeAlert} />
+       
+       {/* MODAL EDIT PROFIL */}
+       {currentUser && (
+         <ProfileModal 
+           user={currentUser} 
+           isOpen={showProfileModal} 
+           onClose={() => setShowProfileModal(false)} 
+           onSave={handleUpdateProfile} 
+         />
+       )}
+    
+       {/* SIDEBAR */}
+       <Sidebar 
+          sidebarOpen={sidebarOpen} 
+          setSidebarOpen={setSidebarOpen} 
+          currentUser={currentUser} 
+          activeTab={activeTab} 
+          handleNav={(tab: any) => { setActiveTab(tab); setView('list'); setSidebarOpen(false); }}
+          onLogout={handleLogout} 
+          onOpenProfile={() => setShowProfileModal(true)} 
+       />
 
-        {/* SCROLLABLE CONTENT */}
-        <main className="flex-1 overflow-y-auto px-4 py-6 md:p-8 pb-24 relative bg-gray-100">
-           <div className="max-w-6xl mx-auto">
-              {activeTab === 'dashboard' && currentUser.permissions?.pages?.dashboard && <Dashboard role={currentUser.role} orders={activeOrders} onSelectOrder={(id) => { setSelectedOrderId(id); setView('detail'); setActiveTab('orders'); }} />}
-              {activeTab === 'orders' && currentUser.permissions?.pages?.orders && (
-                <>
-                  {view === 'list' && <OrderList role={currentUser.role} orders={activeOrders} productionTypes={productionTypes} onSelectOrder={(id) => { setSelectedOrderId(id); setView('detail'); }} onNewOrder={() => setView('create')} onDeleteOrder={handleDeleteOrder} currentUser={currentUser} />}
-                  {view === 'create' && <CreateOrder users={usersList} productionTypes={productionTypes} onCancel={() => setView('list')} onSubmit={handleCreateOrder} />}
-                  {view === 'edit' && selectedOrderId && <EditOrder users={usersList} order={orders.find(o => o.id === selectedOrderId)!} productionTypes={productionTypes} onCancel={() => setView('detail')} onSubmit={handleEditOrder} />}
-                  {view === 'detail' && selectedOrderId && <OrderDetail currentUser={currentUser} order={orders.find(o => o.id === selectedOrderId)!} onBack={() => { setSelectedOrderId(null); setView('list'); }} onEdit={() => setView('edit')} onTriggerUpload={triggerUpload} onUpdateOrder={checkAutoStatus} onDelete={handleDeleteOrder} onConfirm={showConfirm} />}
-                </>
-              )}
-              {activeTab === 'trash' && currentUser.permissions?.pages?.trash && <TrashView orders={orders.filter(o => o.deleted_at)} onRestore={handleRestoreOrder} onPermanentDelete={handlePermanentDelete} />}
-              {activeTab === 'settings' && currentUser.permissions?.pages?.settings && <SettingsPage users={usersList} productionTypes={productionTypes} onSaveUser={handleSaveUser} onDeleteUser={handleDeleteUser} onSaveProductionType={handleSaveType} onDeleteProductionType={handleDeleteType} />}
-              {activeTab === 'kalkulator' && currentUser.permissions?.pages?.kalkulator && <CalculatorView />}
-              {activeTab === 'config_harga' && currentUser.permissions?.pages?.config_harga && <ConfigPriceView />}
-              {activeTab === 'about' && <AboutView />}
-           </div>
-        </main>
-      </div>
+       {/* CONTENT AREA */}
+       <div className="flex-1 flex flex-col min-w-0 h-full overflow-hidden">
+          
+          {/* HEADER */}
+          <Header 
+            currentUser={currentUser} 
+            onToggleSidebar={() => setSidebarOpen(true)} 
+            onLogout={handleLogout} 
+            sidebarOpen={sidebarOpen} 
+            currentPage={activeTab}
+            notifications={notifications}
+          />
+          
+          {/* MAIN CONTENT - SCROLLABLE */}
+          <main className="flex-1 overflow-y-auto px-4 md:px-6 py-2 md:py-3 pb-32 relative bg-gray-100 no-scrollbar">
+             <div className="max-w-7xl mx-auto">
+                {activeTab === 'dashboard' && currentUser.permissions?.pages?.dashboard && (
+                  <Dashboard 
+                    role={currentUser.role} 
+                    orders={activeOrders} 
+                    onSelectOrder={(id) => { setSelectedOrderId(id); setView('detail'); setActiveTab('orders'); }} 
+                  />
+                )}
+                
+                {activeTab === 'orders' && currentUser.permissions?.pages?.orders && (
+                  <>
+                    {view === 'list' && (
+                      <OrderList 
+                        role={currentUser.role} 
+                        orders={activeOrders} 
+                        productionTypes={productionTypes} 
+                        onSelectOrder={(id) => { setSelectedOrderId(id); setView('detail'); }} 
+                        onNewOrder={() => setView('create')} 
+                        onDeleteOrder={handleDeleteOrder} 
+                        currentUser={currentUser} 
+                      />
+                    )}
+                    {view === 'create' && (
+                      <CreateOrder 
+                        users={usersList} 
+                        productionTypes={productionTypes} 
+                        onCancel={() => setView('list')} 
+                        onSubmit={handleCreateOrder} 
+                      />
+                    )}
+                    {view === 'edit' && selectedOrderId && (
+                      <EditOrder 
+                        users={usersList} 
+                        order={orders.find(o => o.id === selectedOrderId)!} 
+                        productionTypes={productionTypes} 
+                        onCancel={() => setView('detail')} 
+                        onSubmit={handleEditOrder} 
+                      />
+                    )}
+                    {view === 'detail' && selectedOrderId && (
+                      <OrderDetail 
+                        currentUser={currentUser} 
+                        order={orders.find(o => o.id === selectedOrderId)!} 
+                        onBack={() => { setSelectedOrderId(null); setView('list'); }} 
+                        onEdit={() => setView('edit')} 
+                        onTriggerUpload={triggerUpload} 
+                        onUpdateOrder={checkAutoStatus} 
+                        onDelete={handleDeleteOrder} 
+                        onConfirm={showConfirm} 
+                      />
+                    )}
+                  </>
+                )}
+                
+                {activeTab === 'trash' && currentUser.permissions?.pages?.trash && (
+                  <TrashView 
+                    orders={orders.filter(o => o.deleted_at)} 
+                    onRestore={handleRestoreOrder} 
+                    onPermanentDelete={handlePermanentDelete} 
+                  />
+                )}
+                
+                {activeTab === 'settings' && currentUser.permissions?.pages?.settings && (
+                  <SettingsPage 
+                    users={usersList} 
+                    productionTypes={productionTypes} 
+                    onSaveUser={handleSaveUser} 
+                    onDeleteUser={handleDeleteUser} 
+                    onSaveProductionType={handleSaveType} 
+                    onDeleteProductionType={handleDeleteType} 
+                  />
+                )}
+                
+                {activeTab === 'kalkulator' && currentUser.permissions?.pages?.kalkulator && <CalculatorView />}
+                {activeTab === 'config_harga' && currentUser.permissions?.pages?.config_harga && <ConfigPriceView />}
+                {activeTab === 'about' && <AboutView />}
+             </div>
+          </main>
+       </div>
     </div>
   );
 }
