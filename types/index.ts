@@ -2,10 +2,8 @@
 
 export type UserRole = 'admin' | 'produksi' | 'qc' | 'manager' | 'supervisor';
 
-// --- UPDATE: DEFINISI MATRIX HAK AKSES ---
+// --- DEFINISI HAK AKSES ---
 export interface UserPermissions {
-  // 1. Akses Halaman (Menu Sidebar)
-  // (Jika config_harga=true, maka user BISA LIHAT)
   pages: {
     dashboard: boolean;
     orders: boolean;
@@ -16,7 +14,6 @@ export interface UserPermissions {
     about: boolean;
   };
   
-  // 2. Akses Global Order
   orders: {
     create: boolean;  
     edit: boolean;    
@@ -25,7 +22,6 @@ export interface UserPermissions {
     permanent_delete: boolean; 
   };
 
-  // 3. Produksi MANUAL
   prod_manual: {
     step_process: boolean; 
     upload_approval: boolean;
@@ -33,7 +29,6 @@ export interface UserPermissions {
     delete_files: boolean; 
   };
 
-  // 4. Produksi DTF
   prod_dtf: {
     step_process: boolean; 
     upload_approval: boolean;
@@ -41,7 +36,6 @@ export interface UserPermissions {
     delete_files: boolean;
   };
 
-  // 5. Finishing & QC
   finishing: {
     qc_check: boolean; 
     qc_reset: boolean; 
@@ -50,9 +44,8 @@ export interface UserPermissions {
     delete_files: boolean; 
   };
 
-  // 6. KHUSUS HARGA (BARU)
   price_config: {
-    edit: boolean; // Jika false = Read Only (Cuma lihat)
+    edit: boolean; 
   };
 }
 
@@ -63,7 +56,6 @@ export const DEFAULT_PERMISSIONS: UserPermissions = {
   prod_manual: { step_process: false, upload_approval: false, access_files: true, delete_files: false },
   prod_dtf: { step_process: false, upload_approval: false, access_files: true, delete_files: false },
   finishing: { qc_check: false, qc_reset: false, packing_update: false, shipping_update: false, delete_files: false },
-  // Default: Tidak bisa edit harga
   price_config: { edit: false } 
 };
 
@@ -73,7 +65,11 @@ export interface UserData {
   password?: string; 
   name: string;
   role: UserRole;
-  permissions: UserPermissions; 
+  permissions: UserPermissions;
+  // Tambahan untuk profil baru (Persiapan update UI nanti)
+  address?: string;
+  dob?: string;
+  avatar_url?: string;
 }
 
 export type OrderStatus =
@@ -97,6 +93,13 @@ export interface Order {
   deadline: string;
   jenis_produksi: string;
   status: OrderStatus; 
+  
+  // --- INI YANG MENYEBABKAN ERROR VERCEL ---
+  // Kamu lupa menambahkan ini di types, padahal dipakai di codingan EditOrder
+  assigned_to?: string | null; 
+  assigned_user?: { name: string } | null; 
+  // ----------------------------------------
+
   link_approval: { link: string | null; by: string | null; timestamp: string | null } | null;
   steps_manual: ProductionStep[];
   steps_dtf: ProductionStep[];
