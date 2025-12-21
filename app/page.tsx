@@ -1,7 +1,7 @@
-// app/page.tsx
+// app/page.tsx - DENGAN DEBUG LOGS
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { createBrowserClient } from '@supabase/ssr';
 import imageCompression from 'browser-image-compression'; 
 
@@ -12,23 +12,27 @@ import CustomAlert from '@/app/components/ui/CustomAlert';
 import LoginScreen from '@/app/components/auth/LoginScreen';
 import ProfileModal from '@/app/components/ui/ProfileModal';
 
-// Dashboard
-import Dashboard from '@/app/components/dashboard/Dashboard'; 
+// Dashboard - Lazy load untuk performa
+import dynamic from 'next/dynamic';
+const Dashboard = dynamic(() => import('@/app/components/dashboard/Dashboard'), {
+  loading: () => <div className="flex items-center justify-center h-64"><div className="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"></div></div>,
+  ssr: false
+});
 
-// Apps & Config
-import CalculatorView from '@/app/components/apps/CalculatorView';
-import ConfigPriceView from '@/app/components/apps/ConfigPriceView';
-import AboutView from '@/app/components/misc/AboutView'; 
+// Apps & Config - Lazy load
+const CalculatorView = dynamic(() => import('@/app/components/apps/CalculatorView'));
+const ConfigPriceView = dynamic(() => import('@/app/components/apps/ConfigPriceView'));
+const AboutView = dynamic(() => import('@/app/components/misc/AboutView'));
 
-// ORDERS 
-import OrderList from '@/app/components/orders/OrderList';
-import CreateOrder from '@/app/components/orders/CreateOrder';
-import EditOrder from '@/app/components/orders/EditOrder';
-import OrderDetail from '@/app/components/orders/OrderDetail';
-import TrashView from '@/app/components/orders/TrashView'; 
+// ORDERS - Lazy load
+const OrderList = dynamic(() => import('@/app/components/orders/OrderList'));
+const CreateOrder = dynamic(() => import('@/app/components/orders/CreateOrder'));
+const EditOrder = dynamic(() => import('@/app/components/orders/EditOrder'));
+const OrderDetail = dynamic(() => import('@/app/components/orders/OrderDetail'));
+const TrashView = dynamic(() => import('@/app/components/orders/TrashView'));
 
-// Settings
-import SettingsPage from '@/app/components/settings/SettingsPage'; 
+// Settings - Lazy load
+const SettingsPage = dynamic(() => import('@/app/components/settings/SettingsPage'));
 
 // Types & Helpers
 import { UserData, Order, ProductionTypeData, DEFAULT_PERMISSIONS, OrderStatus } from '@/types';
@@ -37,6 +41,15 @@ import { triggerOrderNotifications } from '@/lib/orderLogic';
 
 interface CurrentUser extends UserData {
   id: string; 
+}
+
+interface Notification {
+  id: string;
+  title: string;
+  message: string;
+  time: string;
+  isRead: boolean;
+  orderId?: string;
 }
 
 export default function ProductionApp() {
@@ -50,56 +63,116 @@ export default function ProductionApp() {
   const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [showProfileModal, setShowProfileModal] = useState(false);
-  const [notifications, setNotifications] = useState<any[]>([]);
+  const [notifications, setNotifications] = useState<Notification[]>([]);
 
   const [alertState, setAlertState] = useState<{
     isOpen: boolean; title: string; message: string; type: 'success' | 'error' | 'confirm'; onConfirm?: () => void;
   }>({ isOpen: false, title: '', message: '', type: 'success' });
 
-  const supabase = createBrowserClient(
+  // OPTIMASI: Singleton Supabase client dengan useMemo
+  const supabase = useMemo(() => createBrowserClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-  );
+  ), []);
 
-  const showAlert = (title: string, message: string, type: 'success' | 'error' = 'success') => {
+  const showAlert = useCallback((title: string, message: string, type: 'success' | 'error' = 'success') => {
     setAlertState({ isOpen: true, title, message, type, onConfirm: undefined });
-  };
-  const showConfirm = (title: string, message: string, onConfirm: () => void) => {
-    setAlertState({ isOpen: true, title, message, type: 'confirm', onConfirm });
-  };
-  const closeAlert = () => setAlertState(prev => ({ ...prev, isOpen: false }));
+  }, []);
 
-  // Fetch Notifikasi
-  const fetchNotifications = async () => {
+  const showConfirm = useCallback((title: string, message: string, onConfirm: () => void) => {
+    setAlertState({ isOpen: true, title, message, type: 'confirm', onConfirm });
+  }, []);
+
+  const closeAlert = useCallback(() => setAlertState(prev => ({ ...prev, isOpen: false })), []);
+
+  // ✅ FETCH NOTIFIKASI DENGAN DEBUG LOGS
+  const fetchNotifications = useCallback(async () => {
     if (!currentUser) return;
     
     try {
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from('notifications')
         .select('*')
         .eq('user_id', currentUser.id)
         .order('created_at', { ascending: false })
         .limit(20);
       
+      console.log('📬 Raw data dari database:', data); // ✅ DEBUG LOG
+      
+      if (error) {
+        console.error('❌ Error fetching notifications:', error);
+        return;
+      }
+      
       if (data) {
-        setNotifications(data.map((n: any) => ({
-          id: n.id,
-          title: n.title,
-          message: n.message,
-          time: new Date(n.created_at).toLocaleString('id-ID', { 
-            day: '2-digit', 
-            month: 'short',
-            year: 'numeric',
-            hour: '2-digit', 
-            minute: '2-digit' 
-          }),
-          isRead: n.is_read
-        })));
+        const mappedNotifications = data.map((n: any) => {
+          console.log('🔍 Mapping notifikasi:', {
+            id: n.id,
+            title: n.title,
+            order_id: n.order_id, // ✅ Cek apakah order_id ada
+            raw: n
+          });
+          
+          return {
+            id: n.id,
+            title: n.title,
+            message: n.message,
+            time: new Date(n.created_at).toLocaleString('id-ID', { 
+              day: '2-digit', 
+              month: 'short',
+              year: 'numeric',
+              hour: '2-digit', 
+              minute: '2-digit' 
+            }),
+            isRead: n.is_read,
+            orderId: n.order_id // ✅ Ambil order_id dari database
+          };
+        });
+        
+        console.log('✅ Notifications setelah mapping:', mappedNotifications);
+        setNotifications(mappedNotifications);
       }
     } catch (error) {
-      console.error('Error fetching notifications:', error);
+      console.error('❌ Error fetching notifications:', error);
     }
-  };
+  }, [currentUser, supabase]);
+
+  // ✅ HANDLER KLIK NOTIFIKASI DENGAN DEBUG
+  const handleNotificationClick = useCallback(async (notificationId: string, orderId: string) => {
+    console.log('🔔 handleNotificationClick dipanggil:', { notificationId, orderId });
+
+    try {
+      // 1. Tandai notifikasi sebagai sudah dibaca di database
+      const { error } = await supabase
+        .from('notifications')
+        .update({ is_read: true })
+        .eq('id', notificationId);
+      
+      if (error) {
+        console.error('❌ Error update notifikasi:', error);
+      } else {
+        console.log('✅ Notifikasi berhasil ditandai sebagai read');
+        
+        // 2. Update state lokal
+        setNotifications(prev => 
+          prev.map(n => 
+            n.id === notificationId ? { ...n, isRead: true } : n
+          )
+        );
+      }
+    } catch (error) {
+      console.error('❌ Error menandai notifikasi sebagai dibaca:', error);
+    }
+
+    // 3. Navigasi ke halaman detail pesanan
+    console.log('🚀 Navigasi ke pesanan:', orderId);
+    setActiveTab('orders');
+    setView('detail');
+    setSelectedOrderId(orderId);
+    
+    // 4. Tutup sidebar jika di mobile
+    setSidebarOpen(false);
+  }, [supabase]);
 
   useEffect(() => {
     const initSession = async () => {
@@ -124,25 +197,10 @@ export default function ProductionApp() {
       setLoadingUser(false);
     };
     initSession();
-  }, []);
+  }, [supabase]);
 
-  useEffect(() => {
-    if (!currentUser) return;
-    
-    const loadAppData = async () => {
-      await fetchOrders();
-      await fetchUsers();
-      await fetchProductionTypes();
-      await fetchNotifications();
-    };
-    loadAppData();
-
-    // Auto-refresh notifikasi setiap 30 detik
-    const interval = setInterval(fetchNotifications, 30000);
-    return () => clearInterval(interval);
-  }, [currentUser]);
-
-  const fetchOrders = async () => {
+  // OPTIMASI: useCallback untuk fetch functions
+  const fetchOrders = useCallback(async () => {
     const { data } = await supabase
       .from('orders')
       .select(`
@@ -152,28 +210,46 @@ export default function ProductionApp() {
       .order('created_at', { ascending: false });
       
     if (data) setOrders(data.map((o: any) => ({ ...o, kendala: Array.isArray(o.kendala) ? o.kendala : [] })));
-  };
+  }, [supabase]);
 
-  const fetchUsers = async () => {
+  const fetchUsers = useCallback(async () => {
     const { data } = await supabase.from('users').select('*').order('name');
     if (data) setUsersList(data);
-  };
+  }, [supabase]);
 
-  const fetchProductionTypes = async () => {
+  const fetchProductionTypes = useCallback(async () => {
     const { data } = await supabase.from('production_types').select('*').order('name');
     if (data) setProductionTypes(data);
     else if (productionTypes.length === 0) setProductionTypes(DEFAULT_PRODUCTION_TYPES);
-  };
+  }, [supabase, productionTypes.length]);
 
-  const handleLogout = async () => {
+  useEffect(() => {
+    if (!currentUser) return;
+    
+    const loadAppData = async () => {
+      await Promise.all([
+        fetchOrders(),
+        fetchUsers(),
+        fetchProductionTypes(),
+        fetchNotifications()
+      ]);
+    };
+    loadAppData();
+
+    // OPTIMASI: Tingkatkan interval refresh dari 30s ke 60s untuk mobile
+    const interval = setInterval(fetchNotifications, 60000);
+    return () => clearInterval(interval);
+  }, [currentUser, fetchOrders, fetchUsers, fetchProductionTypes, fetchNotifications]);
+
+  const handleLogout = useCallback(async () => {
     showConfirm('Logout', 'Apakah anda yakin ingin keluar?', async () => {
         await supabase.auth.signOut();
         setCurrentUser(null);
         window.location.reload(); 
     });
-  };
+  }, [showConfirm, supabase]);
 
-  const handleUpdateProfile = async (newData: any) => {
+  const handleUpdateProfile = useCallback(async (newData: any) => {
     if (!currentUser) return;
     
     const { error } = await supabase.from('users').update({
@@ -190,17 +266,17 @@ export default function ProductionApp() {
     } else {
       showAlert('Gagal', error.message, 'error');
     }
-  };
+  }, [currentUser, supabase, showAlert]);
 
-  const generateProductionCode = () => {
+  const generateProductionCode = useCallback(() => {
     const now = new Date();
     const prefix = `LCO-${String(now.getMonth() + 1).padStart(2, '0')}/${String(now.getFullYear()).slice(-2)}-`;
     const existingCodes = orders.filter(o => o.kode_produksi?.startsWith(prefix)).map(o => parseInt(o.kode_produksi.split('-').pop()!) || 0);
     const max = existingCodes.length > 0 ? Math.max(...existingCodes) : 0;
     return `${prefix}${String(max + 1).padStart(4, '0')}`;
-  };
+  }, [orders]);
 
-  const handleCreateOrder = async (formData: any) => {
+  const handleCreateOrder = useCallback(async (formData: any) => {
     const payload: any = {
       kode_produksi: generateProductionCode(),
       nama_pemesan: formData.nama,
@@ -233,13 +309,13 @@ export default function ProductionApp() {
       setView('list'); 
       showAlert('Sukses', 'Pesanan berhasil dibuat');
       await triggerOrderNotifications(data);
-      await fetchNotifications(); // Refresh notifikasi setelah create order
+      await fetchNotifications();
     } else { 
       showAlert('Error', error?.message || 'Gagal', 'error'); 
     }
-  };
+  }, [generateProductionCode, supabase, fetchOrders, showAlert, fetchNotifications]);
 
-  const handleEditOrder = async (editedData: any) => {
+  const handleEditOrder = useCallback(async (editedData: any) => {
     if (!selectedOrderId) return;
     const updates = {
       nama_pemesan: editedData.nama, no_hp: editedData.hp, jumlah: parseInt(editedData.jumlah),
@@ -253,28 +329,28 @@ export default function ProductionApp() {
       setView('detail'); 
       showAlert('Sukses', 'Data diupdate');
     }
-  };
+  }, [selectedOrderId, supabase, orders, fetchOrders, showAlert]);
 
-  const handleDeleteOrder = async (id: string) => {
+  const handleDeleteOrder = useCallback(async (id: string) => {
     showConfirm('Hapus?', 'Data dipindah ke sampah.', async () => {
       const { error } = await supabase.from('orders').update({ deleted_at: new Date().toISOString() }).eq('id', id);
       if (!error) { await fetchOrders(); setView('list'); showAlert('Sukses', 'Berhasil'); }
     });
-  };
+  }, [showConfirm, supabase, fetchOrders, showAlert]);
 
-  const handleRestoreOrder = async (id: string) => {
+  const handleRestoreOrder = useCallback(async (id: string) => {
     const { error } = await supabase.from('orders').update({ deleted_at: null }).eq('id', id);
     if (!error) { fetchOrders(); showAlert('Sukses', 'Dipulihkan'); }
-  };
+  }, [supabase, fetchOrders, showAlert]);
 
-  const handlePermanentDelete = async (id: string) => {
+  const handlePermanentDelete = useCallback(async (id: string) => {
     showConfirm('HAPUS PERMANEN?', 'Data tidak bisa kembali!', async () => {
       const { error } = await supabase.from('orders').delete().eq('id', id);
       if (!error) { fetchOrders(); showAlert('Sukses', 'Terhapus'); }
     });
-  };
+  }, [showConfirm, supabase, fetchOrders, showAlert]);
 
-  const triggerUpload = (targetType: string, stepId?: string, kendalaId?: string) => {
+  const triggerUpload = useCallback((targetType: string, stepId?: string, kendalaId?: string) => {
     const input = document.createElement('input'); 
     input.type = 'file'; 
     input.accept = 'image/*,application/pdf';
@@ -327,9 +403,9 @@ export default function ProductionApp() {
     };
     
     input.click();
-  };
+  }, [selectedOrderId, supabase, orders, currentUser, showAlert]);
 
-  const checkAutoStatus = async (orderData: Order) => {
+  const checkAutoStatus = useCallback(async (orderData: Order) => {
     const oldStatus = orderData.status as OrderStatus;
     const hasUnresolvedKendala = orderData.kendala?.some((k: any) => !k.isResolved);
     let normalStatus = 'Pesanan Masuk';
@@ -354,11 +430,11 @@ export default function ProductionApp() {
     if (!error) { 
       fetchOrders(); 
       await triggerOrderNotifications({ ...orderData, status: finalStatus }, oldStatus);
-      await fetchNotifications(); // Refresh notifikasi setelah status berubah
+      await fetchNotifications();
     }
-  };
+  }, [supabase, fetchOrders, fetchNotifications]);
 
-  const handleSaveUser = async (u: any) => {
+  const handleSaveUser = useCallback(async (u: any) => {
     const payload: any = { name: u.name, role: u.role, username: u.username }; 
     if (u.permissions) payload.permissions = u.permissions; 
     if (u.password?.trim()) payload.password = u.password;
@@ -368,30 +444,33 @@ export default function ProductionApp() {
       : await supabase.from('users').insert([payload]); 
       
     if(!error) { fetchUsers(); showAlert('Sukses', 'User tersimpan'); }
-  };
+  }, [supabase, fetchUsers, showAlert]);
 
-  const handleDeleteUser = async (id: string) => { 
+  const handleDeleteUser = useCallback(async (id: string) => { 
     showConfirm('Hapus?', 'User dihapus.', async () => { 
       const { error } = await supabase.from('users').delete().eq('id', id); 
       if(!error) { fetchUsers(); showAlert('Sukses', 'Dihapus'); } 
     }); 
-  };
+  }, [showConfirm, supabase, fetchUsers, showAlert]);
 
-  const handleSaveType = async (t: any) => { 
+  const handleSaveType = useCallback(async (t: any) => { 
     const payload = { name: t.name, value: t.value }; 
     const { error } = t.id 
       ? await supabase.from('production_types').update(payload).eq('id', t.id) 
       : await supabase.from('production_types').insert([payload]); 
       
     if(!error) { fetchProductionTypes(); showAlert('Sukses', 'Tipe tersimpan'); } 
-  };
+  }, [supabase, fetchProductionTypes, showAlert]);
 
-  const handleDeleteType = async (id: string) => { 
+  const handleDeleteType = useCallback(async (id: string) => { 
     showConfirm('Hapus?', 'Yakin hapus tipe ini?', async () => { 
       const { error } = await supabase.from('production_types').delete().eq('id', id); 
       if(!error) { fetchProductionTypes(); showAlert('Sukses', 'Dihapus'); } 
     }); 
-  };
+  }, [showConfirm, supabase, fetchProductionTypes, showAlert]);
+
+  // OPTIMASI: useMemo untuk data yang sering diakses
+  const activeOrders = useMemo(() => orders.filter(o => !o.deleted_at), [orders]);
 
   if (loadingUser) {
     return (
@@ -403,13 +482,10 @@ export default function ProductionApp() {
 
   if (!currentUser) return <LoginScreen />;
 
-  const activeOrders = orders.filter(o => !o.deleted_at);
-
   return (
     <div className="h-screen overflow-hidden bg-gray-100 flex flex-col md:flex-row font-sans text-slate-800">
        <CustomAlert alertState={alertState} closeAlert={closeAlert} />
        
-       {/* MODAL EDIT PROFIL */}
        {currentUser && (
          <ProfileModal 
            user={currentUser} 
@@ -419,7 +495,6 @@ export default function ProductionApp() {
          />
        )}
     
-       {/* SIDEBAR */}
        <Sidebar 
           sidebarOpen={sidebarOpen} 
           setSidebarOpen={setSidebarOpen} 
@@ -430,10 +505,7 @@ export default function ProductionApp() {
           onOpenProfile={() => setShowProfileModal(true)} 
        />
 
-       {/* CONTENT AREA */}
        <div className="flex-1 flex flex-col min-w-0 h-full overflow-hidden">
-          
-          {/* HEADER */}
           <Header 
             currentUser={currentUser} 
             onToggleSidebar={() => setSidebarOpen(true)} 
@@ -441,9 +513,9 @@ export default function ProductionApp() {
             sidebarOpen={sidebarOpen} 
             currentPage={activeTab}
             notifications={notifications}
+            onNotificationClick={handleNotificationClick}
           />
           
-          {/* MAIN CONTENT - SCROLLABLE */}
           <main className="flex-1 overflow-y-auto px-4 md:px-6 py-2 md:py-3 pb-32 relative bg-gray-100 no-scrollbar">
              <div className="max-w-7xl mx-auto">
                 {activeTab === 'dashboard' && currentUser.permissions?.pages?.dashboard && (

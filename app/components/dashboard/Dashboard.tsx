@@ -1,8 +1,9 @@
-// app/components/dashboard/Dashboard.tsx
+// app/components/dashboard/Dashboard.tsx - PART 1
+// VERSI ULTRA OPTIMASI - Komponen Utama & Logic
 
 'use client';
 
-import React, { useMemo, useRef, useState } from 'react';
+import React, { useMemo, useState, useCallback, memo } from 'react';
 import { Order } from '@/types';
 import { 
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, 
@@ -33,9 +34,7 @@ export default function Dashboard({ role, orders, onSelectOrder }: DashboardProp
   
   const [activeIndex, setActiveIndex] = useState<number | null>(null);
 
-  // --- 1. LOGIKA PENGOLAHAN DATA ---
-
-  // A. Data Grafik Batang (Tren PCS)
+  // OPTIMASI 1: Data Grafik dengan useMemo
   const monthlyData = useMemo(() => {
     const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
     const last6Months: { name: string; monthIndex: number; year: number; total: number; pcs: number }[] = [];
@@ -63,7 +62,6 @@ export default function Dashboard({ role, orders, onSelectOrder }: DashboardProp
     return last6Months;
   }, [orders]);
 
-  // B. Data Grafik Lingkaran
   const productionTypeData = useMemo(() => {
     const types: {[key: string]: number} = {};
     orders.forEach(order => {
@@ -77,16 +75,18 @@ export default function Dashboard({ role, orders, onSelectOrder }: DashboardProp
     }));
   }, [orders]);
 
-  // C. Statistik Ringkasan
-  const stats = {
+  // OPTIMASI 2: Stats dengan useMemo
+  const stats = useMemo(() => ({
     totalOrders: orders.length,
     totalPcs: orders.reduce((acc, curr) => acc + curr.jumlah, 0),
     warning: orders.filter(o => getDeadlineStatus(o.deadline, o.status) === 'warning').length,
     overdue: orders.filter(o => getDeadlineStatus(o.deadline, o.status) === 'overdue').length,
     trouble: orders.filter(o => o.kendala && o.kendala.some(k => !k.isResolved)).length,
-  };
+    onProcess: orders.filter(o => o.status === 'On Process').length,
+    selesai: orders.filter(o => o.status === 'Selesai').length,
+  }), [orders]);
 
-  // D. LOGIKA LIST ACTION ITEMS
+  // OPTIMASI 3: Action Items
   const actionItems: ActionItem[] = useMemo(() => {
     const items: ActionItem[] = [];
 
@@ -147,227 +147,130 @@ export default function Dashboard({ role, orders, onSelectOrder }: DashboardProp
   return (
     <div className="space-y-4 md:space-y-6 pb-10">
       
-      {/* ============================================ */}
-      {/* HERO SECTION dengan Background Image */}
-      {/* ============================================ */}
-      <div className="relative rounded-3xl overflow-hidden shadow-2xl">
-        
-        {/* Background Pattern Layer - Industrial/Production Theme */}
-        <div className="absolute inset-0 bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
-          {/* Geometric Pattern Overlay */}
-          <div className="absolute inset-0 opacity-10" style={{
-            backgroundImage: `
-              linear-gradient(30deg, #3b82f6 12%, transparent 12.5%, transparent 87%, #3b82f6 87.5%, #3b82f6),
-              linear-gradient(150deg, #3b82f6 12%, transparent 12.5%, transparent 87%, #3b82f6 87.5%, #3b82f6),
-              linear-gradient(30deg, #3b82f6 12%, transparent 12.5%, transparent 87%, #3b82f6 87.5%, #3b82f6),
-              linear-gradient(150deg, #3b82f6 12%, transparent 12.5%, transparent 87%, #3b82f6 87.5%, #3b82f6),
-              linear-gradient(60deg, #10b981 25%, transparent 25.5%, transparent 75%, #10b981 75%, #10b981),
-              linear-gradient(60deg, #10b981 25%, transparent 25.5%, transparent 75%, #10b981 75%, #10b981)
-            `,
-            backgroundSize: '80px 140px',
-            backgroundPosition: '0 0, 0 0, 40px 70px, 40px 70px, 0 0, 40px 70px'
-          }} />
-          
-          {/* Animated Glow Spots */}
-          <div className="absolute top-0 right-0 w-96 h-96 bg-blue-500/20 rounded-full blur-3xl animate-pulse" />
-          <div className="absolute bottom-0 left-0 w-96 h-96 bg-purple-500/20 rounded-full blur-3xl animate-pulse" style={{animationDelay: '1s'}} />
-        </div>
-        
-        {/* Grid Lines Overlay */}
-        <div className="absolute inset-0 opacity-5" style={{
-          backgroundImage: 'linear-gradient(rgba(255,255,255,0.1) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.1) 1px, transparent 1px)',
-          backgroundSize: '50px 50px'
-        }} />
-        
-        {/* Content Layer */}
-        <div className="relative z-10 p-6 md:p-8 lg:p-10">
-          
-          {/* HEADER */}
-          <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6 md:mb-8">
-            <div>
-                <h2 className="text-2xl md:text-3xl lg:text-4xl font-bold text-white drop-shadow-lg">
-                  Dashboard Produksi
-                </h2>
-                <p className="text-slate-200 text-sm md:text-base mt-1 drop-shadow">
-                  Ringkasan performa dan analitik produksi
-                </p>
-            </div>
-            
-            {/* TAMPILAN STATUS dengan Glassmorphism */}
-            <div className="flex w-full md:w-auto gap-2 overflow-x-auto pb-2 md:pb-0 no-scrollbar">
-                {stats.trouble > 0 && (
-                    <div className="flex-1 md:flex-none justify-center bg-purple-500/90 backdrop-blur-sm text-white px-4 py-2.5 rounded-xl text-xs font-bold border border-purple-400/30 flex items-center gap-2 shadow-lg min-w-[100px]">
-                        <AlertTriangle className="w-4 h-4" /> {stats.trouble} Kendala
-                    </div>
-                )}
-                <div className="flex-1 md:flex-none justify-center bg-red-500/90 backdrop-blur-sm text-white px-4 py-2.5 rounded-xl text-xs font-bold border border-red-400/30 flex items-center gap-2 shadow-lg min-w-[90px]">
-                    <AlertCircle className="w-4 h-4" /> {stats.overdue} Telat
-                </div>
-                <div className="flex-1 md:flex-none justify-center bg-orange-500/90 backdrop-blur-sm text-white px-4 py-2.5 rounded-xl text-xs font-bold border border-orange-400/30 flex items-center gap-2 shadow-lg min-w-[90px]">
-                    <TrendingUp className="w-4 h-4" /> {stats.warning} Urgent
-                </div>
-            </div>
-          </div>
+      {/* HERO SECTION */}
+      <HeroSectionOptimized stats={stats} />
 
-          {/* KARTU STATISTIK dengan Glassmorphism Effect */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
-            <HeroStatCard 
-              title="Total Pesanan" 
-              value={stats.totalOrders} 
-              label="Lifetime" 
-              icon={<Package className="w-5 h-5" />}
-              gradient="from-blue-500 to-blue-600"
-            />
-            <HeroStatCard 
-              title="Total PCS" 
-              value={stats.totalPcs} 
-              label="Produksi" 
-              icon={<TrendingUp className="w-5 h-5" />}
-              gradient="from-indigo-500 to-indigo-600"
-            />
-            <HeroStatCard 
-              title="On Process" 
-              value={orders.filter(o => o.status === 'On Process').length} 
-              label="Sedang Jalan" 
-              icon={<Clock className="w-5 h-5" />}
-              gradient="from-yellow-500 to-yellow-600"
-            />
-            <HeroStatCard 
-              title="Selesai" 
-              value={orders.filter(o => o.status === 'Selesai').length} 
-              label="Completed" 
-              icon={<CheckCircle2 className="w-5 h-5" />}
-              gradient="from-green-500 to-green-600"
-            />
-          </div>
-          
-        </div>
-      </div>
-
-      {/* ============================================ */}
-      {/* SECTION 2: GRAFIK (Tidak Berubah) */}
-      {/* ============================================ */}
+      {/* SECTION GRAFIK */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-6">
         
-        {/* GRAFIK 1: TREN VOLUME PCS */}
-        <div className="lg:col-span-2 bg-white p-4 md:p-6 rounded-2xl border border-slate-200">
-            <div className="flex items-center justify-between mb-4 md:mb-6">
-                <div>
-                    <h3 className="font-bold text-slate-800 text-base md:text-lg flex items-center gap-2">
-                        <Package className="w-4 h-4 md:w-5 md:h-5 text-blue-600" /> Tren Volume (PCS)
-                    </h3>
-                    <p className="text-[10px] md:text-xs text-slate-500">Jumlah item masuk 6 bulan terakhir</p>
-                </div>
-            </div>
-            <div className="h-[200px] md:h-[300px] w-full">
-                <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={monthlyData} margin={{ top: 10, right: 0, left: -10, bottom: 0 }}>
-                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
-                        <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fill: '#64748b', fontSize: 10}} dy={10} />
-                        <YAxis axisLine={false} tickLine={false} tick={{fill: '#64748b', fontSize: 10}} />
-                        <RechartsTooltip 
-                            cursor={{fill: '#f1f5f9'}}
-                            contentStyle={{borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)', fontSize: '12px'}}
-                            formatter={(value: number) => [`${value} Pcs`, 'Total']}
-                        />
-                        <Bar dataKey="pcs" fill="#3b82f6" radius={[4, 4, 0, 0]} barSize={30} name="Total PCS" />
-                    </BarChart>
-                </ResponsiveContainer>
-            </div>
-        </div>
+        {/* BAR CHART */}
+        <ChartBarMemo monthlyData={monthlyData} />
 
-        {/* GRAFIK 2: PIE CHART */}
-        <div className="bg-white p-4 md:p-6 rounded-2xl border border-slate-200 flex flex-col">
-            <div className="mb-2 md:mb-4">
-                <h3 className="font-bold text-slate-800 text-base md:text-lg flex items-center gap-2">
-                    <PieChartIcon className="w-4 h-4 md:w-5 md:h-5 text-purple-600" /> Jenis Produksi
-                </h3>
-                <p className="text-[10px] md:text-xs text-slate-500">Distribusi tipe order keseluruhan</p>
-            </div>
-            <div className="flex-1 min-h-[200px] md:min-h-[250px] relative">
-                <ResponsiveContainer width="100%" height="100%">
-                    <PieChart>
-                        <Pie
-                            data={productionTypeData}
-                            cx="50%"
-                            cy="50%"
-                            innerRadius={50}
-                            outerRadius={70}
-                            paddingAngle={5}
-                            dataKey="value"
-                            onMouseEnter={(_, index) => setActiveIndex(index)} 
-                            onMouseLeave={() => setActiveIndex(null)}
-                        >
-                            {productionTypeData.map((entry, index) => (
-                                <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} stroke="none" />
-                            ))}
-                        </Pie>
-                        <Legend verticalAlign="bottom" height={36} iconType="circle" wrapperStyle={{fontSize: '10px'}} />
-                    </PieChart>
-                </ResponsiveContainer>
-                
-                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-center pointer-events-none pb-6">
-                    <span 
-                        className="text-2xl md:text-3xl font-extrabold transition-colors duration-300"
-                        style={{ color: centerColor }}
-                    >
-                        {centerValue}
-                    </span>
-                    <p className="text-[8px] md:text-[10px] text-slate-400 uppercase font-bold transition-all duration-300">
-                        {centerLabel}
-                    </p>
-                </div>
-            </div>
-        </div>
+        {/* PIE CHART */}
+        <ChartPieMemo 
+          productionTypeData={productionTypeData}
+          activeIndex={activeIndex}
+          setActiveIndex={setActiveIndex}
+          centerValue={centerValue}
+          centerLabel={centerLabel}
+          centerColor={centerColor}
+        />
       </div>
 
-      {/* ============================================ */}
-      {/* SECTION 3: LIST PERLU TINDAKAN (Tidak Berubah) */}
-      {/* ============================================ */}
-      <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
-        <div className="p-4 md:p-5 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
-             <h3 className="font-bold text-slate-800 text-sm md:text-base flex items-center gap-2">
-                <AlertCircle className="w-4 h-4 text-red-500"/> Perlu Tindakan Segera
-             </h3>
-             <span className="text-[10px] bg-slate-200 text-slate-600 px-2 py-0.5 rounded-full font-bold">{actionItems.length} Isu</span>
-        </div>
-        
-        <div className="divide-y divide-slate-50">
-             {actionItems.slice(0, 10).map((item) => (
-                <ActionRow key={item.uniqueKey} item={item} onSelectOrder={onSelectOrder} />
-             ))}
-             
-             {actionItems.length === 0 && (
-                 <div className="p-6 md:p-8 text-center flex flex-col items-center text-slate-400">
-                    <CheckCircle2 className="w-8 h-8 md:w-10 md:h-10 mb-2 text-green-400 opacity-50" />
-                    <p className="text-xs md:text-sm">Aman! Tidak ada kendala, telat, atau urgent.</p>
-                 </div>
-             )}
-        </div>
-      </div>
+      {/* ACTION ITEMS */}
+      <ActionListOptimized actionItems={actionItems} onSelectOrder={onSelectOrder} />
     </div>
   );
 }
 
 // ==========================================
-// SUB-COMPONENT: HERO STAT CARD (BARU)
+// MEMOIZED: HERO SECTION
 // ==========================================
-function HeroStatCard({ 
-  title, 
-  value, 
-  label, 
-  icon, 
-  gradient 
-}: { 
-  title: string;
-  value: number;
-  label: string;
-  icon: React.ReactNode;
-  gradient: string;
+const HeroSectionOptimized = memo(({ stats }: { stats: any }) => {
+  return (
+    <div className="relative rounded-3xl overflow-hidden shadow-2xl">
+      {/* Background - SIMPLIFIED */}
+      <div className="absolute inset-0 bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
+        {/* Pattern sederhana */}
+        <div className="absolute inset-0 opacity-5" style={{
+          backgroundImage: 'linear-gradient(30deg, #3b82f6 12%, transparent 12.5%, transparent 87%, #3b82f6 87.5%)',
+          backgroundSize: '80px 140px'
+        }} />
+        
+        {/* Glow tanpa animasi */}
+        <div className="absolute top-0 right-0 w-96 h-96 bg-blue-500/10 rounded-full blur-3xl" />
+        <div className="absolute bottom-0 left-0 w-96 h-96 bg-purple-500/10 rounded-full blur-3xl" />
+      </div>
+      
+      {/* Grid */}
+      <div className="absolute inset-0 opacity-3" style={{
+        backgroundImage: 'linear-gradient(rgba(255,255,255,0.05) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.05) 1px, transparent 1px)',
+        backgroundSize: '50px 50px'
+      }} />
+      
+      <div className="relative z-10 p-6 md:p-8 lg:p-10">
+        
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6 md:mb-8">
+          <div>
+              <h2 className="text-2xl md:text-3xl lg:text-4xl font-bold text-white drop-shadow-lg">
+                Dashboard Produksi
+              </h2>
+              <p className="text-slate-200 text-sm md:text-base mt-1 drop-shadow">
+                Ringkasan performa dan analitik produksi
+              </p>
+          </div>
+          
+          <div className="flex w-full md:w-auto gap-2 overflow-x-auto pb-2 md:pb-0 no-scrollbar">
+              {stats.trouble > 0 && (
+                  <div className="flex-1 md:flex-none justify-center bg-purple-500/90 backdrop-blur-sm text-white px-4 py-2.5 rounded-xl text-xs font-bold border border-purple-400/30 flex items-center gap-2 shadow-lg min-w-[100px]">
+                      <AlertTriangle className="w-4 h-4" /> {stats.trouble} Kendala
+                  </div>
+              )}
+              <div className="flex-1 md:flex-none justify-center bg-red-500/90 backdrop-blur-sm text-white px-4 py-2.5 rounded-xl text-xs font-bold border border-red-400/30 flex items-center gap-2 shadow-lg min-w-[90px]">
+                  <AlertCircle className="w-4 h-4" /> {stats.overdue} Telat
+              </div>
+              <div className="flex-1 md:flex-none justify-center bg-orange-500/90 backdrop-blur-sm text-white px-4 py-2.5 rounded-xl text-xs font-bold border border-orange-400/30 flex items-center gap-2 shadow-lg min-w-[90px]">
+                  <TrendingUp className="w-4 h-4" /> {stats.warning} Urgent
+              </div>
+          </div>
+        </div>
+
+        {/* STAT CARDS */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
+          <HeroStatCard 
+            title="Total Pesanan" 
+            value={stats.totalOrders} 
+            label="Lifetime" 
+            icon={<Package className="w-5 h-5" />}
+            gradient="from-blue-500 to-blue-600"
+          />
+          <HeroStatCard 
+            title="Total PCS" 
+            value={stats.totalPcs} 
+            label="Produksi" 
+            icon={<TrendingUp className="w-5 h-5" />}
+            gradient="from-indigo-500 to-indigo-600"
+          />
+          <HeroStatCard 
+            title="On Process" 
+            value={stats.onProcess} 
+            label="Sedang Jalan" 
+            icon={<Clock className="w-5 h-5" />}
+            gradient="from-yellow-500 to-yellow-600"
+          />
+          <HeroStatCard 
+            title="Selesai" 
+            value={stats.selesai} 
+            label="Completed" 
+            icon={<CheckCircle2 className="w-5 h-5" />}
+            gradient="from-green-500 to-green-600"
+          />
+        </div>
+        
+      </div>
+    </div>
+  );
+});
+HeroSectionOptimized.displayName = 'HeroSectionOptimized';
+
+// ==========================================
+// HERO STAT CARD
+// ==========================================
+function HeroStatCard({ title, value, label, icon, gradient }: { 
+  title: string; value: number; label: string; icon: React.ReactNode; gradient: string;
 }) {
     return (
-        <div className="group relative overflow-hidden rounded-2xl backdrop-blur-md bg-white/10 border border-white/20 p-4 md:p-5 hover:bg-white/20 transition-all duration-300 hover:scale-105 hover:shadow-2xl">
-            {/* Gradient Accent */}
+        <div className="group relative overflow-hidden rounded-2xl backdrop-blur-md bg-white/10 border border-white/20 p-4 md:p-5 hover:bg-white/20 transition-all duration-300 hover:scale-105 hover:shadow-2xl will-change-transform">
             <div className={`absolute inset-0 bg-gradient-to-br ${gradient} opacity-0 group-hover:opacity-20 transition-opacity duration-300`} />
             
             <div className="relative z-10">
@@ -389,20 +292,144 @@ function HeroStatCard({
                     </span>
                 </div>
             </div>
-            
-            {/* Shine Effect on Hover */}
-            <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500">
-                <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000" />
-            </div>
         </div>
     );
 }
 
+// Helper
+function formatDateDiff(dateStr: string) {
+    const d = new Date(dateStr);
+    const now = new Date();
+    const diff = Math.floor((now.getTime() - d.getTime()) / (1000 * 60 * 60 * 24));
+    return diff > 0 ? diff : 0;
+}
+
 // ==========================================
-// SUB-COMPONENT: ACTION ROW
+// MEMOIZED: BAR CHART
 // ==========================================
-function ActionRow({ item, onSelectOrder }: { item: ActionItem, onSelectOrder: (id: string) => void }) {
-    const hiddenTicketRef = useRef<HTMLDivElement>(null); 
+const ChartBarMemo = memo(({ monthlyData }: { monthlyData: any[] }) => {
+  return (
+    <div className="lg:col-span-2 bg-white p-4 md:p-6 rounded-2xl border border-slate-200">
+        <div className="flex items-center justify-between mb-4 md:mb-6">
+            <div>
+                <h3 className="font-bold text-slate-800 text-base md:text-lg flex items-center gap-2">
+                    <Package className="w-4 h-4 md:w-5 md:h-5 text-blue-600" /> Tren Volume (PCS)
+                </h3>
+                <p className="text-[10px] md:text-xs text-slate-500">Jumlah item masuk 6 bulan terakhir</p>
+            </div>
+        </div>
+        <div className="h-[200px] md:h-[300px] w-full">
+            <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={monthlyData} margin={{ top: 10, right: 0, left: -10, bottom: 0 }}>
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
+                    <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fill: '#64748b', fontSize: 10}} dy={10} />
+                    <YAxis axisLine={false} tickLine={false} tick={{fill: '#64748b', fontSize: 10}} />
+                    <RechartsTooltip 
+                        cursor={{fill: '#f1f5f9'}}
+                        contentStyle={{borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)', fontSize: '12px'}}
+                        formatter={(value: number) => [`${value} Pcs`, 'Total']}
+                    />
+                    <Bar dataKey="pcs" fill="#3b82f6" radius={[4, 4, 0, 0]} barSize={30} name="Total PCS" />
+                </BarChart>
+            </ResponsiveContainer>
+        </div>
+    </div>
+  );
+});
+ChartBarMemo.displayName = 'ChartBarMemo';
+
+// ==========================================
+// MEMOIZED: PIE CHART
+// ==========================================
+const ChartPieMemo = memo(({ 
+  productionTypeData, 
+  activeIndex, 
+  setActiveIndex, 
+  centerValue, 
+  centerLabel, 
+  centerColor 
+}: any) => {
+  return (
+    <div className="bg-white p-4 md:p-6 rounded-2xl border border-slate-200 flex flex-col">
+        <div className="mb-2 md:mb-4">
+            <h3 className="font-bold text-slate-800 text-base md:text-lg flex items-center gap-2">
+                <PieIcon className="w-4 h-4 md:w-5 md:h-5 text-purple-600" /> Jenis Produksi
+            </h3>
+            <p className="text-[10px] md:text-xs text-slate-500">Distribusi tipe order keseluruhan</p>
+        </div>
+        <div className="flex-1 min-h-[200px] md:min-h-[250px] relative">
+            <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                    <Pie
+                        data={productionTypeData}
+                        cx="50%"
+                        cy="50%"
+                        innerRadius={50}
+                        outerRadius={70}
+                        paddingAngle={5}
+                        dataKey="value"
+                        onMouseEnter={(_, index) => setActiveIndex(index)} 
+                        onMouseLeave={() => setActiveIndex(null)}
+                    >
+                        {productionTypeData.map((entry: any, index: number) => (
+                            <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} stroke="none" />
+                        ))}
+                    </Pie>
+                    <Legend verticalAlign="bottom" height={36} iconType="circle" wrapperStyle={{fontSize: '10px'}} />
+                </PieChart>
+            </ResponsiveContainer>
+            
+            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-center pointer-events-none pb-6">
+                <span 
+                    className="text-2xl md:text-3xl font-extrabold transition-colors duration-300"
+                    style={{ color: centerColor }}
+                >
+                    {centerValue}
+                </span>
+                <p className="text-[8px] md:text-[10px] text-slate-400 uppercase font-bold transition-all duration-300">
+                    {centerLabel}
+                </p>
+            </div>
+        </div>
+    </div>
+  );
+});
+ChartPieMemo.displayName = 'ChartPieMemo';
+
+// ==========================================
+// MEMOIZED: ACTION LIST
+// ==========================================
+const ActionListOptimized = memo(({ actionItems, onSelectOrder }: { actionItems: any[], onSelectOrder: (id: string) => void }) => {
+  return (
+    <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
+      <div className="p-4 md:p-5 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
+           <h3 className="font-bold text-slate-800 text-sm md:text-base flex items-center gap-2">
+              <AlertCircle className="w-4 h-4 text-red-500"/> Perlu Tindakan Segera
+           </h3>
+           <span className="text-[10px] bg-slate-200 text-slate-600 px-2 py-0.5 rounded-full font-bold">{actionItems.length} Isu</span>
+      </div>
+      
+      <div className="divide-y divide-slate-50">
+           {actionItems.slice(0, 10).map((item: any) => (
+              <ActionRowMemo key={item.uniqueKey} item={item} onSelectOrder={onSelectOrder} />
+           ))}
+           
+           {actionItems.length === 0 && (
+               <div className="p-6 md:p-8 text-center flex flex-col items-center text-slate-400">
+                  <CheckCircle2 className="w-8 h-8 md:w-10 md:h-10 mb-2 text-green-400 opacity-50" />
+                  <p className="text-xs md:text-sm">Aman! Tidak ada kendala, telat, atau urgent.</p>
+               </div>
+           )}
+      </div>
+    </div>
+  );
+});
+ActionListOptimized.displayName = 'ActionListOptimized';
+
+// ==========================================
+// MEMOIZED: ACTION ROW
+// ==========================================
+const ActionRowMemo = memo(({ item, onSelectOrder }: { item: any, onSelectOrder: (id: string) => void }) => {
     const [isSharing, setIsSharing] = useState(false);
     const { order, type, detail } = item;
 
@@ -438,16 +465,26 @@ function ActionRow({ item, onSelectOrder }: { item: ActionItem, onSelectOrder: (
             break;
     }
 
-    const handleShare = async (e: React.MouseEvent) => {
+    const handleShare = useCallback(async (e: React.MouseEvent) => {
         e.stopPropagation(); 
-        if (!hiddenTicketRef.current) return;
-        
         setIsSharing(true);
+        
+        // Render on-demand
+        const ticketElement = document.createElement('div');
+        ticketElement.style.position = 'absolute';
+        ticketElement.style.left = '-9999px';
+        document.body.appendChild(ticketElement);
+        
+        const root = (await import('react-dom/client')).createRoot(ticketElement);
+        root.render(<ShareTicket item={item} />);
+        
+        await new Promise(resolve => setTimeout(resolve, 100));
+        
         try {
-            const dataUrl = await toPng(hiddenTicketRef.current, { 
+            const dataUrl = await toPng(ticketElement, { 
                 cacheBust: true, 
                 backgroundColor: '#ffffff', 
-                pixelRatio: 3 
+                pixelRatio: 2
             });
             const blob = await (await fetch(dataUrl)).blob();
             const file = new File([blob], `Laporan-${type}-${order.kode_produksi}.png`, { type: 'image/png' });
@@ -467,62 +504,62 @@ function ActionRow({ item, onSelectOrder }: { item: ActionItem, onSelectOrder: (
         } catch (err) {
             console.error('Gagal membuat gambar:', err);
         } finally {
+            root.unmount();
+            document.body.removeChild(ticketElement);
             setIsSharing(false);
         }
-    };
+    }, [item, order, type]);
 
     return (
-        <>
-            <div 
-                className="group p-3 md:p-4 flex items-center justify-between hover:bg-slate-50 transition cursor-pointer relative" 
-                onClick={() => onSelectOrder(order.id)}
-            >
-                <div className="flex flex-1 items-center gap-3 bg-white pr-4 py-2 rounded-md h-full">
-                    <div className={`w-1.5 self-stretch rounded-full ${indicatorColor} flex-shrink-0`}></div>
-                    <div className="flex-1 min-w-0 py-1"> 
-                        <div className="flex items-center gap-2">
-                            <p className="font-bold text-slate-800 text-xs md:text-sm line-clamp-1">{order.nama_pemesan}</p>
-                            <span className="text-[10px] text-slate-400 font-mono hidden md:inline-block">#{order.kode_produksi}</span>
-                        </div>
-                        <div className={`flex items-start gap-1.5 mt-1 ${textColor}`}>
-                            {icon}
-                            <p className="text-[10px] md:text-xs font-semibold leading-relaxed break-words whitespace-normal">
-                                {type === 'KENDALA' ? `Kendala: ${detail}` : detail}
-                            </p>
-                        </div>
+        <div 
+            className="group p-3 md:p-4 flex items-center justify-between hover:bg-slate-50 transition cursor-pointer relative" 
+            onClick={() => onSelectOrder(order.id)}
+        >
+            <div className="flex flex-1 items-center gap-3 bg-white pr-4 py-2 rounded-md h-full">
+                <div className={`w-1.5 self-stretch rounded-full ${indicatorColor} flex-shrink-0`}></div>
+                <div className="flex-1 min-w-0 py-1"> 
+                    <div className="flex items-center gap-2">
+                        <p className="font-bold text-slate-800 text-xs md:text-sm line-clamp-1">{order.nama_pemesan}</p>
+                        <span className="text-[10px] text-slate-400 font-mono hidden md:inline-block">#{order.kode_produksi}</span>
                     </div>
-                    <div className="text-right pl-2 flex-shrink-0 self-start">
-                        <span className={`text-[10px] md:text-xs font-bold px-2 py-1 rounded border ${badgeClass}`}>
-                            {type}
-                        </span>
-                        <p className="text-[9px] md:text-[10px] text-slate-400 mt-1.5 font-medium">Deadline: {new Date(order.deadline).toLocaleDateString('id-ID', {day: 'numeric', month: 'short'})}</p>
+                    <div className={`flex items-start gap-1.5 mt-1 ${textColor}`}>
+                        {icon}
+                        <p className="text-[10px] md:text-xs font-semibold leading-relaxed break-words whitespace-normal">
+                            {type === 'KENDALA' ? `Kendala: ${detail}` : detail}
+                        </p>
                     </div>
                 </div>
-
-                <button 
-                    onClick={handleShare}
-                    disabled={isSharing}
-                    className="ml-2 p-2 text-slate-300 hover:text-blue-600 hover:bg-blue-50 rounded-full transition-all flex-shrink-0 self-center"
-                >
-                    {isSharing ? <Loader2 className="w-5 h-5 animate-spin" /> : <Share2 className="w-5 h-5" />}
-                </button>
+                <div className="text-right pl-2 flex-shrink-0 self-start">
+                    <span className={`text-[10px] md:text-xs font-bold px-2 py-1 rounded border ${badgeClass}`}>
+                        {type}
+                    </span>
+                    <p className="text-[9px] md:text-[10px] text-slate-400 mt-1.5 font-medium">
+                      Deadline: {new Date(order.deadline).toLocaleDateString('id-ID', {day: 'numeric', month: 'short'})}
+                    </p>
+                </div>
             </div>
 
-            <div className="absolute -left-[9999px] top-0">
-                <ShareTicket ref={hiddenTicketRef} item={item} />
-            </div>
-        </>
+            <button 
+                onClick={handleShare}
+                disabled={isSharing}
+                className="ml-2 p-2 text-slate-300 hover:text-blue-600 hover:bg-blue-50 rounded-full transition-all flex-shrink-0 self-center active:scale-90"
+                style={{ WebkitTapHighlightColor: 'transparent' }}
+            >
+                {isSharing ? <Loader2 className="w-5 h-5 animate-spin" /> : <Share2 className="w-5 h-5" />}
+            </button>
+        </div>
     );
-}
+}, (prevProps, nextProps) => {
+  return prevProps.item.uniqueKey === nextProps.item.uniqueKey;
+});
+ActionRowMemo.displayName = 'ActionRowMemo';
 
 // ==========================================
-// SUB-COMPONENT: SHARE TICKET (HD LAYOUT)
+// SHARE TICKET COMPONENT
 // ==========================================
-// Komponen ini didesain khusus agar hasil gambarnya bagus, rapi, dan detail
-const ShareTicket = React.forwardRef<HTMLDivElement, { item: ActionItem }>(({ item }, ref) => {
+function ShareTicket({ item }: { item: any }) {
     const { order, type, detail } = item;
     
-    // Warna tema berdasarkan tipe masalah
     let themeColor = 'bg-slate-800';
     let borderColor = 'border-slate-200';
     let alertBg = 'bg-slate-50';
@@ -561,7 +598,7 @@ const ShareTicket = React.forwardRef<HTMLDivElement, { item: ActionItem }>(({ it
     }
 
     return (
-        <div ref={ref} className="w-[600px] bg-white p-8 rounded-3xl border border-slate-200 shadow-xl font-sans">
+        <div className="w-[600px] bg-white p-8 rounded-3xl border border-slate-200 shadow-xl font-sans">
             {/* HEADER */}
             <div className="flex justify-between items-start mb-6 border-b border-slate-100 pb-4">
                 <div>
@@ -574,14 +611,13 @@ const ShareTicket = React.forwardRef<HTMLDivElement, { item: ActionItem }>(({ it
                     <h1 className="text-3xl font-extrabold text-slate-800 mt-2">{order.nama_pemesan}</h1>
                     <p className="text-slate-500 text-sm mt-1">Dibuat: {formatDate(order.tanggal_masuk)}</p>
                 </div>
-                {/* Brand / Logo Placeholder (Opsional) */}
                 <div className="text-right">
                     <h2 className="text-lg font-bold text-slate-700">LCO Production</h2>
                     <p className="text-xs text-slate-400">Production Control Card</p>
                 </div>
             </div>
 
-            {/* ORDER DETAILS GRID (Mirip OrderList Card tapi lebih rapi untuk cetak) */}
+            {/* ORDER DETAILS */}
             <div className="grid grid-cols-3 gap-4 mb-6">
                 <div className="bg-slate-50 p-4 rounded-xl border border-slate-100">
                     <span className="text-xs text-slate-500 uppercase font-bold block mb-1">Jumlah</span>
@@ -597,7 +633,7 @@ const ShareTicket = React.forwardRef<HTMLDivElement, { item: ActionItem }>(({ it
                 </div>
             </div>
 
-            {/* ALERT / MESSAGE SECTION */}
+            {/* ALERT MESSAGE */}
             <div className={`p-5 rounded-2xl border-2 border-dashed ${borderColor} ${alertBg}`}>
                 <div className="flex items-start gap-3">
                     <div className={`p-2 rounded-full ${themeColor} text-white`}>
@@ -616,29 +652,7 @@ const ShareTicket = React.forwardRef<HTMLDivElement, { item: ActionItem }>(({ it
             </div>
         </div>
     );
-});
-ShareTicket.displayName = 'ShareTicket';
-
-function PieChartIcon(props: any) {
-    return <PieIcon {...props} />;
 }
 
-function StatCard({ title, value, label, color }: { title: string, value: number, label: string, color: string }) {
-    return (
-        <div className={`p-3 md:p-4 rounded-xl border ${color} flex flex-col justify-between h-24 md:h-32  transition-transform active:scale-95 md:active:scale-100`}>
-            <span className="text-[9px] md:text-[10px] uppercase font-bold opacity-70 tracking-wider truncate">{title}</span>
-            <div>
-                <span className="text-2xl md:text-4xl font-extrabold block md:inline">{value}</span>
-                <span className="text-[9px] md:text-[10px] opacity-80 block md:inline md:ml-1">{label}</span>
-            </div>
-        </div>
-    );
-}
-
-// Helper untuk menghitung selisih hari
-function formatDateDiff(dateStr: string) {
-    const d = new Date(dateStr);
-    const now = new Date();
-    const diff = Math.floor((now.getTime() - d.getTime()) / (1000 * 60 * 60 * 24));
-    return diff > 0 ? diff : 0;
-}
+// EXPORT SEMUA KOMPONEN YANG DIBUTUHKAN
+export { ChartBarMemo, ChartPieMemo, ActionListOptimized, ActionRowMemo, ShareTicket };

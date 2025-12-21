@@ -1,4 +1,4 @@
-// app/components/misc/AboutView.tsx
+// app/components/misc/AboutView.tsx - V.8.0
 
 'use client';
 
@@ -13,7 +13,7 @@ interface ChangelogEntry {
 
 const APP_INFO = {
   name: "LCO SuperApp",
-  version: "V.7.0",  // UPDATED KE V.8.0
+  version: "V.8.0",  // ✅ UPDATED KE V.8.0
   purpose: "Aplikasi produksi Sablon, Langitan.co.",
   creator: "Tim Developer Langitan.co",
   creationDate: "Desember 2025",
@@ -25,8 +25,16 @@ const CHANGELOG: ChangelogEntry[] = [
     version: "8.0",
     date: "2025-12-21",
     changes: [
-      "Tampilan baru serta logika baru.",
-      "Pesanan akan muncul di user yang dipilih.",
+      "Smart Notification System: Sistem notifikasi interaktif dengan navigasi langsung ke detail pesanan hanya dengan sekali klik.",
+      "Real-time Notification Center: Notifikasi realtime ditampilkan di header dengan badge unread count dan dropdown modern.",
+      "One-Click Navigation: Klik notifikasi langsung mengarahkan user ke halaman detail pesanan yang relevan, meningkatkan efisiensi workflow.",
+      "Order-Linked Notifications: Setiap notifikasi kini terhubung langsung dengan pesanan terkait (order_id) untuk tracking yang lebih akurat.",
+      "Auto Mark as Read: Notifikasi otomatis ditandai sebagai 'dibaca' saat diklik, dengan update database realtime.",
+      "Persistent Notification Storage: Notifikasi tersimpan permanen di database dengan relasi foreign key ke tabel orders.",
+      "Enhanced UI/UX: Dropdown notifikasi responsif dengan animasi smooth, highlight untuk notifikasi belum dibaca, dan tampilan mobile-friendly.",
+      "Performance Optimization: Fetch notifikasi menggunakan useCallback untuk mencegah re-render berlebihan dan interval polling 60 detik.",
+      "Database Security: Penambahan index pada kolom order_id dan foreign key constraint dengan CASCADE delete untuk data integrity.",
+      "Bug Fixes: Perbaikan masalah notifikasi yang tidak bisa diklik dan handling error untuk notifikasi tanpa order_id.",
     ],
   },
   {
@@ -191,7 +199,7 @@ export default function AboutView() {
 
           {/* LIST CHANGELOG */}
           {showChangelog && (
-             <div className="mt-4 space-y-4">
+             <div className="mt-4 space-y-4 max-h-[60vh] overflow-y-auto pr-2">
                 {CHANGELOG.map((log, index) => (
                   <div key={index} className="bg-slate-50 rounded-xl p-4 border border-slate-100">
                      <div className="flex items-center justify-between mb-3 border-b border-slate-200 pb-2">

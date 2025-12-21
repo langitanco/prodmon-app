@@ -24,3 +24,19 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
+
+/* Optimasi Hardware Acceleration */
+.will-change-transform {
+  will-change: transform;
+}
+
+/* Smooth Scrolling */
+.overflow-y-auto, .overflow-x-auto {
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Disable Text Selection untuk UI Elements */
+button, .cursor-pointer {
+  -webkit-user-select: none;
+  user-select: none;
+}

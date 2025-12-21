@@ -1,9 +1,15 @@
-// lib/notificationHelper.ts
+// lib/notificationHelper.ts - FIXED VERSION WITH order_id
 
 import { createClient } from '@/lib/supabase/client';
 
 // 1. Kirim ke 1 User (Spesifik)
-export const sendNotification = async (targetUserId: string, title: string, body: string) => {
+// ✅ UPDATED: Tambah parameter orderId
+export const sendNotification = async (
+  targetUserId: string, 
+  title: string, 
+  body: string, 
+  orderId?: string
+) => {
   try {
     if (!targetUserId) return;
 
@@ -14,6 +20,7 @@ export const sendNotification = async (targetUserId: string, title: string, body
       user_id: targetUserId,
       title,
       message: body,
+      order_id: orderId, // ✅ Tambahkan order_id
       is_read: false
     });
 
@@ -41,8 +48,14 @@ export const sendNotification = async (targetUserId: string, title: string, body
 };
 
 // 2. Kirim ke User berdasarkan Role (Massal)
-// Contoh usage: sendToRoles(['produksi', 'supervisor'], 'Judul', 'Pesan')
-export const sendToRoles = async (roles: string[], title: string, body: string) => {
+// ✅ UPDATED: Tambah parameter orderId
+// Contoh usage: sendToRoles(['produksi', 'supervisor'], 'Judul', 'Pesan', 'order-uuid')
+export const sendToRoles = async (
+  roles: string[], 
+  title: string, 
+  body: string, 
+  orderId?: string
+) => {
   const supabase = createClient();
   
   try {
@@ -63,6 +76,7 @@ export const sendToRoles = async (roles: string[], title: string, body: string) 
         user_id: u.id,
         title,
         message: body,
+        order_id: orderId, // ✅ Tambahkan order_id
         is_read: false
       }));
 
@@ -95,7 +109,12 @@ export const sendToRoles = async (roles: string[], title: string, body: string) 
 };
 
 // 3. Kirim ke SEMUA User
-export const sendToAllUsers = async (title: string, body: string) => {
+// ✅ UPDATED: Tambah parameter orderId
+export const sendToAllUsers = async (
+  title: string, 
+  body: string, 
+  orderId?: string
+) => {
   const supabase = createClient();
   
   try {
@@ -114,6 +133,7 @@ export const sendToAllUsers = async (title: string, body: string) => {
         user_id: u.id,
         title,
         message: body,
+        order_id: orderId, // ✅ Tambahkan order_id
         is_read: false
       }));
 

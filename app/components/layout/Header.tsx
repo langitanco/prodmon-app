@@ -1,4 +1,4 @@
-// app/components/layout/Header.tsx
+// app/components/layout/Header.tsx - FIXED CLICK HANDLER
 'use client';
 
 import React, { useState } from 'react';
@@ -11,14 +11,48 @@ interface HeaderProps {
   onLogout: () => void;
   sidebarOpen: boolean;
   currentPage?: string;
-  notifications?: Array<{id: string; title: string; message: string; time: string; isRead: boolean}>; // ← PROP INI YANG KURANG
+  notifications?: Array<{
+    id: string; 
+    title: string; 
+    message: string; 
+    time: string; 
+    isRead: boolean;
+    orderId?: string;
+  }>;
+  onNotificationClick?: (notificationId: string, orderId: string) => void;
 }
 
-export default function Header({ currentUser, onToggleSidebar, onLogout, sidebarOpen, currentPage = 'dashboard', notifications = [] }: HeaderProps) {
+export default function Header({ 
+  currentUser, 
+  onToggleSidebar, 
+  onLogout, 
+  sidebarOpen, 
+  currentPage = 'dashboard', 
+  notifications = [],
+  onNotificationClick 
+}: HeaderProps) {
   const [showNotif, setShowNotif] = useState(false);
   const [showProfile, setShowProfile] = useState(false);
   
   const unreadCount = notifications.filter(n => !n.isRead).length;
+
+  // ✅ FIXED: Handle klik notifikasi
+  const handleNotificationClick = (notif: any) => {
+    console.log('Notifikasi diklik:', notif); // Debug log
+    
+    setShowNotif(false); // Tutup dropdown
+    
+    // ✅ PERBAIKAN: Cek apakah orderId ada DAN callback tersedia
+    if (notif.orderId && onNotificationClick) {
+      console.log('Memanggil callback dengan orderId:', notif.orderId); // Debug log
+      onNotificationClick(notif.id, notif.orderId);
+    } else {
+      console.warn('orderId tidak tersedia atau callback tidak ada', {
+        orderId: notif.orderId,
+        hasCallback: !!onNotificationClick
+      });
+    }
+  };
 
   return (
     <header className={`
@@ -35,7 +69,8 @@ export default function Header({ currentUser, onToggleSidebar, onLogout, sidebar
       <div className="flex items-center gap-4">
         <button 
           onClick={onToggleSidebar} 
-          className="p-2.5 bg-white rounded-2xl text-slate-600 md:hidden hover:bg-slate-50 border border-slate-100 shadow-sm"
+          className="p-2.5 bg-white rounded-2xl text-slate-600 md:hidden hover:bg-slate-50 border border-slate-100 shadow-sm active:scale-95 transition-transform"
+          style={{ WebkitTapHighlightColor: 'transparent' }}
         >
           <Menu className="w-6 h-6" />
         </button>
@@ -52,11 +87,13 @@ export default function Header({ currentUser, onToggleSidebar, onLogout, sidebar
 
       {/* KANAN: Notifikasi & Profil Mobile */}
       <div className="flex items-center gap-3">
-        {/* BELL NOTIFIKASI */}
+        
+        {/* BELL NOTIFIKASI - DENGAN NAVIGASI */}
         <div className="relative">
            <button 
              onClick={() => setShowNotif(!showNotif)}
-             className="p-2.5 md:p-3 bg-white border border-slate-100 rounded-2xl text-slate-500 hover:text-blue-600 transition relative shadow-sm"
+             className="p-2.5 md:p-3 bg-white border border-slate-100 rounded-2xl text-slate-500 hover:text-blue-600 transition relative shadow-sm active:scale-95"
+             style={{ WebkitTapHighlightColor: 'transparent' }}
            >
               <Bell className="w-5 h-5" />
               {unreadCount > 0 && (
@@ -66,9 +103,26 @@ export default function Header({ currentUser, onToggleSidebar, onLogout, sidebar
 
            {showNotif && (
              <>
-               <div className="fixed inset-0 z-10" onClick={() => setShowNotif(false)}/>
-               <div className="absolute right-0 top-full mt-2 w-80 bg-white rounded-2xl shadow-xl border border-slate-100 z-20 overflow-hidden">
-                  <div className="px-4 py-3 border-b border-slate-100 font-bold text-sm text-slate-800 flex items-center justify-between">
+               {/* Overlay */}
+               <div 
+                 className="fixed inset-0 z-30 bg-black/10" 
+                 onClick={() => setShowNotif(false)}
+               />
+               
+               {/* Dropdown - RESPONSIVE POSITIONING */}
+               <div className="
+                 fixed md:absolute 
+                 right-4 md:right-0 
+                 top-24 md:top-full 
+                 md:mt-2 
+                 w-[calc(100vw-2rem)] md:w-80 
+                 max-w-md
+                 bg-white rounded-2xl shadow-2xl border border-slate-100 
+                 z-40 
+                 overflow-hidden
+                 animate-in fade-in slide-in-from-top-2 md:slide-in-from-top-0 duration-200
+               ">
+                  <div className="px-4 py-3 border-b border-slate-100 font-bold text-sm text-slate-800 flex items-center justify-between sticky top-0 bg-white z-10">
                     <span>Notifikasi</span>
                     {unreadCount > 0 && (
                       <span className="text-xs bg-red-500 text-white px-2 py-0.5 rounded-full">{unreadCount}</span>
@@ -76,17 +130,33 @@ export default function Header({ currentUser, onToggleSidebar, onLogout, sidebar
                   </div>
                   
                   {notifications.length === 0 ? (
-                    <div className="p-6 text-center text-xs text-slate-400">Tidak ada notifikasi</div>
+                    <div className="p-6 text-center text-xs text-slate-400">
+                      <Bell className="w-8 h-8 mx-auto mb-2 text-slate-300" />
+                      <p>Tidak ada notifikasi</p>
+                    </div>
                   ) : (
-                    <div className="max-h-96 overflow-y-auto">
+                    <div className="max-h-[60vh] md:max-h-96 overflow-y-auto">
                       {notifications.map(notif => (
                         <div 
                           key={notif.id} 
-                          className={`px-4 py-3 border-b border-slate-50 hover:bg-slate-50 transition ${!notif.isRead ? 'bg-blue-50/50' : ''}`}
+                          className={`px-4 py-3 border-b border-slate-50 hover:bg-slate-50 active:bg-slate-100 transition cursor-pointer ${!notif.isRead ? 'bg-blue-50/50' : ''}`}
+                          onClick={() => handleNotificationClick(notif)}
+                          style={{ WebkitTapHighlightColor: 'transparent' }}
                         >
-                          <p className="font-semibold text-xs text-slate-800">{notif.title}</p>
-                          <p className="text-xs text-slate-600 mt-1">{notif.message}</p>
-                          <p className="text-[10px] text-slate-400 mt-1">{notif.time}</p>
+                          <div className="flex items-start gap-2">
+                            {!notif.isRead && (
+                              <div className="w-2 h-2 rounded-full bg-blue-500 mt-1.5 flex-shrink-0"></div>
+                            )}
+                            <div className="flex-1 min-w-0">
+                              <p className="font-semibold text-xs text-slate-800 line-clamp-1">{notif.title}</p>
+                              <p className="text-xs text-slate-600 mt-1 line-clamp-2">{notif.message}</p>
+                              <p className="text-[10px] text-slate-400 mt-1">{notif.time}</p>
+                              {/* ✅ DEBUG: Tampilkan orderId jika ada */}
+                              {notif.orderId && (
+                                <p className="text-[9px] text-blue-500 mt-0.5">Order: {notif.orderId}</p>
+                              )}
+                            </div>
+                          </div>
                         </div>
                       ))}
                     </div>
@@ -100,7 +170,8 @@ export default function Header({ currentUser, onToggleSidebar, onLogout, sidebar
         <div className="relative md:hidden">
            <button 
              onClick={() => setShowProfile(!showProfile)}
-             className="w-10 h-10 rounded-2xl bg-white border border-slate-100 flex items-center justify-center shadow-sm overflow-hidden"
+             className="w-10 h-10 rounded-2xl bg-white border border-slate-100 flex items-center justify-center shadow-sm overflow-hidden active:scale-95 transition-transform"
+             style={{ WebkitTapHighlightColor: 'transparent' }}
            >
               {currentUser.avatar_url ? (
                  <img src={currentUser.avatar_url} alt="User" className="w-full h-full object-cover" />
@@ -113,16 +184,30 @@ export default function Header({ currentUser, onToggleSidebar, onLogout, sidebar
 
            {showProfile && (
              <>
-               <div className="fixed inset-0 z-10" onClick={() => setShowProfile(false)}/>
-               <div className="absolute right-0 top-full mt-2 w-56 bg-white rounded-2xl shadow-xl border border-slate-100 z-20 p-2 animate-in fade-in zoom-in-95">
+               <div 
+                 className="fixed inset-0 z-30 bg-black/10" 
+                 onClick={() => setShowProfile(false)}
+               />
+               <div className="
+                 fixed md:absolute 
+                 right-4 md:right-0 
+                 top-24 md:top-full 
+                 md:mt-2 
+                 w-56 
+                 bg-white rounded-2xl shadow-2xl border border-slate-100 
+                 z-40 
+                 p-2 
+                 animate-in fade-in slide-in-from-top-2 duration-200
+               ">
                   <div className="px-4 py-3 border-b border-slate-50">
-                     <p className="text-sm font-bold text-slate-800">{currentUser.name}</p>
+                     <p className="text-sm font-bold text-slate-800 truncate">{currentUser.name}</p>
                      <p className="text-[10px] text-blue-600 font-bold uppercase">{currentUser.role}</p>
                   </div>
                   
                   <button 
                     onClick={() => { setShowProfile(false); onLogout(); }}
-                    className="w-full text-left px-4 py-3 text-sm text-red-600 hover:bg-red-50 rounded-xl flex items-center gap-2 font-bold transition mt-1"
+                    className="w-full text-left px-4 py-3 text-sm text-red-600 hover:bg-red-50 active:bg-red-100 rounded-xl flex items-center gap-2 font-bold transition mt-1"
+                    style={{ WebkitTapHighlightColor: 'transparent' }}
                   >
                     <LogOut className="w-4 h-4" /> Logout
                   </button>
