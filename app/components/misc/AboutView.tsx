@@ -1,4 +1,4 @@
-// app/components/misc/AboutView.tsx - V.8.0
+// app/components/misc/AboutView.tsx - V.8.1
 
 'use client';
 
@@ -13,7 +13,7 @@ interface ChangelogEntry {
 
 const APP_INFO = {
   name: "LCO SuperApp",
-  version: "V.8.0",  // ✅ UPDATED KE V.8.0
+  version: "V.8.5",  // ✅ UPDATED KE V.8.5
   purpose: "Aplikasi produksi Sablon, Langitan.co.",
   creator: "Tim Developer Langitan.co",
   creationDate: "Desember 2025",
@@ -21,6 +21,19 @@ const APP_INFO = {
 
 // --- DATA RIWAYAT UPDATE ---
 const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: "8.5",
+    date: "2025-12-22",
+    changes: [
+      "New Feature: 'Arsip Selesai' - Menu dedikasi untuk melihat rekapitulasi pesanan yang telah rampung dengan statistik grafik.",
+      "Smart Pagination: Tabel arsip kini dilengkapi fitur paginasi (10/20/50 baris) dengan custom dropdown, mencegah scrolling halaman yang terlalu panjang.",
+      "Advanced Filtering: Penambahan filter arsip berdasarkan 'Bulan' spesifik dan pencarian (Search) realtime.",
+      "Mobile-Optimized Tables: Tabel kini menggunakan sistem 'Internal Scroll' dengan 'Sticky Header', judul kolom tetap terlihat saat discroll kebawah.",
+      "Dynamic Header System: Tampilan header kini adaptif; menampilkan 'Judul Menu' saat di Mobile dan 'Salam Sapaan' saat di Desktop.",
+      "SPA Back Navigation: Logika tombol 'Back' browser diperbaiki. Jika ditekan di menu lain, akan kembali ke Dashboard terlebih dahulu sebelum keluar aplikasi.",
+      "UI/UX Refinement: Perbaikan layout grid statistik pada tampilan mobile agar lebih compact (2 kolom) dan grafik full-width.",
+    ],
+  },
   {
     version: "8.0",
     date: "2025-12-21",
