@@ -469,30 +469,50 @@ const ActionRowMemo = memo(({ item, onSelectOrder }: { item: any, onSelectOrder:
         e.stopPropagation(); 
         setIsSharing(true);
         
-        // Render on-demand
+        // 1. Buat elemen container
         const ticketElement = document.createElement('div');
-        ticketElement.style.position = 'absolute';
-        ticketElement.style.left = '-9999px';
+        
+        // PERBAIKAN PENTING:
+        // Jangan gunakan left: -9999px. Browser modern sering skip rendering area itu.
+        // Taruh di belakang layar (z-index negative) tapi tetap di viewport.
+        Object.assign(ticketElement.style, {
+            position: 'fixed',
+            top: '0',
+            left: '0',
+            zIndex: '-9999', // Di belakang segalanya
+            width: '600px',  // Lebar fix sesuai desain ShareTicket
+            height: 'auto',
+            visibility: 'visible', // Harus visible agar bisa dicapture
+            background: '#ffffff'  // Pastikan background putih, bukan transparan
+        });
+
         document.body.appendChild(ticketElement);
         
+        // 2. Render komponen React ke dalam elemen tersebut
         const root = (await import('react-dom/client')).createRoot(ticketElement);
         root.render(<ShareTicket item={item} />);
         
-        await new Promise(resolve => setTimeout(resolve, 100));
+        // 3. Beri waktu React & Tailwind untuk render sepenuhnya
+        // Naikkan ke 300ms - 500ms untuk keamanan (terutama di HP yang lambat)
+        await new Promise(resolve => setTimeout(resolve, 500));
         
         try {
+            // 4. Capture
             const dataUrl = await toPng(ticketElement, { 
                 cacheBust: true, 
-                backgroundColor: '#ffffff', 
-                pixelRatio: 2
+                backgroundColor: '#ffffff',
+                pixelRatio: 2, // Kualitas tinggi (Retina)
+                width: 600,    // Paksa lebar capture
+                // Filter node yang tidak perlu jika ada
             });
+
             const blob = await (await fetch(dataUrl)).blob();
             const file = new File([blob], `Laporan-${type}-${order.kode_produksi}.png`, { type: 'image/png' });
 
             if (navigator.share) {
                 await navigator.share({
-                    title: `Laporan Produksi: ${type}`,
-                    text: `Detail laporan untuk pesanan ${order.nama_pemesan}`,
+                    title: `Laporan Langitan: ${type}`, // Branding kamu
+                    text: `Detail laporan produksi untuk pesanan ${order.nama_pemesan}`,
                     files: [file],
                 });
             } else {
@@ -503,10 +523,17 @@ const ActionRowMemo = memo(({ item, onSelectOrder }: { item: any, onSelectOrder:
             }
         } catch (err) {
             console.error('Gagal membuat gambar:', err);
+            alert('Gagal generate gambar. Coba lagi.');
         } finally {
-            root.unmount();
-            document.body.removeChild(ticketElement);
-            setIsSharing(false);
+            // 5. Cleanup
+            // Gunakan timeout kecil saat unmount agar tidak crash di beberapa browser mobile
+            setTimeout(() => {
+                root.unmount();
+                if (document.body.contains(ticketElement)) {
+                    document.body.removeChild(ticketElement);
+                }
+                setIsSharing(false);
+            }, 100);
         }
     }, [item, order, type]);
 
@@ -644,7 +671,7 @@ function ShareTicket({ item }: { item: any }) {
                         <p className={`text-lg font-bold leading-relaxed ${alertText}`}>
                             {detail}
                         </p>
-                        <p className="text-xs opacity-60 mt-2">
+                        <p className="text-xs text-slate-800 mt-2">
                            Laporan dibuat pada: {new Date().toLocaleString('id-ID')}
                         </p>
                     </div>
