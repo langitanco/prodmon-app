@@ -29,6 +29,7 @@ const OrderList = dynamic(() => import('@/app/components/orders/OrderList'));
 const CreateOrder = dynamic(() => import('@/app/components/orders/CreateOrder'));
 const EditOrder = dynamic(() => import('@/app/components/orders/EditOrder'));
 const OrderDetail = dynamic(() => import('@/app/components/orders/OrderDetail'));
+const CompletedOrders = dynamic(() => import('@/app/components/orders/CompletedOrders')); // <-- UPDATE 1: Import Component Baru
 const TrashView = dynamic(() => import('@/app/components/orders/TrashView'));
 
 // Settings - Lazy load
@@ -55,7 +56,10 @@ interface Notification {
 export default function ProductionApp() {
   const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null);
   const [loadingUser, setLoadingUser] = useState(true);
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'orders' | 'settings' | 'trash' | 'kalkulator' | 'config_harga' | 'about'>('dashboard');
+  
+  // UPDATE 2: Tambahkan 'completed_orders' ke dalam tipe state activeTab
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'orders' | 'completed_orders' | 'settings' | 'trash' | 'kalkulator' | 'config_harga' | 'about'>('dashboard');
+  
   const [orders, setOrders] = useState<Order[]>([]);
   const [usersList, setUsersList] = useState<UserData[]>([]);
   const [productionTypes, setProductionTypes] = useState<ProductionTypeData[]>([]);
@@ -240,6 +244,48 @@ export default function ProductionApp() {
     const interval = setInterval(fetchNotifications, 60000);
     return () => clearInterval(interval);
   }, [currentUser, fetchOrders, fetchUsers, fetchProductionTypes, fetchNotifications]);
+
+  // ==========================================
+  // FITUR: BACK BUTTON HANDLER (NAVIGATION)
+  // ==========================================
+  useEffect(() => {
+    // Fungsi yang jalan saat tombol Back ditekan
+    const handlePopState = (event: PopStateEvent) => {
+      // Cek apakah sekarang sedang BUKAN di dashboard?
+      if (activeTab !== 'dashboard') {
+        // Jika iya, jangan biarkan browser keluar/mundur jauh
+        // Tapi paksa aplikasi ganti state ke 'dashboard'
+        setActiveTab('dashboard');
+        
+        // Reset juga view internal agar bersih
+        setView('list'); 
+        setSelectedOrderId(null);
+        
+        // Opsional: Jika di mobile, ini mencegah efek 'flicker' browser
+        // event.preventDefault(); // (Browser modern kadang mengabaikan ini, tapi history api di bawah yang memegang kendali)
+      }
+    };
+
+    // Pasang pendengar event tombol back
+    window.addEventListener('popstate', handlePopState);
+
+    // LOGIKA PUSH HISTORY:
+    // Setiap kali 'activeTab' berubah...
+    if (activeTab !== 'dashboard') {
+      // Jika kita pindah ke menu selain dashboard (misal: orders),
+      // Kita tambahkan "history palsu" ke browser.
+      // Ini membuat tombol Back menjadi "aktif" (bisa ditekan).
+      window.history.pushState({ tab: activeTab }, '', `?tab=${activeTab}`);
+    } else {
+      // Jika kembali ke dashboard, kita tidak perlu pushState baru agar tumpukan history tidak menumpuk,
+      // tapi secara alami tombol back akan memakan stack yang kita buat sebelumnya.
+    }
+
+    // Bersihkan listener saat component unmount atau tab berubah
+    return () => {
+      window.removeEventListener('popstate', handlePopState);
+    };
+  }, [activeTab]); // Dependency array: jalankan setiap kali activeTab berubah
 
   const handleLogout = useCallback(async () => {
     showConfirm('Logout', 'Apakah anda yakin ingin keluar?', async () => {
@@ -569,6 +615,11 @@ export default function ProductionApp() {
                       />
                     )}
                   </>
+                )}
+
+                {/* UPDATE 3: Render Component CompletedOrders */}
+                {activeTab === 'completed_orders' && currentUser.permissions?.pages?.orders && (
+                   <CompletedOrders orders={activeOrders} />
                 )}
                 
                 {activeTab === 'trash' && currentUser.permissions?.pages?.trash && (

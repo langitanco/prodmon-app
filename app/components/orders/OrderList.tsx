@@ -3,7 +3,7 @@
 import React, { useState } from 'react';
 import { formatDate, getDeadlineStatus, getStatusColor, MONTHS } from '@/lib/utils';
 import { Order, ProductionTypeData, UserData } from '@/types';
-import { BarChart3, Calendar, ClipboardList, Clock, FileText, Trash2, User } from 'lucide-react'; // Tambah icon User
+import { BarChart3, Calendar, ClipboardList, Clock, FileText, Trash2, User } from 'lucide-react'; 
 
 interface OrderListProps {
   role: string;
@@ -20,23 +20,21 @@ export default function OrderList({ role, orders, productionTypes, onSelectOrder
   const [monthFilter, setMonthFilter] = useState<string>('all');
   const [typeFilter, setTypeFilter] = useState<string>('all');
 
-  // --- LOGIKA IZIN ---
   const canDeleteOrder = role === 'supervisor' || currentUser?.permissions?.orders?.delete === true;
   const canCreateOrder = role === 'supervisor' || currentUser?.permissions?.orders?.create === true;
-
-  // Cek apakah user adalah Management (Bisa melihat semua PIC)
   const isManagement = ['admin', 'manager', 'supervisor'].includes(role);
 
   const filteredOrders = orders.filter((o) => {
+    if (statusFilter !== 'completed' && o.status === 'Selesai') {
+        return false;
+    }
+
     let statusMatch = true;
-    
     if (statusFilter === 'process') {
         statusMatch = o.status === 'On Process' || o.status === 'Finishing' || o.status === 'Pesanan Masuk';
-    } 
-    else if (statusFilter === 'overdue') {
+    } else if (statusFilter === 'overdue') {
         statusMatch = o.status === 'Telat' || getDeadlineStatus(o.deadline, o.status) === 'overdue';
-    } 
-    else if (statusFilter === 'completed') {
+    } else if (statusFilter === 'completed') {
         statusMatch = o.status === 'Selesai' || o.status === 'Kirim';
     }
 
@@ -60,49 +58,72 @@ export default function OrderList({ role, orders, productionTypes, onSelectOrder
        
        {/* HEADER & FILTER */}
        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-3 md:gap-4">
-        <div>
+        
+        {/* JUDUL: KEMBALI ADA, TAPI DI-HIDE SAAT MOBILE (hidden md:block) */}
+        <div className="hidden md:block">
           <h2 className="text-xl md:text-2xl font-bold text-slate-800">Daftar Pesanan</h2>
-          <p className="text-xs md:text-sm text-slate-500 mt-0.5 md:mt-1 font-medium">Kelola {filteredOrders.length} pesanan masuk</p>
+          <p className="text-xs md:text-sm text-slate-500 mt-0.5 md:mt-1 font-medium">Kelola {filteredOrders.length} pesanan aktif</p>
         </div>
 
-        <div className="flex flex-row w-full md:w-auto items-center gap-2 md:gap-3 overflow-x-auto pb-1">
-          <select 
-            className="bg-white border border-slate-300 text-slate-700 text-[10px] md:text-sm rounded-lg p-2 focus:ring-blue-500 focus:border-blue-500 font-medium"
-            value={monthFilter}
-            onChange={(e) => setMonthFilter(e.target.value)}
-          >
-            <option value="all">Semua Bulan</option>
-            {MONTHS.map((m, i) => (
-              <option key={i} value={i.toString()}>{m}</option>
-            ))}
-          </select>
+        {/* BAGIAN KANAN: Filter & Tombol Tambah */}
+        <div className="flex flex-col md:flex-row w-full md:w-auto items-center gap-2 md:gap-3">
+             {/* Filter Status (Khusus Mobile: Taruh disini agar layout rapi) */}
+             <div className="flex md:hidden gap-2 overflow-x-auto pb-2 scrollbar-hide w-full">
+                {[
+                { id: null, label: 'Semua' },
+                { id: 'process', label: 'Proses' },
+                { id: 'overdue', label: 'Telat' },
+                { id: 'completed', label: 'Siap Kirim' } 
+                ].map((f) => (
+                <button 
+                    key={f.id || 'all'}
+                    onClick={() => setStatusFilter(f.id)}
+                    className={`px-3 py-1.5 rounded-full text-[10px] font-bold whitespace-nowrap transition border ${statusFilter === f.id ? 'bg-slate-800 text-white border-slate-800 shadow-md' : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'}`}
+                >
+                    {f.label}
+                </button>
+                ))}
+             </div>
 
-          <select 
-            className="bg-white border border-slate-300 text-slate-700 text-[10px] md:text-sm rounded-lg p-2 focus:ring-blue-500 focus:border-blue-500 font-medium"
-            value={typeFilter}
-            onChange={(e) => setTypeFilter(e.target.value)}
-          >
-            <option value="all">Semua Jenis</option>
-            {productionTypes.map((pt) => (
-              <option key={pt.id} value={pt.value}>{pt.name}</option>
-            ))}
-          </select>
+             <div className="flex flex-row w-full md:w-auto items-center gap-2 md:gap-3 overflow-x-auto pb-1 justify-end">
+                <select 
+                    className="bg-white border border-slate-300 text-slate-700 text-[10px] md:text-sm rounded-lg p-2 focus:ring-blue-500 focus:border-blue-500 font-medium"
+                    value={monthFilter}
+                    onChange={(e) => setMonthFilter(e.target.value)}
+                >
+                    <option value="all">Semua Bulan</option>
+                    {MONTHS.map((m, i) => (
+                    <option key={i} value={i.toString()}>{m}</option>
+                    ))}
+                </select>
 
-          {canCreateOrder && (
-            <button onClick={onNewOrder} className="bg-blue-600 text-white px-3 py-2 md:px-4 md:py-2.5 rounded-lg text-[10px] md:text-sm font-bold flex items-center justify-center gap-2 hover:bg-blue-700 transition shadow-sm active:scale-95 whitespace-nowrap ml-auto md:ml-0">
-              <ClipboardList className="w-3 h-3 md:w-4 md:h-4"/> Tambah
-            </button>
-          )}
+                <select 
+                    className="bg-white border border-slate-300 text-slate-700 text-[10px] md:text-sm rounded-lg p-2 focus:ring-blue-500 focus:border-blue-500 font-medium"
+                    value={typeFilter}
+                    onChange={(e) => setTypeFilter(e.target.value)}
+                >
+                    <option value="all">Semua Jenis</option>
+                    {productionTypes.map((pt) => (
+                    <option key={pt.id} value={pt.value}>{pt.name}</option>
+                    ))}
+                </select>
+
+                {canCreateOrder && (
+                    <button onClick={onNewOrder} className="bg-blue-600 text-white px-3 py-2 md:px-4 md:py-2.5 rounded-lg text-[10px] md:text-sm font-bold flex items-center justify-center gap-2 hover:bg-blue-700 transition shadow-sm active:scale-95 whitespace-nowrap ml-auto md:ml-0">
+                    <ClipboardList className="w-3 h-3 md:w-4 md:h-4"/> Tambah
+                    </button>
+                )}
+            </div>
         </div>
       </div>
 
-      {/* FILTER BUTTONS */}
-      <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
+      {/* FILTER BUTTONS (Desktop Only - karena mobile sudah ada di atas) */}
+      <div className="hidden md:flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
         {[
-          { id: null, label: 'Semua' },
+          { id: null, label: 'Semua (Aktif)' },
           { id: 'process', label: 'Proses' },
           { id: 'overdue', label: 'Telat' },
-          { id: 'completed', label: 'Selesai' }
+          { id: 'completed', label: 'Siap Kirim' } 
         ].map((f) => (
           <button 
             key={f.id || 'all'}
@@ -126,34 +147,23 @@ export default function OrderList({ role, orders, productionTypes, onSelectOrder
                 onClick={() => onSelectOrder(order.id)} 
                 className={`bg-white rounded-2xl shadow-sm border p-3 md:p-5 cursor-pointer hover:shadow-md transition relative overflow-hidden active:scale-[0.98] h-full flex flex-col justify-between ${showOverdueBadge ? 'border-red-300 ring-1 ring-red-100' : 'border-slate-200'}`}
               >
-                
-                {/* WRAPPER KONTEN ATAS (flex-1 akan mendorong tombol hapus ke bawah) */}
                 <div className="flex-1">
                     <div className="flex justify-between items-start mb-1 md:mb-4 mt-1">
                       <div className="flex flex-col gap-1">
                           <span className="text-[10px] md:text-xs font-mono font-bold text-slate-500 bg-slate-100 px-1.5 py-0.5 md:px-2 md:py-1 rounded-md h-fit w-fit">#{order.kode_produksi}</span>
-                          
-                          {/* --- TAMBAHAN: BADGE PIC KHUSUS MANAGEMENT --- */}
                           {isManagement && (
                              <div className="flex items-center gap-1 bg-blue-50 text-blue-700 px-1.5 py-0.5 rounded border border-blue-100 w-fit">
                                 <User className="w-3 h-3"/>
-                                <span className="text-[10px] font-bold truncate max-w-[100px]">
-                                   {order.assigned_user?.name || 'No PIC'}
-                                </span>
+                                <span className="text-[10px] font-bold truncate max-w-[100px]">{order.assigned_user?.name || 'No PIC'}</span>
                              </div>
                           )}
                       </div>
-                      
-                      {/* STATUS WRAPPER */}
                       <div className="flex flex-col gap-1 items-end">
                           <span className={`text-[9px] md:text-[10px] font-extrabold px-2 py-0.5 md:px-2.5 md:py-1 rounded-full border uppercase tracking-wide whitespace-nowrap ${getStatusColor(order.status)}`}>
                             {order.status}
                           </span>
-
                           {showOverdueBadge && (
-                            <span className="text-[8px] md:text-[9px] font-extrabold px-2 py-0.5 rounded-full border border-red-200 bg-red-100 text-red-700 uppercase tracking-wide whitespace-nowrap">
-                                Telat Deadline
-                            </span>
+                            <span className="text-[8px] md:text-[9px] font-extrabold px-2 py-0.5 rounded-full border border-red-200 bg-red-100 text-red-700 uppercase tracking-wide whitespace-nowrap">Telat Deadline</span>
                           )}
                       </div>
                     </div>
@@ -182,23 +192,15 @@ export default function OrderList({ role, orders, productionTypes, onSelectOrder
                     </div>
                 </div>
 
-                {/* TOMBOL HAPUS (Akan selalu nempel di bawah karena flex-1 di atas) */}
                 {canDeleteOrder && (
-                  <button 
-                    onClick={(e) => { 
-                      e.stopPropagation(); 
-                      onDeleteOrder(order.id); 
-                    }}
-                    className="mt-auto w-full bg-red-50 text-red-600 px-3 py-1.5 md:py-2 rounded-lg text-[10px] md:text-xs font-bold hover:bg-red-100 transition border border-red-200 flex items-center justify-center gap-2"
-                  >
+                  <button onClick={(e) => { e.stopPropagation(); onDeleteOrder(order.id); }} className="mt-auto w-full bg-red-50 text-red-600 px-3 py-1.5 md:py-2 rounded-lg text-[10px] md:text-xs font-bold hover:bg-red-100 transition border border-red-200 flex items-center justify-center gap-2">
                     <Trash2 className="w-3 h-3 md:w-3.5 md:h-3.5"/> Hapus Pesanan
                   </button>
                 )}
               </div>
              );
           })}
-          
-          {filteredOrders.length === 0 && <div className="col-span-full text-center text-slate-400 py-12 border-2 border-dashed border-slate-200 rounded-xl bg-slate-50 text-xs">Tidak ada pesanan sesuai filter</div>}
+          {filteredOrders.length === 0 && <div className="col-span-full text-center text-slate-400 py-12 border-2 border-dashed border-slate-200 rounded-xl bg-slate-50 text-xs">Tidak ada pesanan aktif sesuai filter</div>}
       </div>
     </div>
   );

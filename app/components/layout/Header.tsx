@@ -1,4 +1,4 @@
-// app/components/layout/Header.tsx - FIXED CLICK HANDLER
+// app/components/layout/Header.tsx - FIXED CLICK HANDLER & MOBILE TITLE
 'use client';
 
 import React, { useState } from 'react';
@@ -36,15 +36,28 @@ export default function Header({
   
   const unreadCount = notifications.filter(n => !n.isRead).length;
 
+  // --- LOGIKA JUDUL HALAMAN (MOBILE) ---
+  const pageTitles: { [key: string]: string } = {
+    dashboard: 'Dashboard',
+    orders: 'Daftar Pesanan',
+    completed_orders: 'Arsip Selesai',
+    trash: 'Sampah',
+    settings: 'Pengaturan',
+    kalkulator: 'Kalkulator HPP',
+    config_harga: 'Konfigurasi Harga',
+    about: 'Tentang Aplikasi',
+    default: 'Langitan.co'
+  };
+
+  const currentTitle = pageTitles[currentPage] || pageTitles.default;
+
   // ✅ FIXED: Handle klik notifikasi
   const handleNotificationClick = (notif: any) => {
-    console.log('Notifikasi diklik:', notif); // Debug log
+    console.log('Notifikasi diklik:', notif); 
+    setShowNotif(false); 
     
-    setShowNotif(false); // Tutup dropdown
-    
-    // ✅ PERBAIKAN: Cek apakah orderId ada DAN callback tersedia
     if (notif.orderId && onNotificationClick) {
-      console.log('Memanggil callback dengan orderId:', notif.orderId); // Debug log
+      console.log('Memanggil callback dengan orderId:', notif.orderId); 
       onNotificationClick(notif.id, notif.orderId);
     } else {
       console.warn('orderId tidak tersedia atau callback tidak ada', {
@@ -65,7 +78,7 @@ export default function Header({
       md:bg-gray-100 md:backdrop-blur-none
     `}>
       
-      {/* KIRI: Tombol Menu & Teks Salam */}
+      {/* KIRI: Tombol Menu, Judul Mobile & Salam Desktop */}
       <div className="flex items-center gap-4">
         <button 
           onClick={onToggleSidebar} 
@@ -75,6 +88,7 @@ export default function Header({
           <Menu className="w-6 h-6" />
         </button>
 
+        {/* TAMPILAN DESKTOP: Hanya muncul Salam di Dashboard */}
         <div className="hidden md:block">
           {currentPage === 'dashboard' && (
             <>
@@ -83,12 +97,19 @@ export default function Header({
             </>
           )}
         </div>
+
+        {/* TAMPILAN MOBILE: Judul Menu Aktif */}
+        <div className="md:hidden">
+           <h1 className="text-lg font-extrabold text-slate-800 tracking-tight">
+             {currentTitle}
+           </h1>
+        </div>
       </div>
 
       {/* KANAN: Notifikasi & Profil Mobile */}
       <div className="flex items-center gap-3">
         
-        {/* BELL NOTIFIKASI - DENGAN NAVIGASI */}
+        {/* BELL NOTIFIKASI */}
         <div className="relative">
            <button 
              onClick={() => setShowNotif(!showNotif)}
@@ -103,13 +124,11 @@ export default function Header({
 
            {showNotif && (
              <>
-               {/* Overlay */}
                <div 
                  className="fixed inset-0 z-30 bg-black/10" 
                  onClick={() => setShowNotif(false)}
                />
                
-               {/* Dropdown - RESPONSIVE POSITIONING */}
                <div className="
                  fixed md:absolute 
                  right-4 md:right-0 
@@ -151,7 +170,6 @@ export default function Header({
                               <p className="font-semibold text-xs text-slate-800 line-clamp-1">{notif.title}</p>
                               <p className="text-xs text-slate-600 mt-1 line-clamp-2">{notif.message}</p>
                               <p className="text-[10px] text-slate-400 mt-1">{notif.time}</p>
-                              {/* ✅ DEBUG: Tampilkan orderId jika ada */}
                               {notif.orderId && (
                                 <p className="text-[9px] text-blue-500 mt-0.5">Order: {notif.orderId}</p>
                               )}

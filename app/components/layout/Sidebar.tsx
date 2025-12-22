@@ -3,7 +3,8 @@
 
 import React, { memo } from 'react';
 import { 
-  Home, ClipboardList, Settings, Calculator, Trash2, Info, X, DollarSign, LogOut
+  Home, ClipboardList, Settings, Calculator, Trash2, Info, X, DollarSign, LogOut,
+  Archive // <--- IMPORT BARU
 } from 'lucide-react';
 import { UserData } from '@/types';
 
@@ -19,6 +20,7 @@ interface SidebarProps {
 
 export default function Sidebar({ sidebarOpen, setSidebarOpen, currentUser, activeTab, handleNav, onLogout, onOpenProfile }: SidebarProps) {
   
+  // Helper cek permission
   const canAccess = (page: string) => currentUser.permissions?.pages?.[page as keyof typeof currentUser.permissions.pages];
 
   const menuGroups = [
@@ -26,7 +28,9 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen, currentUser, acti
       title: 'UTAMA',
       items: [
         { id: 'dashboard', label: 'Dashboard', icon: Home, visible: canAccess('dashboard') },
-        { id: 'orders', label: 'Pesanan', icon: ClipboardList, visible: canAccess('orders') },
+        { id: 'orders', label: 'Pesanan Aktif', icon: ClipboardList, visible: canAccess('orders') },
+        // MENU BARU DISINI:
+        { id: 'completed_orders', label: 'Pesanan Selesai', icon: Archive, visible: canAccess('orders') }, 
       ]
     },
     {
@@ -48,7 +52,7 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen, currentUser, acti
 
   return (
     <>
-      {/* OVERLAY - OPTIMIZED: Hapus backdrop-blur (sangat berat di mobile) */}
+      {/* OVERLAY */}
       {sidebarOpen && (
         <div 
           className="fixed inset-0 z-40 bg-black/30 md:hidden transition-opacity duration-300" 
@@ -57,7 +61,7 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen, currentUser, acti
         />
       )}
 
-      {/* SIDEBAR - OPTIMIZED: Tambah will-change untuk GPU acceleration */}
+      {/* SIDEBAR */}
       <aside className={`
         fixed md:static inset-y-0 left-0 z-50 w-64 bg-white border-r border-slate-100 flex flex-col transition-transform duration-300 ease-out will-change-transform
         ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'} md:translate-x-0
@@ -144,8 +148,9 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen, currentUser, acti
 }
 
 // ==========================================
-// MEMOIZED: PROFILE CARD MOBILE
+// MEMOIZED COMPONENTS (SAMA SEPERTI SEBELUMNYA)
 // ==========================================
+
 const ProfileCardMobileMemo = memo(({ currentUser, onOpenProfile }: { currentUser: UserData, onOpenProfile: () => void }) => {
   return (
     <div className="md:hidden mb-6 p-4 bg-slate-50 rounded-2xl border border-slate-100 flex items-center gap-3">
@@ -167,18 +172,7 @@ const ProfileCardMobileMemo = memo(({ currentUser, onOpenProfile }: { currentUse
 });
 ProfileCardMobileMemo.displayName = 'ProfileCardMobileMemo';
 
-// ==========================================
-// MEMOIZED: MENU ITEM
-// ==========================================
-const MenuItemMemo = memo(({ 
-  item, 
-  isActive, 
-  onClick 
-}: { 
-  item: any, 
-  isActive: boolean, 
-  onClick: () => void 
-}) => {
+const MenuItemMemo = memo(({ item, isActive, onClick }: { item: any, isActive: boolean, onClick: () => void }) => {
   return (
     <button
       onClick={onClick}
@@ -198,18 +192,7 @@ const MenuItemMemo = memo(({
 });
 MenuItemMemo.displayName = 'MenuItemMemo';
 
-// ==========================================
-// MEMOIZED: PROFILE CARD DESKTOP
-// ==========================================
-const ProfileCardDesktopMemo = memo(({ 
-  currentUser, 
-  onOpenProfile, 
-  onLogout 
-}: { 
-  currentUser: UserData, 
-  onOpenProfile: () => void, 
-  onLogout: () => void 
-}) => {
+const ProfileCardDesktopMemo = memo(({ currentUser, onOpenProfile, onLogout }: { currentUser: UserData, onOpenProfile: () => void, onLogout: () => void }) => {
   return (
     <div className="p-4 border-t border-slate-100 hidden md:block">
        <div className="bg-slate-50 rounded-2xl p-3 border border-slate-100 flex items-center gap-3">
