@@ -1,3 +1,4 @@
+// app/(auth)/login/page.tsx (atau lokasi file LoginScreen Anda)
 'use client';
 
 import React, { useState } from 'react';
@@ -46,25 +47,39 @@ export default function LoginScreen() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-slate-900 p-4">
-      <div className="bg-white w-full max-w-md rounded-2xl shadow-2xl overflow-hidden flex flex-col md:flex-row">
+    // FIX: Background adaptif (Light: slate-100, Dark: slate-950)
+    <div className="min-h-screen flex items-center justify-center bg-slate-100 dark:bg-slate-950 p-4 transition-colors duration-300">
+      
+      {/* FIX: Card Background (Light: white, Dark: slate-800 + Border halus) */}
+      <div className="bg-white dark:bg-slate-800 w-full max-w-md rounded-2xl shadow-2xl dark:shadow-black/50 overflow-hidden flex flex-col md:flex-row border border-transparent dark:border-slate-700 transition-all duration-300">
         <div className="p-8 w-full">
             <div className="text-center mb-8">
+              {/* Icon Box tetap biru agar branding konsisten */}
               <div className="bg-blue-600 w-14 h-14 rounded-xl flex items-center justify-center mx-auto mb-4 shadow-lg shadow-blue-500/30">
                 <ClipboardList className="w-8 h-8 text-white"/>
               </div>
-              <h2 className="text-2xl font-extrabold text-slate-800">Login Langitan.co</h2>
-              <p className="text-slate-600 text-sm mt-1 font-medium">Masuk Sistem Produksi</p>
+              
+              {/* FIX: Text Color Adaptif */}
+              <h2 className="text-2xl font-extrabold text-slate-800 dark:text-white transition-colors">
+                Login Langitan.co
+              </h2>
+              <p className="text-slate-600 dark:text-slate-400 text-sm mt-1 font-medium transition-colors">
+                Masuk Sistem Produksi
+              </p>
             </div>
 
             <form onSubmit={handleSubmit} className="space-y-5">
               <div>
-                <label className="block text-xs font-bold text-slate-700 uppercase mb-2 tracking-wide">Email</label>
+                {/* FIX: Label Color */}
+                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 uppercase mb-2 tracking-wide transition-colors">
+                  Email
+                </label>
+                {/* FIX: Input Styles (Dark Mode: bg-slate-900, text-white, border-slate-700) */}
                 <input 
                   type="email" 
                   autoCapitalize="none"
                   autoComplete="email"
-                  className="w-full p-3.5 border-2 border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition font-medium text-slate-800 placeholder-slate-400"
+                  className="w-full p-3.5 border-2 border-slate-200 dark:border-slate-700 rounded-xl bg-transparent dark:bg-slate-900 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition font-medium text-slate-800 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500"
                   placeholder="masukkan email..."
                   value={email}
                   onChange={e => setEmail(e.target.value)}
@@ -72,11 +87,13 @@ export default function LoginScreen() {
                 />
               </div>
               <div>
-                <label className="block text-xs font-bold text-slate-700 uppercase mb-2 tracking-wide">Password</label>
+                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 uppercase mb-2 tracking-wide transition-colors">
+                  Password
+                </label>
                 <div className="relative">
                   <input 
                     type={showPassword ? "text" : "password"}
-                    className="w-full p-3.5 border-2 border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition font-medium text-slate-800 placeholder-slate-400 pr-12"
+                    className="w-full p-3.5 border-2 border-slate-200 dark:border-slate-700 rounded-xl bg-transparent dark:bg-slate-900 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition font-medium text-slate-800 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 pr-12"
                     placeholder="masukkan password..."
                     value={password}
                     onChange={e => setPassword(e.target.value)}
@@ -85,7 +102,7 @@ export default function LoginScreen() {
                   <button 
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-1"
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 p-1 transition-colors"
                   >
                     {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
                   </button>
@@ -93,7 +110,8 @@ export default function LoginScreen() {
               </div>
               
               {error && (
-                <div className="text-red-600 text-sm text-center font-bold bg-red-50 p-3 rounded-xl border border-red-100 animate-pulse">
+                // FIX: Error Box Dark Mode (Red background with transparency)
+                <div className="text-red-600 dark:text-red-400 text-sm text-center font-bold bg-red-50 dark:bg-red-900/20 p-3 rounded-xl border border-red-100 dark:border-red-800/50 animate-pulse transition-colors">
                     {error}
                 </div>
               )}
@@ -107,7 +125,8 @@ export default function LoginScreen() {
               </button>
             </form>
 
-            <div className="mt-8 text-center text-xs text-slate-500 bg-slate-50 p-3 rounded-lg border border-slate-100">
+            {/* FIX: Footer Note Dark Mode */}
+            <div className="mt-8 text-center text-xs text-slate-500 dark:text-slate-400 bg-slate-50 dark:bg-slate-700/30 p-3 rounded-lg border border-slate-100 dark:border-slate-700 transition-colors">
               Pastikan akun Anda sudah terdaftar untuk bisa melanjutkan.
             </div>
         </div>

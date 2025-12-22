@@ -1,4 +1,4 @@
-// app/page.tsx - DENGAN DEBUG LOGS
+// app/page.tsx - DENGAN DARK MODE SUPPORT
 'use client';
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
@@ -29,7 +29,7 @@ const OrderList = dynamic(() => import('@/app/components/orders/OrderList'));
 const CreateOrder = dynamic(() => import('@/app/components/orders/CreateOrder'));
 const EditOrder = dynamic(() => import('@/app/components/orders/EditOrder'));
 const OrderDetail = dynamic(() => import('@/app/components/orders/OrderDetail'));
-const CompletedOrders = dynamic(() => import('@/app/components/orders/CompletedOrders')); // <-- UPDATE 1: Import Component Baru
+const CompletedOrders = dynamic(() => import('@/app/components/orders/CompletedOrders')); 
 const TrashView = dynamic(() => import('@/app/components/orders/TrashView'));
 
 // Settings - Lazy load
@@ -57,7 +57,6 @@ export default function ProductionApp() {
   const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null);
   const [loadingUser, setLoadingUser] = useState(true);
   
-  // UPDATE 2: Tambahkan 'completed_orders' ke dalam tipe state activeTab
   const [activeTab, setActiveTab] = useState<'dashboard' | 'orders' | 'completed_orders' | 'settings' | 'trash' | 'kalkulator' | 'config_harga' | 'about'>('dashboard');
   
   const [orders, setOrders] = useState<Order[]>([]);
@@ -101,7 +100,7 @@ export default function ProductionApp() {
         .order('created_at', { ascending: false })
         .limit(20);
       
-      console.log('📬 Raw data dari database:', data); // ✅ DEBUG LOG
+      console.log('📬 Raw data dari database:', data); 
       
       if (error) {
         console.error('❌ Error fetching notifications:', error);
@@ -113,7 +112,7 @@ export default function ProductionApp() {
           console.log('🔍 Mapping notifikasi:', {
             id: n.id,
             title: n.title,
-            order_id: n.order_id, // ✅ Cek apakah order_id ada
+            order_id: n.order_id, 
             raw: n
           });
           
@@ -129,7 +128,7 @@ export default function ProductionApp() {
               minute: '2-digit' 
             }),
             isRead: n.is_read,
-            orderId: n.order_id // ✅ Ambil order_id dari database
+            orderId: n.order_id 
           };
         });
         
@@ -240,7 +239,6 @@ export default function ProductionApp() {
     };
     loadAppData();
 
-    // OPTIMASI: Tingkatkan interval refresh dari 30s ke 60s untuk mobile
     const interval = setInterval(fetchNotifications, 60000);
     return () => clearInterval(interval);
   }, [currentUser, fetchOrders, fetchUsers, fetchProductionTypes, fetchNotifications]);
@@ -249,43 +247,24 @@ export default function ProductionApp() {
   // FITUR: BACK BUTTON HANDLER (NAVIGATION)
   // ==========================================
   useEffect(() => {
-    // Fungsi yang jalan saat tombol Back ditekan
     const handlePopState = (event: PopStateEvent) => {
-      // Cek apakah sekarang sedang BUKAN di dashboard?
       if (activeTab !== 'dashboard') {
-        // Jika iya, jangan biarkan browser keluar/mundur jauh
-        // Tapi paksa aplikasi ganti state ke 'dashboard'
         setActiveTab('dashboard');
-        
-        // Reset juga view internal agar bersih
         setView('list'); 
         setSelectedOrderId(null);
-        
-        // Opsional: Jika di mobile, ini mencegah efek 'flicker' browser
-        // event.preventDefault(); // (Browser modern kadang mengabaikan ini, tapi history api di bawah yang memegang kendali)
       }
     };
 
-    // Pasang pendengar event tombol back
     window.addEventListener('popstate', handlePopState);
 
-    // LOGIKA PUSH HISTORY:
-    // Setiap kali 'activeTab' berubah...
     if (activeTab !== 'dashboard') {
-      // Jika kita pindah ke menu selain dashboard (misal: orders),
-      // Kita tambahkan "history palsu" ke browser.
-      // Ini membuat tombol Back menjadi "aktif" (bisa ditekan).
       window.history.pushState({ tab: activeTab }, '', `?tab=${activeTab}`);
-    } else {
-      // Jika kembali ke dashboard, kita tidak perlu pushState baru agar tumpukan history tidak menumpuk,
-      // tapi secara alami tombol back akan memakan stack yang kita buat sebelumnya.
-    }
+    } 
 
-    // Bersihkan listener saat component unmount atau tab berubah
     return () => {
       window.removeEventListener('popstate', handlePopState);
     };
-  }, [activeTab]); // Dependency array: jalankan setiap kali activeTab berubah
+  }, [activeTab]);
 
   const handleLogout = useCallback(async () => {
     showConfirm('Logout', 'Apakah anda yakin ingin keluar?', async () => {
@@ -515,12 +494,12 @@ export default function ProductionApp() {
     }); 
   }, [showConfirm, supabase, fetchProductionTypes, showAlert]);
 
-  // OPTIMASI: useMemo untuk data yang sering diakses
   const activeOrders = useMemo(() => orders.filter(o => !o.deleted_at), [orders]);
 
   if (loadingUser) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50">
+      // UPDATE: Tambahkan dark:bg-slate-950
+      <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50 dark:bg-slate-950">
         <div className="w-12 h-12 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
       </div>
     );
@@ -529,7 +508,8 @@ export default function ProductionApp() {
   if (!currentUser) return <LoginScreen />;
 
   return (
-    <div className="h-screen overflow-hidden bg-gray-100 flex flex-col md:flex-row font-sans text-slate-800">
+    // UPDATE: Tambahkan dark:bg-slate-950 dan dark:text-slate-100 pada container utama
+    <div className="h-screen overflow-hidden bg-gray-100 dark:bg-slate-950 flex flex-col md:flex-row font-sans text-slate-800 dark:text-slate-100">
        <CustomAlert alertState={alertState} closeAlert={closeAlert} />
        
        {currentUser && (
@@ -562,7 +542,8 @@ export default function ProductionApp() {
             onNotificationClick={handleNotificationClick}
           />
           
-          <main className="flex-1 overflow-y-auto px-4 md:px-6 py-2 md:py-3 pb-32 relative bg-gray-100 no-scrollbar">
+          {/* UPDATE: Tambahkan dark:bg-slate-950 pada main content area */}
+          <main className="flex-1 overflow-y-auto px-4 md:px-6 py-2 md:py-3 pb-32 relative bg-gray-100 dark:bg-slate-950 no-scrollbar">
              <div className="max-w-7xl mx-auto">
                 {activeTab === 'dashboard' && currentUser.permissions?.pages?.dashboard && (
                   <Dashboard 
@@ -617,7 +598,6 @@ export default function ProductionApp() {
                   </>
                 )}
 
-                {/* UPDATE 3: Render Component CompletedOrders */}
                 {activeTab === 'completed_orders' && currentUser.permissions?.pages?.orders && (
                    <CompletedOrders orders={activeOrders} />
                 )}

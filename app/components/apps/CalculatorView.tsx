@@ -1,3 +1,5 @@
+// app/components/apps/CalculatorView.tsx
+
 'use client';
 
 import React, { useState, useEffect } from 'react';
@@ -83,7 +85,6 @@ export default function CalculatorView() {
       hppSablon = (area * dtfPricePerCm) + (area * dtfTintaCostPerCm) + pressCost + dtfPrintFilmCostPerPcs;
       currentGesutCost = pressCost; 
     } else {
-      // MANUAL Calculation
       const paySmall = inputs.colorsSmall * (config.gesut_manual_kecil ?? 0);
       const payMedium = inputs.colorsMedium * (config.gesut_manual_sedang ?? 0);
       const payLarge = inputs.colorsLarge * (config.gesut_manual_besar ?? 0);
@@ -111,89 +112,87 @@ export default function CalculatorView() {
   const handleInputChange = (e: any, field: string) => { const rawValue = e.target.value.replace(/\D/g, ''); setInputs((prev) => ({ ...prev, [field]: Number(rawValue) })); };
   const formatResult = (num: number) => new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(num);
 
-  if (loading) return (<div className="flex flex-col items-center justify-center h-[60vh]"><div className="w-12 h-12 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin mb-4"></div></div>);
+  if (loading) return (<div className="flex flex-col items-center justify-center h-[60vh] bg-transparent"><div className="w-12 h-12 border-4 border-blue-200 dark:border-slate-800 border-t-blue-600 rounded-full animate-spin mb-4"></div></div>);
 
   const showResult = finalPrice > 0;
   const currentTotalBonus = selectedAddonIds.reduce((total, id) => { const item = addons.find(a => a.id === id); return total + (item ? Number(item.cost) : 0); }, 0);
   const totalManualColors = inputs.colorsSmall + inputs.colorsMedium + inputs.colorsLarge;
 
   return (
-    <div className="h-full bg-slate-50 flex flex-col md:flex-row rounded-xl overflow-hidden border border-slate-200">
+    <div className="h-full bg-slate-50 dark:bg-slate-900 flex flex-col md:flex-row rounded-xl overflow-hidden border border-slate-200 dark:border-slate-800 transition-colors duration-300">
       
       {/* PANEL KIRI: INPUT */}
-      <div className="flex-1 p-4 md:p-8 overflow-y-auto pb-40 md:pb-8">
+      <div className="flex-1 p-4 md:p-8 overflow-y-auto pb-40 md:pb-8 custom-scrollbar">
         <div className="max-w-xl mx-auto">
           <div className="flex items-center justify-between mb-6">
-             <h2 className="text-2xl font-bold text-slate-800">Kalkulator Produksi</h2>
-             <span className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded-full animate-pulse font-bold">● Live</span>
+             <h2 className="text-2xl font-bold text-slate-800 dark:text-white">Kalkulator Produksi</h2>
+             <span className="text-xs bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 px-2 py-1 rounded-full animate-pulse font-bold">● Live</span>
           </div>
           
-          <div className="bg-white p-1 rounded-xl shadow-sm border border-gray-200 flex mb-6">
-            <button onClick={() => setMode('DTF')} className={`flex-1 py-3 rounded-lg text-sm font-bold transition-all ${mode === 'DTF' ? 'bg-blue-600 text-white shadow-md' : 'text-gray-500 hover:bg-gray-50'}`}>Sablon DTF</button>
-            <button onClick={() => setMode('MANUAL')} className={`flex-1 py-3 rounded-lg text-sm font-bold transition-all ${mode === 'MANUAL' ? 'bg-blue-600 text-white shadow-md' : 'text-gray-500 hover:bg-gray-50'}`}>Sablon Manual</button>
+          <div className="bg-white dark:bg-slate-800 p-1 rounded-xl shadow-sm border border-gray-200 dark:border-slate-700 flex mb-6">
+            <button onClick={() => setMode('DTF')} className={`flex-1 py-3 rounded-lg text-sm font-bold transition-all ${mode === 'DTF' ? 'bg-blue-600 text-white shadow-md' : 'text-gray-500 dark:text-slate-400 hover:bg-gray-50 dark:hover:bg-slate-700'}`}>Sablon DTF</button>
+            <button onClick={() => setMode('MANUAL')} className={`flex-1 py-3 rounded-lg text-sm font-bold transition-all ${mode === 'MANUAL' ? 'bg-blue-600 text-white shadow-md' : 'text-gray-500 dark:text-slate-400 hover:bg-gray-50 dark:hover:bg-slate-700'}`}>Sablon Manual</button>
           </div>
 
-          <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200 space-y-6">
+          <div className="bg-white dark:bg-slate-800 p-6 rounded-xl shadow-sm border border-gray-200 dark:border-slate-700 space-y-6">
             <div>
-              <label className="block text-xs font-bold text-gray-500 uppercase mb-2">Jumlah Order (Pcs)</label>
-              <input type="text" inputMode="numeric" value={formatNumberDisplay(inputs.qty)} onChange={(e) => handleInputChange(e, 'qty')} className="w-full text-xl font-bold text-gray-900 border-gray-300 border rounded-lg p-3 focus:ring-2 focus:ring-blue-500 outline-none placeholder-gray-300" placeholder="0" />
+              <label className="block text-xs font-bold text-gray-500 dark:text-slate-400 uppercase mb-2">Jumlah Order (Pcs)</label>
+              <input type="text" inputMode="numeric" value={formatNumberDisplay(inputs.qty)} onChange={(e) => handleInputChange(e, 'qty')} className="w-full text-xl font-bold text-gray-900 dark:text-white bg-transparent border-gray-300 dark:border-slate-600 border rounded-lg p-3 focus:ring-2 focus:ring-blue-500 outline-none placeholder-gray-300 dark:placeholder-slate-600" placeholder="0" />
             </div>
             <div>
-              <label className="block text-xs font-bold text-gray-500 uppercase mb-2">Harga Kaos Polos</label>
-              <input type="text" inputMode="numeric" value={formatRupiahDisplay(inputs.kaosPrice)} onChange={(e) => handleInputChange(e, 'kaosPrice')} className="w-full text-xl font-bold text-gray-900 border-gray-300 border rounded-lg p-3 focus:ring-2 focus:ring-blue-500 outline-none placeholder-gray-300" placeholder="Rp 0" />
+              <label className="block text-xs font-bold text-gray-500 dark:text-slate-400 uppercase mb-2">Harga Kaos Polos</label>
+              <input type="text" inputMode="numeric" value={formatRupiahDisplay(inputs.kaosPrice)} onChange={(e) => handleInputChange(e, 'kaosPrice')} className="w-full text-xl font-bold text-gray-900 dark:text-white bg-transparent border-gray-300 dark:border-slate-600 border rounded-lg p-3 focus:ring-2 focus:ring-blue-500 outline-none placeholder-gray-300 dark:placeholder-slate-600" placeholder="Rp 0" />
             </div>
             
             {mode === 'DTF' ? (
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                    <label className="block text-xs font-bold text-gray-500 uppercase mb-2">Lebar Desain (cm)</label>
-                    <input type="text" inputMode="numeric" value={formatNumberDisplay(inputs.width)} onChange={(e) => handleInputChange(e, 'width')} className="w-full text-xl font-bold text-gray-900 border-gray-300 border rounded-lg p-3 focus:ring-2 focus:ring-blue-500 outline-none placeholder-gray-300" placeholder="0" />
+                    <label className="block text-xs font-bold text-gray-500 dark:text-slate-400 uppercase mb-2">Lebar Desain (cm)</label>
+                    <input type="text" inputMode="numeric" value={formatNumberDisplay(inputs.width)} onChange={(e) => handleInputChange(e, 'width')} className="w-full text-xl font-bold text-gray-900 dark:text-white bg-transparent border-gray-300 dark:border-slate-600 border rounded-lg p-3 focus:ring-2 focus:ring-blue-500 outline-none placeholder-gray-300 dark:placeholder-slate-600" placeholder="0" />
                 </div>
                 <div>
-                    <label className="block text-xs font-bold text-gray-500 uppercase mb-2">Panjang Desain (cm)</label>
-                    <input type="text" inputMode="numeric" value={formatNumberDisplay(inputs.length)} onChange={(e) => handleInputChange(e, 'length')} className="w-full text-xl font-bold text-gray-900 border-gray-300 border rounded-lg p-3 focus:ring-2 focus:ring-blue-500 outline-none placeholder-gray-300" placeholder="0" />
+                    <label className="block text-xs font-bold text-gray-500 dark:text-slate-400 uppercase mb-2">Panjang Desain (cm)</label>
+                    <input type="text" inputMode="numeric" value={formatNumberDisplay(inputs.length)} onChange={(e) => handleInputChange(e, 'length')} className="w-full text-xl font-bold text-gray-900 dark:text-white bg-transparent border-gray-300 dark:border-slate-600 border rounded-lg p-3 focus:ring-2 focus:ring-blue-500 outline-none placeholder-gray-300 dark:placeholder-slate-600" placeholder="0" />
                 </div>
               </div>
             ) : (
               <div className="space-y-4">
-                  <div className="p-4 bg-slate-50 rounded-lg border border-slate-200">
+                  <div className="p-4 bg-slate-50 dark:bg-slate-900/50 rounded-lg border border-slate-200 dark:border-slate-700">
                     <div className="flex items-center gap-2 mb-3">
                         <Info className="w-4 h-4 text-blue-500"/>
-                        <span className="text-xs font-bold text-slate-700 uppercase">Detail Warna & Area</span>
+                        <span className="text-xs font-bold text-slate-700 dark:text-slate-300 uppercase">Detail Warna & Area</span>
                     </div>
                     
-                    {/* Grid 3 Kolom */}
                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                         <div>
-                            <label className="block text-[10px] font-bold text-slate-500 mb-1 text-left truncate">KECIL (Logo/Label)</label>
-                            <input type="text" inputMode="numeric" value={formatNumberDisplay(inputs.colorsSmall)} onChange={(e) => handleInputChange(e, 'colorsSmall')} className="w-full font-bold text-slate-900 border-slate-300 border rounded-lg p-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none text-center" placeholder="0" />
+                            <label className="block text-[10px] font-bold text-slate-500 dark:text-slate-400 mb-1 text-left truncate">KECIL (Logo/Label)</label>
+                            <input type="text" inputMode="numeric" value={formatNumberDisplay(inputs.colorsSmall)} onChange={(e) => handleInputChange(e, 'colorsSmall')} className="w-full font-bold text-slate-900 dark:text-white bg-transparent border-slate-300 dark:border-slate-600 border rounded-lg p-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none text-center" placeholder="0" />
                         </div>
                         <div>
-                            <label className="block text-[10px] font-bold text-slate-500 mb-1 text-left truncate">SEDANG (A4)</label>
-                            <input type="text" inputMode="numeric" value={formatNumberDisplay(inputs.colorsMedium)} onChange={(e) => handleInputChange(e, 'colorsMedium')} className="w-full font-bold text-slate-900 border-slate-300 border rounded-lg p-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none text-center" placeholder="0" />
+                            <label className="block text-[10px] font-bold text-slate-500 dark:text-slate-400 mb-1 text-left truncate">SEDANG (A4)</label>
+                            <input type="text" inputMode="numeric" value={formatNumberDisplay(inputs.colorsMedium)} onChange={(e) => handleInputChange(e, 'colorsMedium')} className="w-full font-bold text-slate-900 dark:text-white bg-transparent border-slate-300 dark:border-slate-600 border rounded-lg p-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none text-center" placeholder="0" />
                         </div>
                         <div>
-                            <label className="block text-[10px] font-bold text-slate-500 mb-1 text-left truncate">BESAR (A3/Blok)</label>
-                            <input type="text" inputMode="numeric" value={formatNumberDisplay(inputs.colorsLarge)} onChange={(e) => handleInputChange(e, 'colorsLarge')} className="w-full font-bold text-slate-900 border-slate-300 border rounded-lg p-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none text-center" placeholder="0" />
+                            <label className="block text-[10px] font-bold text-slate-500 dark:text-slate-400 mb-1 text-left truncate">BESAR (A3/Blok)</label>
+                            <input type="text" inputMode="numeric" value={formatNumberDisplay(inputs.colorsLarge)} onChange={(e) => handleInputChange(e, 'colorsLarge')} className="w-full font-bold text-slate-900 dark:text-white bg-transparent border-slate-300 dark:border-slate-600 border rounded-lg p-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none text-center" placeholder="0" />
                         </div>
                     </div>
-                    <div className="h-2"></div>
                   </div>
               </div>
             )}
 
-            <hr className="border-dashed border-gray-200" />
+            <hr className="border-dashed border-gray-200 dark:border-slate-700" />
 
             <div>
-                <label className="block text-xs font-bold text-gray-500 uppercase mb-3">Tambahan / Bonus (Checklist)</label>
+                <label className="block text-xs font-bold text-gray-500 dark:text-slate-400 uppercase mb-3">Tambahan / Bonus (Checklist)</label>
                 <div className="grid grid-cols-1 gap-2">
-                    {addons.length === 0 ? <p className="text-sm text-gray-400 italic">Tidak ada opsi bonus aktif.</p> : addons.map((addon) => (
-                        <label key={addon.id} className={`flex items-center justify-between p-3 rounded-lg border cursor-pointer transition-all ${selectedAddonIds.includes(addon.id) ? 'bg-blue-50 border-blue-300 shadow-sm' : 'bg-white border-gray-200 hover:bg-gray-50'}`}>
+                    {addons.length === 0 ? <p className="text-sm text-gray-400 dark:text-slate-600 italic">Tidak ada opsi bonus aktif.</p> : addons.map((addon) => (
+                        <label key={addon.id} className={`flex items-center justify-between p-3 rounded-lg border cursor-pointer transition-all ${selectedAddonIds.includes(addon.id) ? 'bg-blue-50 dark:bg-blue-900/20 border-blue-300 dark:border-blue-700 shadow-sm' : 'bg-white dark:bg-slate-800 border-gray-200 dark:border-slate-700 hover:bg-gray-50 dark:hover:bg-slate-700'}`}>
                             <div className="flex items-center gap-3">
-                                <input type="checkbox" checked={selectedAddonIds.includes(addon.id)} onChange={() => toggleAddon(addon.id)} className="w-5 h-5 text-blue-600 rounded focus:ring-blue-500 border-gray-300"/>
-                                <span className={`font-medium text-sm ${selectedAddonIds.includes(addon.id) ? 'text-blue-900' : 'text-gray-700'}`}>{addon.name}</span>
+                                <input type="checkbox" checked={selectedAddonIds.includes(addon.id)} onChange={() => toggleAddon(addon.id)} className="w-5 h-5 text-blue-600 rounded focus:ring-blue-500 border-gray-300 dark:border-slate-600 bg-transparent"/>
+                                <span className={`font-medium text-sm ${selectedAddonIds.includes(addon.id) ? 'text-blue-900 dark:text-blue-300' : 'text-gray-700 dark:text-slate-300'}`}>{addon.name}</span>
                             </div>
-                            <span className="text-xs font-mono text-gray-500 font-bold">+Rp {Number(addon.cost).toLocaleString('id-ID')}</span>
+                            <span className="text-xs font-mono text-gray-500 dark:text-slate-400 font-bold">+Rp {Number(addon.cost).toLocaleString('id-ID')}</span>
                         </label>
                     ))}
                 </div>
@@ -204,7 +203,7 @@ export default function CalculatorView() {
       </div>
 
       {/* PANEL KANAN: HASIL */}
-      <div className={`md:w-1/3 p-6 md:p-10 flex flex-col justify-center border-t-4 md:border-t-0 md:border-l border-slate-700 transition-colors duration-300 ${showResult ? 'bg-slate-900 border-blue-500' : 'bg-slate-800 border-slate-600'}`}>
+      <div className={`md:w-1/3 p-6 md:p-10 flex flex-col justify-center border-t-4 md:border-t-0 md:border-l border-slate-700 dark:border-slate-800 transition-all duration-300 ${showResult ? 'bg-slate-900 dark:bg-black/40 border-blue-500' : 'bg-slate-800 dark:bg-slate-950/50 border-slate-600'}`}>
         <div className="max-w-sm mx-auto w-full">
           <p className="text-slate-400 text-xs font-bold mb-1 uppercase tracking-widest">Rekomendasi Harga Jual</p>
           <div className={`text-4xl md:text-5xl font-extrabold mb-2 tracking-tight truncate transition-all duration-300 ${showResult ? 'text-white' : 'text-slate-600'}`}>
@@ -225,7 +224,6 @@ export default function CalculatorView() {
                     <>
                         <div className="flex justify-between text-sm">
                             <span className="text-slate-400">Total Warna ({totalManualColors})</span>
-                            {/* UPDATE: Menampilkan Total Uang Upah Gesut */}
                             <span className="font-bold text-white">{formatResult(laborDetails.gesut)} <span className="text-[10px] text-slate-500 font-normal">/pcs</span></span>
                         </div>
                         

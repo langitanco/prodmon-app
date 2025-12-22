@@ -161,7 +161,7 @@ export default function OrderDetail({ currentUser, order, onBack, onEdit, onTrig
     <div className="space-y-4 md:space-y-6 pb-24">
       {/* HEADER ACTIONS */}
       <div className="flex items-center justify-between flex-wrap gap-3">
-        <button onClick={onBack} className="text-xs md:text-sm text-slate-500 hover:text-blue-600 flex items-center gap-2 font-bold p-2 -ml-2 rounded-lg hover:bg-slate-100 transition">
+        <button onClick={onBack} className="text-xs md:text-sm text-slate-500 dark:text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 flex items-center gap-2 font-bold p-2 -ml-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition">
           <ChevronRight className="w-4 h-4 md:w-5 md:h-5 rotate-180"/> Kembali
         </button>
         <div className="flex gap-2">
@@ -171,13 +171,13 @@ export default function OrderDetail({ currentUser, order, onBack, onEdit, onTrig
       </div>
       
       {/* HEADER INFO & STATUS */}
-      <div className="bg-white p-4 md:p-6 rounded-2xl border shadow-sm flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+      <div className="bg-white dark:bg-slate-900 p-4 md:p-6 rounded-2xl border dark:border-slate-800 shadow-sm flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div className="flex-1">
-            <h1 className="text-xl md:text-2xl font-extrabold text-slate-800 mb-1">{order.nama_pemesan}</h1>
-            <div className="text-xs md:text-sm text-slate-500 font-medium flex flex-wrap gap-2 md:gap-3 items-center">
-              <span className="bg-slate-100 px-2 py-0.5 rounded font-mono text-slate-600">#{order.kode_produksi}</span>
+            <h1 className="text-xl md:text-2xl font-extrabold text-slate-800 dark:text-white mb-1">{order.nama_pemesan}</h1>
+            <div className="text-xs md:text-sm text-slate-500 dark:text-slate-400 font-medium flex flex-wrap gap-2 md:gap-3 items-center">
+              <span className="bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded font-mono text-slate-600 dark:text-slate-300">#{order.kode_produksi}</span>
               <span>{order.jumlah} Pcs</span>
-              <span className={isLate ? 'text-red-600 font-bold' : ''}>{formatDate(order.deadline)}</span>
+              <span className={isLate ? 'text-red-600 dark:text-red-400 font-bold' : ''}>{formatDate(order.deadline)}</span>
               <button onClick={() => openWA(order.no_hp)} className="bg-green-600 text-white px-2 py-1 rounded-lg text-[10px] font-bold flex items-center gap-1"> <Phone className="w-3 h-3"/> WA </button>
             </div>
         </div>
@@ -187,63 +187,58 @@ export default function OrderDetail({ currentUser, order, onBack, onEdit, onTrig
                {order.status}
             </div>
             {isLate && (
-               <div className="px-4 py-2 rounded-xl font-black text-xs md:text-sm border border-red-200 bg-red-100 text-red-700 uppercase tracking-wider text-center w-full md:w-auto">
+               <div className="px-4 py-2 rounded-xl font-black text-xs md:text-sm border border-red-200 bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-400 dark:border-red-800 uppercase tracking-wider text-center w-full md:w-auto">
                   TELAT DEADLINE
                </div>
             )}
         </div>
       </div>
 
-      {/* --- STEP 1: APPROVAL DESAIN (Redesain: Menyamakan dengan Step Produksi) --- */}
-      <div className="bg-white p-4 md:p-6 rounded-2xl border shadow-sm">
-          <h3 className="font-bold text-slate-800 mb-4 flex items-center gap-2 text-sm md:text-lg"> 
-            <div className="bg-blue-100 text-blue-700 w-8 h-8 rounded-full flex items-center justify-center text-sm">1</div> Approval Desain
+      {/* --- STEP 1: APPROVAL DESAIN --- */}
+      <div className="bg-white dark:bg-slate-900 p-4 md:p-6 rounded-2xl border dark:border-slate-800 shadow-sm">
+          <h3 className="font-bold text-slate-800 dark:text-white mb-4 flex items-center gap-2 text-sm md:text-lg"> 
+            <div className="bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-400 w-8 h-8 rounded-full flex items-center justify-center text-sm">1</div> Approval Desain
           </h3>
           
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-slate-100 pb-4 last:border-0 gap-3">
-              {/* BAGIAN KIRI: Info & Link */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-4 last:border-0 gap-3">
               <div>
                  {order.link_approval?.link ? (
                     <>
-                       <div className="font-bold text-sm md:text-base text-slate-800">File Desain Terupload</div>
-                       <div className="text-[10px] text-slate-500">Oleh: {order.link_approval.by} | {order.link_approval.timestamp}</div>
-                       <a href={order.link_approval.link} target="_blank" className="text-[10px] text-blue-600 font-bold flex items-center gap-1 mt-1 hover:underline">
+                       <div className="font-bold text-sm md:text-base text-slate-800 dark:text-slate-200">File Desain Terupload</div>
+                       <div className="text-[10px] text-slate-500 dark:text-slate-400">Oleh: {order.link_approval.by} | {order.link_approval.timestamp}</div>
+                       <a href={order.link_approval.link} target="_blank" className="text-[10px] text-blue-600 dark:text-blue-400 font-bold flex items-center gap-1 mt-1 hover:underline">
                           <Eye className="w-3.5 h-3.5"/> Lihat File
                        </a>
                     </>
                  ) : (
                     <>
-                       <div className="font-bold text-sm md:text-base text-slate-400">File Desain</div>
-                       <div className="text-[10px] text-slate-400 italic">Belum ada file yang diupload...</div>
+                       <div className="font-bold text-sm md:text-base text-slate-400 dark:text-slate-600">File Desain</div>
+                       <div className="text-[10px] text-slate-400 dark:text-slate-600 italic">Belum ada file yang diupload...</div>
                     </>
                  )}
               </div>
 
-              {/* BAGIAN KANAN: Tombol Aksi */}
               <div className="flex items-center gap-2">
                  {order.link_approval?.link ? (
-                    // KONDISI: SUDAH ADA FILE (Tampil Badge Selesai + Hapus)
                     <>
-                       <div className="flex items-center gap-2 bg-green-50 px-3 py-1.5 rounded-lg border border-green-100">
-                          <CheckCircle className="w-4 h-4 text-green-600"/> 
-                          <span className="text-[10px] font-bold text-green-700 uppercase">SELESAI</span>
+                       <div className="flex items-center gap-2 bg-green-50 dark:bg-green-900/20 px-3 py-1.5 rounded-lg border border-green-100 dark:border-green-900/40">
+                          <CheckCircle className="w-4 h-4 text-green-600 dark:text-green-400"/> 
+                          <span className="text-[10px] font-bold text-green-700 dark:text-green-400 uppercase">SELESAI</span>
                        </div>
                        {canDeleteApprovalFile && (
                           <button 
                              onClick={() => handleFileDelete('approval')} 
                              className="text-red-400 hover:text-red-600 transition ml-1 p-1"
-                             title="Hapus File"
                           >
                              <Trash2 className="w-4 h-4"/>
                           </button>
                        )}
                     </>
                  ) : (
-                    // KONDISI: BELUM ADA FILE (Tampil Tombol Upload)
                     canUploadApproval && (
                        <button 
                           onClick={() => onTriggerUpload('approval')} 
-                          className="bg-white border-2 border-slate-200 px-4 py-2 rounded-lg text-xs font-bold text-slate-600 flex items-center justify-center gap-2 hover:bg-slate-50 transition w-full sm:w-auto"
+                          className="bg-white dark:bg-slate-800 border-2 border-slate-200 dark:border-slate-700 px-4 py-2 rounded-lg text-xs font-bold text-slate-600 dark:text-slate-300 flex items-center justify-center gap-2 hover:bg-slate-50 dark:hover:bg-slate-700 transition w-full sm:w-auto"
                        >
                           <Upload className="w-4 h-4"/> Upload File
                        </button>
@@ -254,23 +249,22 @@ export default function OrderDetail({ currentUser, order, onBack, onEdit, onTrig
       </div>
 
       {/* --- STEP 2: PRODUKSI --- */}
-      <div className="bg-white p-4 md:p-6 rounded-2xl border shadow-sm">
+      <div className="bg-white dark:bg-slate-900 p-4 md:p-6 rounded-2xl border dark:border-slate-800 shadow-sm">
           <div className="flex justify-between items-center mb-4">
-            <h3 className="font-bold text-slate-800 flex items-center gap-2 text-sm md:text-lg"> <div className="bg-slate-100 w-8 h-8 rounded-full flex items-center justify-center text-sm">2</div> Produksi ({order.jenis_produksi}) </h3>
+            <h3 className="font-bold text-slate-800 dark:text-white flex items-center gap-2 text-sm md:text-lg"> <div className="bg-slate-100 dark:bg-slate-800 w-8 h-8 rounded-full flex items-center justify-center text-sm">2</div> Produksi ({order.jenis_produksi}) </h3>
             {canUpdateStep && (
-              <button onClick={() => setShowKendalaForm(!showKendalaForm)} className="text-xs bg-slate-100 text-slate-600 border border-slate-200 px-3 py-1.5 rounded-lg font-bold flex items-center gap-1.5 hover:bg-slate-200 transition"> <MessageSquare className="w-3.5 h-3.5"/> {showKendalaForm ? 'Tutup Laporan' : 'Lapor Kendala'} </button>
+              <button onClick={() => setShowKendalaForm(!showKendalaForm)} className="text-xs bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700 px-3 py-1.5 rounded-lg font-bold flex items-center gap-1.5 hover:bg-slate-200 dark:hover:bg-slate-700 transition"> <MessageSquare className="w-3.5 h-3.5"/> {showKendalaForm ? 'Tutup Laporan' : 'Lapor Kendala'} </button>
             )}
           </div>
 
-          {/* FORM LAPOR KENDALA */}
           {showKendalaForm && (
-            <div className="mb-6 p-4 bg-slate-50 rounded-xl border border-slate-200 animate-in fade-in slide-in-from-top-2">
-              <h4 className="text-xs font-bold text-slate-700 uppercase mb-2">Form Laporan Kendala</h4>
+            <div className="mb-6 p-4 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 animate-in fade-in slide-in-from-top-2">
+              <h4 className="text-xs font-bold text-slate-700 dark:text-slate-400 uppercase mb-2">Form Laporan Kendala</h4>
               <div className="flex gap-2">
                  <input 
                     type="text" 
                     placeholder="Tulis detail kendala" 
-                    className="flex-1 text-sm px-3 py-2 text-slate-800 border border-slate-300 rounded-lg outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 bg-white" 
+                    className="flex-1 text-sm px-3 py-2 text-slate-800 dark:text-slate-100 border border-slate-300 dark:border-slate-600 rounded-lg outline-none focus:border-blue-500 dark:bg-slate-900" 
                     value={kendalaNote} 
                     onChange={e => setKendalaNote(e.target.value)} 
                  />
@@ -281,39 +275,31 @@ export default function OrderDetail({ currentUser, order, onBack, onEdit, onTrig
             </div>
           )}
 
-          {/* DAFTAR KENDALA */}
           {order.kendala && order.kendala.some(k => !k.isResolved) && (
              <div className="mb-6 space-y-3">
                 {order.kendala.filter(k => !k.isResolved).map((k) => (
-                   <div key={k.id} className="bg-white border border-slate-200 rounded-xl p-3 md:p-4 shadow-sm flex flex-col sm:flex-row gap-3">
-                      
-                      {/* WRAPPER KONTEN (ATAS DI HP, KIRI DI LAPTOP) */}
+                   <div key={k.id} className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-3 md:p-4 shadow-sm flex flex-col sm:flex-row gap-3">
                       <div className="flex items-start gap-3 flex-1">
-                          <div className="bg-orange-100 p-2 rounded-full flex-shrink-0">
-                             <AlertTriangle className="w-4 h-4 text-orange-600"/>
+                          <div className="bg-orange-100 dark:bg-orange-900/30 p-2 rounded-full flex-shrink-0">
+                             <AlertTriangle className="w-4 h-4 text-orange-600 dark:text-orange-400"/>
                           </div>
                           <div>
-                             <p className="font-bold text-slate-800 text-sm mb-1">{k.notes}</p>
-                             <div className="flex flex-wrap items-center gap-3 text-[10px] text-slate-500">
+                             <p className="font-bold text-slate-800 dark:text-slate-200 text-sm mb-1">{k.notes}</p>
+                             <div className="flex flex-wrap items-center gap-3 text-[10px] text-slate-500 dark:text-slate-400">
                                 <span className="flex items-center gap-1"><User className="w-3 h-3"/> {k.reportedBy}</span>
                                 <span className="flex items-center gap-1"><Clock className="w-3 h-3"/> {k.timestamp}</span>
                              </div>
                           </div>
                       </div>
 
-                      {/* WRAPPER TOMBOL (BAWAH DI HP, KANAN DI LAPTOP) */}
-                      <div className="flex items-center justify-end gap-2 w-full sm:w-auto border-t sm:border-t-0 border-slate-100 pt-2 sm:pt-0 mt-1 sm:mt-0">
+                      <div className="flex items-center justify-end gap-2 w-full sm:w-auto border-t sm:border-t-0 border-slate-100 dark:border-slate-700 pt-2 sm:pt-0 mt-1 sm:mt-0">
                          {canUpdateStep && (
-                            <button onClick={() => handleResolveKendala(k.id)} className="bg-green-50 text-green-700 border border-green-200 text-[10px] px-3 py-1.5 rounded-lg font-bold hover:bg-green-100 transition whitespace-nowrap">
+                            <button onClick={() => handleResolveKendala(k.id)} className="bg-green-50 dark:bg-green-900/30 text-green-700 dark:text-green-400 border border-green-200 dark:border-green-800 text-[10px] px-3 py-1.5 rounded-lg font-bold hover:bg-green-100 transition whitespace-nowrap">
                                 ✓ Selesaikan
                             </button>
                          )}
                          {isSupervisor && (
-                            <button 
-                                onClick={() => handleDeleteKendala(k.id)} 
-                                className="text-slate-400 hover:text-red-500 hover:bg-red-50 p-1.5 rounded-lg transition"
-                                title="Hapus Kendala"
-                            >
+                            <button onClick={() => handleDeleteKendala(k.id)} className="text-slate-400 hover:text-red-500 p-1.5 rounded-lg transition">
                                 <Trash2 className="w-4 h-4"/>
                             </button>
                          )}
@@ -323,25 +309,24 @@ export default function OrderDetail({ currentUser, order, onBack, onEdit, onTrig
              </div>
           )}
 
-          {/* LIST LANGKAH PRODUKSI */}
           <div className="space-y-4">
             {currentSteps?.map((step) => (
-              <div key={step.id} className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-slate-100 pb-4 last:border-0 gap-3">
+              <div key={step.id} className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-4 last:border-0 gap-3">
                   <div>
-                    <div className={`font-bold text-sm md:text-base ${step.isCompleted ? 'text-slate-800' : 'text-slate-400'}`}>{step.name}</div>
-                    {step.isCompleted && <div className="text-[10px] text-slate-500">Oleh: {step.uploadedBy} | {step.timestamp}</div>}
-                    {step.fileUrl && <a href={step.fileUrl} target="_blank" className="text-[10px] text-blue-600 font-bold flex items-center gap-1 mt-1 hover:underline"><Eye className="w-3.5 h-3.5"/> Lihat Bukti</a>}
+                    <div className={`font-bold text-sm md:text-base ${step.isCompleted ? 'text-slate-800 dark:text-slate-200' : 'text-slate-400 dark:text-slate-600'}`}>{step.name}</div>
+                    {step.isCompleted && <div className="text-[10px] text-slate-500 dark:text-slate-400">Oleh: {step.uploadedBy} | {step.timestamp}</div>}
+                    {step.fileUrl && <a href={step.fileUrl} target="_blank" className="text-[10px] text-blue-600 dark:text-blue-400 font-bold flex items-center gap-1 mt-1 hover:underline"><Eye className="w-3.5 h-3.5"/> Lihat Bukti</a>}
                   </div>
                   {step.isCompleted ? (
-                    <div className="flex items-center gap-2 bg-green-50 px-3 py-1.5 rounded-lg border border-green-100">
-                      <CheckCircle className="w-4 h-4 text-green-600"/> <span className="text-[10px] font-bold text-green-700 uppercase">SELESAI</span>
+                    <div className="flex items-center gap-2 bg-green-50 dark:bg-green-900/20 px-3 py-1.5 rounded-lg border border-green-100 dark:border-green-900/40">
+                      <CheckCircle className="w-4 h-4 text-green-600 dark:text-green-400"/> <span className="text-[10px] font-bold text-green-700 dark:text-green-400 uppercase">SELESAI</span>
                       {canDeleteStepFile && <button onClick={() => handleFileDelete('step', true, step.id)} className="text-red-400 hover:text-red-600 transition ml-2"><Trash2 className="w-3.5 h-3.5"/></button>}
                     </div>
                   ) : (
                     canUpdateStep && (
                       step.type === 'status_update' 
                       ? <button onClick={() => handleStatusStep(step.id)} className="bg-blue-600 text-white text-xs px-4 py-2 rounded-lg font-bold hover:bg-blue-700 shadow-sm transition w-full sm:w-auto">Tandai Selesai</button>
-                      : <button onClick={() => onTriggerUpload('step', step.id)} className="bg-white border-2 border-slate-200 px-4 py-2 rounded-lg text-xs font-bold text-slate-600 flex items-center justify-center gap-2 hover:bg-slate-50 transition w-full sm:w-auto"><Camera className="w-4 h-4"/> Upload Foto</button>
+                      : <button onClick={() => onTriggerUpload('step', step.id)} className="bg-white dark:bg-slate-800 border-2 border-slate-200 dark:border-slate-700 px-4 py-2 rounded-lg text-xs font-bold text-slate-600 dark:text-slate-300 flex items-center justify-center gap-2 hover:bg-slate-50 dark:hover:bg-slate-700 transition w-full sm:w-auto"><Camera className="w-4 h-4"/> Upload Foto</button>
                     )
                   )}
               </div>
@@ -352,38 +337,38 @@ export default function OrderDetail({ currentUser, order, onBack, onEdit, onTrig
        {/* --- STEP 3: QC & PACKING --- */}
        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
            {/* KIRI: AREA QC */}
-           <div className="bg-white p-4 md:p-6 rounded-2xl border shadow-sm flex flex-col h-full">
-             <div className="flex items-center gap-2 mb-4 border-b border-slate-100 pb-2">
-                <div className="bg-slate-100 w-6 h-6 rounded-full flex items-center justify-center text-xs text-slate-600 font-bold">3a</div>
-                <h3 className="font-bold text-slate-800 text-sm md:text-base">Quality Control</h3>
+           <div className="bg-white dark:bg-slate-900 p-4 md:p-6 rounded-2xl border dark:border-slate-800 shadow-sm flex flex-col h-full">
+             <div className="flex items-center gap-2 mb-4 border-b border-slate-100 dark:border-slate-800 pb-2">
+                <div className="bg-slate-100 dark:bg-slate-800 w-6 h-6 rounded-full flex items-center justify-center text-xs text-slate-600 dark:text-slate-400 font-bold">3a</div>
+                <h3 className="font-bold text-slate-800 dark:text-white text-sm md:text-base">Quality Control</h3>
              </div>
 
              {isRevisi && order.finishing_qc.notes && (
-                <div className="bg-red-50 border border-red-200 p-4 rounded-xl mb-4">
-                  <p className="text-[10px] font-bold text-red-700 uppercase mb-1 flex items-center gap-1"> <AlertTriangle className="w-3 h-3"/> Alasan Revisi:</p>
-                  <p className="text-xs text-red-900 font-medium italic">"{order.finishing_qc.notes}"</p>
+                <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 p-4 rounded-xl mb-4">
+                  <p className="text-[10px] font-bold text-red-700 dark:text-red-400 uppercase mb-1 flex items-center gap-1"> <AlertTriangle className="w-3 h-3"/> Alasan Revisi:</p>
+                  <p className="text-xs text-red-900 dark:text-red-200 font-medium italic">"{order.finishing_qc.notes}"</p>
                 </div>
              )}
              
              {isRevisi && canUpdateStep && (
-                 <button onClick={handleRevisiSelesai} className="w-full bg-white border-2 border-red-100 text-red-600 py-3 rounded-xl font-bold text-xs uppercase hover:bg-red-50 transition mb-4 shadow-sm">
+                 <button onClick={handleRevisiSelesai} className="w-full bg-white dark:bg-slate-800 border-2 border-red-100 dark:border-red-900/40 text-red-600 dark:text-red-400 py-3 rounded-xl font-bold text-xs uppercase hover:bg-red-50 transition mb-4">
                     ✓ Konfirmasi Revisi Selesai
                  </button>
              )}
 
              {order.finishing_qc.isPassed ? (
-                <div className="flex-1 flex flex-col items-center justify-center p-6 bg-green-50 rounded-2xl border-2 border-dashed border-green-200 text-center min-h-[160px]">
-                    <div className="bg-green-100 p-3 rounded-full mb-2"><CheckCircle className="w-8 h-8 text-green-600"/></div>
-                    <h4 className="font-bold text-green-800">Lolos QC</h4>
-                    <p className="text-[10px] text-green-600 mt-1">Oleh: {order.finishing_qc.checkedBy}</p>
-                    {canResetQC && <button onClick={handleDeleteQC} className="text-red-500 text-[10px] mt-4 hover:underline">Reset</button>}
+                <div className="flex-1 flex flex-col items-center justify-center p-6 bg-green-50 dark:bg-green-900/10 rounded-2xl border-2 border-dashed border-green-200 dark:border-green-800 text-center min-h-[160px]">
+                    <div className="bg-green-100 dark:bg-green-900/30 p-3 rounded-full mb-2"><CheckCircle className="w-8 h-8 text-green-600 dark:text-green-400"/></div>
+                    <h4 className="font-bold text-green-800 dark:text-green-400">Lolos QC</h4>
+                    <p className="text-[10px] text-green-600 dark:text-green-500 mt-1">Oleh: {order.finishing_qc.checkedBy}</p>
+                    {canResetQC && <button onClick={handleDeleteQC} className="text-red-500 dark:text-red-400 text-[10px] mt-4 hover:underline">Reset</button>}
                 </div>
              ) : (
                 canCheckQC ? (
                   <div className="flex-1 flex flex-col">
-                     <textarea placeholder="Catatan QC (Wajib jika revisi)..." className="w-full text-sm p-3 text-slate-800 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-100 outline-none transition mb-3 resize-none h-32" value={qcNote} onChange={e=>setQcNote(e.target.value)}/>
+                     <textarea placeholder="Catatan QC (Wajib jika revisi)..." className="w-full text-sm p-3 text-slate-800 dark:text-slate-100 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl outline-none transition mb-3 resize-none h-32" value={qcNote} onChange={e=>setQcNote(e.target.value)}/>
                      <div className="grid grid-cols-2 gap-3 mt-auto">
-                        <button onClick={()=>handleQC(false)} disabled={!qcNote.trim()} className="bg-white border-2 border-red-100 text-red-600 py-2.5 rounded-xl font-bold text-xs hover:bg-red-50 disabled:opacity-50 transition">
+                        <button onClick={()=>handleQC(false)} disabled={!qcNote.trim()} className="bg-white dark:bg-slate-800 border-2 border-red-100 dark:border-red-900 text-red-600 dark:text-red-400 py-2.5 rounded-xl font-bold text-xs hover:bg-red-50 disabled:opacity-50 transition">
                            REVISI
                         </button>
                         <button onClick={()=>handleQC(true)} className="bg-blue-600 text-white py-2.5 rounded-xl font-bold text-xs hover:bg-blue-700 shadow-md transition">
@@ -392,48 +377,48 @@ export default function OrderDetail({ currentUser, order, onBack, onEdit, onTrig
                      </div>
                   </div>
                 ) : (
-                   <div className="flex-1 flex items-center justify-center text-center p-6 border-2 border-dashed border-slate-200 rounded-2xl bg-slate-50 min-h-[160px]">
-                      <span className="text-xs text-slate-400 font-medium italic">{!isRevisi ? 'Menunggu produksi selesai...' : 'Sedang Revisi'}</span>
+                   <div className="flex-1 flex items-center justify-center text-center p-6 border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-2xl bg-slate-50 dark:bg-slate-800/50 min-h-[160px]">
+                      <span className="text-xs text-slate-400 dark:text-slate-600 font-medium italic">{!isRevisi ? 'Menunggu produksi selesai...' : 'Sedang Revisi'}</span>
                    </div>
                 )
              )}
            </div>
 
            {/* KANAN: AREA PACKING */}
-           <div className="bg-white p-4 md:p-6 rounded-2xl border shadow-sm flex flex-col h-full">
-             <div className="flex items-center gap-2 mb-4 border-b border-slate-100 pb-2">
-                <div className="bg-slate-100 w-6 h-6 rounded-full flex items-center justify-center text-xs text-slate-600 font-bold">3b</div>
-                <h3 className="font-bold text-slate-800 text-sm md:text-base">Packing</h3>
+           <div className="bg-white dark:bg-slate-900 p-4 md:p-6 rounded-2xl border dark:border-slate-800 shadow-sm flex flex-col h-full">
+             <div className="flex items-center gap-2 mb-4 border-b border-slate-100 dark:border-slate-800 pb-2">
+                <div className="bg-slate-100 dark:bg-slate-800 w-6 h-6 rounded-full flex items-center justify-center text-xs text-slate-600 dark:text-slate-400 font-bold">3b</div>
+                <h3 className="font-bold text-slate-800 dark:text-white text-sm md:text-base">Packing</h3>
              </div>
 
              {order.finishing_packing.isPacked ? (
-                 <div className="flex-1 flex flex-col items-center justify-center p-6 bg-white rounded-2xl border border-slate-200 text-center shadow-sm relative overflow-hidden group min-h-[160px]">
+                 <div className="flex-1 flex flex-col items-center justify-center p-6 bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 text-center shadow-sm relative overflow-hidden group min-h-[160px]">
                      {order.finishing_packing.fileUrl ? (
-                        <div className="relative w-full h-32 mb-3 rounded-lg overflow-hidden border border-slate-100">
+                        <div className="relative w-full h-32 mb-3 rounded-lg overflow-hidden border border-slate-100 dark:border-slate-700">
                            <img src={order.finishing_packing.fileUrl} alt="Packing" className="w-full h-full object-cover"/>
                            <a href={order.finishing_packing.fileUrl} target="_blank" className="absolute inset-0 bg-black/40 flex items-center justify-center text-white opacity-0 group-hover:opacity-100 transition duration-300 font-bold text-xs">
                               <Eye className="w-4 h-4 mr-1"/> Lihat
                            </a>
                         </div>
-                     ) : <Package className="w-10 h-10 text-slate-300 mb-2"/>}
+                     ) : <Package className="w-10 h-10 text-slate-300 dark:text-slate-600 mb-2"/>}
                      
-                     <div className="flex items-center gap-2 text-green-700 font-bold text-sm bg-green-50 px-3 py-1 rounded-full border border-green-100">
+                     <div className="flex items-center gap-2 text-green-700 dark:text-green-400 font-bold text-sm bg-green-50 dark:bg-green-900/20 px-3 py-1 rounded-full border border-green-100 dark:border-green-800">
                         <CheckCircle className="w-4 h-4"/> Selesai
                      </div>
                      
-                     {canDeleteFinishingFile && <button onClick={() => handleFileDelete('packing')} className="absolute top-2 right-2 text-slate-300 hover:text-red-500 p-1"><Trash2 className="w-4 h-4"/></button>}
+                     {canDeleteFinishingFile && <button onClick={() => handleFileDelete('packing')} className="absolute top-2 right-2 text-slate-300 dark:text-slate-600 hover:text-red-500 p-1"><Trash2 className="w-4 h-4"/></button>}
                  </div>
              ) : (
                 <div className="flex-1 flex items-center justify-center">
                    {canUpdatePacking ? (
-                      <button onClick={()=>onTriggerUpload('packing')} className="bg-purple-600 text-white w-full py-4 rounded-xl font-bold text-sm flex flex-col items-center justify-center gap-2 shadow-md hover:bg-purple-700 hover:scale-[1.02] transition duration-200">
+                      <button onClick={()=>onTriggerUpload('packing')} className="bg-purple-600 text-white w-full py-4 rounded-xl font-bold text-sm flex flex-col items-center justify-center gap-2 shadow-md hover:bg-purple-700 transition duration-200">
                           <Camera className="w-6 h-6"/>
                           <span>UPLOAD FOTO</span>
                       </button>
                    ) : (
-                      <div className="text-center p-8 border-2 border-dashed border-slate-200 rounded-2xl w-full min-h-[160px] flex flex-col justify-center items-center">
-                         <Package className="w-8 h-8 text-slate-300 mb-2"/>
-                         <p className="text-xs text-slate-400 italic">Menunggu QC Lolos</p>
+                      <div className="text-center p-8 border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-2xl w-full min-h-[160px] flex flex-col justify-center items-center">
+                         <Package className="w-8 h-8 text-slate-300 dark:text-slate-600 mb-2"/>
+                         <p className="text-xs text-slate-400 dark:text-slate-600 italic">Menunggu QC Lolos</p>
                       </div>
                    )}
                 </div>
@@ -442,31 +427,30 @@ export default function OrderDetail({ currentUser, order, onBack, onEdit, onTrig
        </div>
 
        {/* --- STEP 4: PENGIRIMAN --- */}
-       <div className="bg-white p-4 md:p-6 rounded-2xl border shadow-sm">
-         <h3 className="font-bold text-slate-800 mb-4 flex items-center gap-2 text-sm md:text-lg"> <div className="bg-slate-100 w-8 h-8 rounded-full flex items-center justify-center text-sm">4</div> Pengiriman</h3>
-         <div className="p-4 border border-slate-200 rounded-xl bg-slate-50/50 space-y-4">
+       <div className="bg-white dark:bg-slate-900 p-4 md:p-6 rounded-2xl border dark:border-slate-800 shadow-sm">
+         <h3 className="font-bold text-slate-800 dark:text-white mb-4 flex items-center gap-2 text-sm md:text-lg"> <div className="bg-slate-100 dark:bg-slate-800 w-8 h-8 rounded-full flex items-center justify-center text-sm">4</div> Pengiriman</h3>
+         <div className="p-4 border border-slate-200 dark:border-slate-700 rounded-xl bg-slate-50/50 dark:bg-slate-800/50 space-y-4">
             <div className="flex justify-between items-center">
-              <span className="text-xs md:text-sm font-bold text-slate-700">Bukti Kirim (Resi)</span>
+              <span className="text-xs md:text-sm font-bold text-slate-700 dark:text-slate-300">Bukti Kirim (Resi)</span>
               {order.shipping.bukti_kirim ? (
                 <div className="flex gap-2 items-center">
-                   <a href={order.shipping.bukti_kirim} target="_blank" className="text-green-600 font-bold underline text-xs">LIHAT RESI</a>
-                   {canDeleteFinishingFile && <button onClick={() => handleFileDelete('shipping_kirim')} className="text-red-500"><Trash2 className="w-4 h-4"/></button>}
+                   <a href={order.shipping.bukti_kirim} target="_blank" className="text-green-600 dark:text-green-400 font-bold underline text-xs">LIHAT RESI</a>
+                   {canDeleteFinishingFile && <button onClick={() => handleFileDelete('shipping_kirim')} className="text-red-500 dark:text-red-400"><Trash2 className="w-4 h-4"/></button>}
                 </div>
-              ) : (canUpdateShipping ? <button onClick={()=>onTriggerUpload('shipping_kirim')} className="text-[10px] md:text-xs bg-blue-600 text-white px-3 py-2 rounded-lg font-bold shadow-md">UPLOAD RESI</button> : <span className="text-[10px] text-slate-300 italic">Menunggu pengerjaan & packing selesai...</span>)}
+              ) : (canUpdateShipping ? <button onClick={()=>onTriggerUpload('shipping_kirim')} className="text-[10px] md:text-xs bg-blue-600 text-white px-3 py-2 rounded-lg font-bold shadow-md">UPLOAD RESI</button> : <span className="text-[10px] text-slate-300 dark:text-slate-600 italic">Menunggu pengerjaan & packing selesai...</span>)}
             </div>
             
-            <div className="flex justify-between items-center border-t border-slate-200 pt-4">
-              <span className="text-xs md:text-sm font-bold text-slate-700">Bukti Terima (User)</span>
+            <div className="flex justify-between items-center border-t border-slate-200 dark:border-slate-700 pt-4">
+              <span className="text-xs md:text-sm font-bold text-slate-700 dark:text-slate-300">Bukti Terima (User)</span>
               {order.shipping.bukti_terima ? (
                 <div className="flex gap-2 items-center">
-                   <a href={order.shipping.bukti_terima} target="_blank" className="text-orange-600 font-bold underline text-xs">LIHAT BUKTI</a>
-                   {canDeleteFinishingFile && <button onClick={() => handleFileDelete('shipping_terima')} className="text-red-500"><Trash2 className="w-4 h-4"/></button>}
+                   <a href={order.shipping.bukti_terima} target="_blank" className="text-orange-600 dark:text-orange-400 font-bold underline text-xs">LIHAT BUKTI</a>
+                   {canDeleteFinishingFile && <button onClick={() => handleFileDelete('shipping_terima')} className="text-red-500 dark:text-red-400"><Trash2 className="w-4 h-4"/></button>}
                 </div>
-              ) : (canUpdateShipping && order.shipping.bukti_kirim ? <button onClick={()=>onTriggerUpload('shipping_terima')} className="text-[10px] md:text-xs bg-orange-600 text-white px-3 py-2 rounded-lg font-bold shadow-md">UPLOAD TERIMA</button> : <span className="text-[10px] text-slate-300 italic">-</span>)}
+              ) : (canUpdateShipping && order.shipping.bukti_kirim ? <button onClick={()=>onTriggerUpload('shipping_terima')} className="text-[10px] md:text-xs bg-orange-600 text-white px-3 py-2 rounded-lg font-bold shadow-md">UPLOAD TERIMA</button> : <span className="text-[10px] text-slate-300 dark:text-slate-600 italic">-</span>)}
             </div>
          </div>
        </div>
-
     </div>
   );
 }

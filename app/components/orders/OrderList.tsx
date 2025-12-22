@@ -59,15 +59,15 @@ export default function OrderList({ role, orders, productionTypes, onSelectOrder
        {/* HEADER & FILTER */}
        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-3 md:gap-4">
         
-        {/* JUDUL: KEMBALI ADA, TAPI DI-HIDE SAAT MOBILE (hidden md:block) */}
+        {/* JUDUL: HIDDEN SAAT MOBILE, DARK MODE SUPPORT */}
         <div className="hidden md:block">
-          <h2 className="text-xl md:text-2xl font-bold text-slate-800">Daftar Pesanan</h2>
-          <p className="text-xs md:text-sm text-slate-500 mt-0.5 md:mt-1 font-medium">Kelola {filteredOrders.length} pesanan aktif</p>
+          <h2 className="text-xl md:text-2xl font-bold text-slate-800 dark:text-white">Daftar Pesanan</h2>
+          <p className="text-xs md:text-sm text-slate-500 dark:text-slate-400 mt-0.5 md:mt-1 font-medium">Kelola {filteredOrders.length} pesanan aktif</p>
         </div>
 
         {/* BAGIAN KANAN: Filter & Tombol Tambah */}
         <div className="flex flex-col md:flex-row w-full md:w-auto items-center gap-2 md:gap-3">
-             {/* Filter Status (Khusus Mobile: Taruh disini agar layout rapi) */}
+             {/* Filter Status (Mobile) */}
              <div className="flex md:hidden gap-2 overflow-x-auto pb-2 scrollbar-hide w-full">
                 {[
                 { id: null, label: 'Semua' },
@@ -78,7 +78,11 @@ export default function OrderList({ role, orders, productionTypes, onSelectOrder
                 <button 
                     key={f.id || 'all'}
                     onClick={() => setStatusFilter(f.id)}
-                    className={`px-3 py-1.5 rounded-full text-[10px] font-bold whitespace-nowrap transition border ${statusFilter === f.id ? 'bg-slate-800 text-white border-slate-800 shadow-md' : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'}`}
+                    className={`px-3 py-1.5 rounded-full text-[10px] font-bold whitespace-nowrap transition border ${
+                      statusFilter === f.id 
+                        ? 'bg-slate-800 text-white border-slate-800 dark:bg-blue-600 dark:border-blue-600 shadow-md' 
+                        : 'bg-white text-slate-600 border-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700'
+                    }`}
                 >
                     {f.label}
                 </button>
@@ -87,7 +91,7 @@ export default function OrderList({ role, orders, productionTypes, onSelectOrder
 
              <div className="flex flex-row w-full md:w-auto items-center gap-2 md:gap-3 overflow-x-auto pb-1 justify-end">
                 <select 
-                    className="bg-white border border-slate-300 text-slate-700 text-[10px] md:text-sm rounded-lg p-2 focus:ring-blue-500 focus:border-blue-500 font-medium"
+                    className="bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-200 text-[10px] md:text-sm rounded-lg p-2 focus:ring-blue-500 focus:border-blue-500 font-medium outline-none"
                     value={monthFilter}
                     onChange={(e) => setMonthFilter(e.target.value)}
                 >
@@ -98,7 +102,7 @@ export default function OrderList({ role, orders, productionTypes, onSelectOrder
                 </select>
 
                 <select 
-                    className="bg-white border border-slate-300 text-slate-700 text-[10px] md:text-sm rounded-lg p-2 focus:ring-blue-500 focus:border-blue-500 font-medium"
+                    className="bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-200 text-[10px] md:text-sm rounded-lg p-2 focus:ring-blue-500 focus:border-blue-500 font-medium outline-none"
                     value={typeFilter}
                     onChange={(e) => setTypeFilter(e.target.value)}
                 >
@@ -117,7 +121,7 @@ export default function OrderList({ role, orders, productionTypes, onSelectOrder
         </div>
       </div>
 
-      {/* FILTER BUTTONS (Desktop Only - karena mobile sudah ada di atas) */}
+      {/* FILTER BUTTONS (Desktop) */}
       <div className="hidden md:flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
         {[
           { id: null, label: 'Semua (Aktif)' },
@@ -128,7 +132,11 @@ export default function OrderList({ role, orders, productionTypes, onSelectOrder
           <button 
             key={f.id || 'all'}
             onClick={() => setStatusFilter(f.id)}
-            className={`px-3 py-1.5 md:px-5 md:py-2 rounded-full text-[10px] md:text-sm font-bold whitespace-nowrap transition border ${statusFilter === f.id ? 'bg-slate-800 text-white border-slate-800 shadow-md' : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'}`}
+            className={`px-3 py-1.5 md:px-5 md:py-2 rounded-full text-[10px] md:text-sm font-bold whitespace-nowrap transition border ${
+              statusFilter === f.id 
+                ? 'bg-slate-800 text-white border-slate-800 dark:bg-blue-600 dark:border-blue-600 shadow-md' 
+                : 'bg-white text-slate-600 border-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700'
+            }`}
           >
             {f.label}
           </button>
@@ -145,14 +153,16 @@ export default function OrderList({ role, orders, productionTypes, onSelectOrder
               <div 
                 key={order.id} 
                 onClick={() => onSelectOrder(order.id)} 
-                className={`bg-white rounded-2xl shadow-sm border p-3 md:p-5 cursor-pointer hover:shadow-md transition relative overflow-hidden active:scale-[0.98] h-full flex flex-col justify-between ${showOverdueBadge ? 'border-red-300 ring-1 ring-red-100' : 'border-slate-200'}`}
+                className={`bg-white dark:bg-slate-900 rounded-2xl shadow-sm border p-3 md:p-5 cursor-pointer hover:shadow-md dark:hover:shadow-blue-900/10 transition relative overflow-hidden active:scale-[0.98] h-full flex flex-col justify-between ${
+                  showOverdueBadge ? 'border-red-300 dark:border-red-900 ring-1 ring-red-100 dark:ring-red-900/20' : 'border-slate-200 dark:border-slate-800'
+                }`}
               >
                 <div className="flex-1">
                     <div className="flex justify-between items-start mb-1 md:mb-4 mt-1">
                       <div className="flex flex-col gap-1">
-                          <span className="text-[10px] md:text-xs font-mono font-bold text-slate-500 bg-slate-100 px-1.5 py-0.5 md:px-2 md:py-1 rounded-md h-fit w-fit">#{order.kode_produksi}</span>
+                          <span className="text-[10px] md:text-xs font-mono font-bold text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 md:px-2 md:py-1 rounded-md h-fit w-fit">#{order.kode_produksi}</span>
                           {isManagement && (
-                             <div className="flex items-center gap-1 bg-blue-50 text-blue-700 px-1.5 py-0.5 rounded border border-blue-100 w-fit">
+                             <div className="flex items-center gap-1 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400 px-1.5 py-0.5 rounded border border-blue-100 dark:border-blue-900/30 w-fit">
                                 <User className="w-3 h-3"/>
                                 <span className="text-[10px] font-bold truncate max-w-[100px]">{order.assigned_user?.name || 'No PIC'}</span>
                              </div>
@@ -163,44 +173,44 @@ export default function OrderList({ role, orders, productionTypes, onSelectOrder
                             {order.status}
                           </span>
                           {showOverdueBadge && (
-                            <span className="text-[8px] md:text-[9px] font-extrabold px-2 py-0.5 rounded-full border border-red-200 bg-red-100 text-red-700 uppercase tracking-wide whitespace-nowrap">Telat Deadline</span>
+                            <span className="text-[8px] md:text-[9px] font-extrabold px-2 py-0.5 rounded-full border border-red-200 bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-100 dark:border-red-800 uppercase tracking-wide whitespace-nowrap">Telat Deadline</span>
                           )}
                       </div>
                     </div>
                     
-                    <h3 className="font-bold text-sm md:text-lg text-slate-800 line-clamp-1 mb-0.5 md:mb-1 leading-tight">{order.nama_pemesan}</h3>
-                    <div className="text-[10px] md:text-xs text-slate-500 mb-2 md:mb-4 font-medium flex items-center gap-1">
+                    <h3 className="font-bold text-sm md:text-lg text-slate-800 dark:text-white line-clamp-1 mb-0.5 md:mb-1 leading-tight">{order.nama_pemesan}</h3>
+                    <div className="text-[10px] md:text-xs text-slate-500 dark:text-slate-400 mb-2 md:mb-4 font-medium flex items-center gap-1">
                       <Calendar className="w-3 h-3"/> {formatDate(order.tanggal_masuk)}
                     </div>
                     
-                    <div className="pt-2 border-t border-slate-100 grid grid-cols-3 md:grid-cols-1 gap-1 md:gap-2 mb-3">
+                    <div className="pt-2 border-t border-slate-100 dark:border-slate-800 grid grid-cols-3 md:grid-cols-1 gap-1 md:gap-2 mb-3">
                       <div className="flex flex-col md:flex-row md:items-center md:justify-between text-[10px] md:text-sm">
-                        <span className="text-slate-500 flex items-center gap-1.5 font-medium hidden md:flex"><FileText className="w-4 h-4"/> Jumlah</span>
+                        <span className="text-slate-500 dark:text-slate-400 flex items-center gap-1.5 font-medium hidden md:flex"><FileText className="w-4 h-4"/> Jumlah</span>
                         <span className="text-slate-500 text-[8px] md:hidden uppercase font-bold">Jml</span>
-                        <span className="font-bold text-slate-800">{order.jumlah} Pcs</span>
+                        <span className="font-bold text-slate-800 dark:text-slate-200">{order.jumlah} Pcs</span>
                       </div>
-                      <div className="flex flex-col md:flex-row md:items-center md:justify-between text-[10px] md:text-sm border-l md:border-l-0 border-slate-100 pl-2 md:pl-0">
-                        <span className="text-slate-500 flex items-center gap-1.5 font-medium hidden md:flex"><BarChart3 className="w-4 h-4"/> Tipe</span>
+                      <div className="flex flex-col md:flex-row md:items-center md:justify-between text-[10px] md:text-sm border-l md:border-l-0 border-slate-100 dark:border-slate-800 pl-2 md:pl-0">
+                        <span className="text-slate-500 dark:text-slate-400 flex items-center gap-1.5 font-medium hidden md:flex"><BarChart3 className="w-4 h-4"/> Tipe</span>
                         <span className="text-slate-500 text-[8px] md:hidden uppercase font-bold">Tipe</span>
-                        <span className="font-bold text-slate-800 uppercase bg-slate-50 md:px-2 rounded">{order.jenis_produksi}</span>
+                        <span className="font-bold text-slate-800 dark:text-slate-200 uppercase bg-slate-50 dark:bg-slate-800 md:px-2 rounded">{order.jenis_produksi}</span>
                       </div>
-                      <div className="flex flex-col md:flex-row md:items-center md:justify-between text-[10px] md:text-sm border-l md:border-l-0 border-slate-100 pl-2 md:pl-0">
-                        <span className="text-slate-500 flex items-center gap-1.5 font-medium hidden md:flex"><Clock className="w-4 h-4"/> Deadline</span>
+                      <div className="flex flex-col md:flex-row md:items-center md:justify-between text-[10px] md:text-sm border-l md:border-l-0 border-slate-100 dark:border-slate-800 pl-2 md:pl-0">
+                        <span className="text-slate-500 dark:text-slate-400 flex items-center gap-1.5 font-medium hidden md:flex"><Clock className="w-4 h-4"/> Deadline</span>
                         <span className="text-slate-500 text-[8px] md:hidden uppercase font-bold">Deadline</span>
-                        <span className={`font-bold ${showOverdueBadge ? 'text-red-600' : 'text-slate-800'}`}>{formatDate(order.deadline)}</span>
+                        <span className={`font-bold ${showOverdueBadge ? 'text-red-600 dark:text-red-400' : 'text-slate-800 dark:text-slate-200'}`}>{formatDate(order.deadline)}</span>
                       </div>
                     </div>
                 </div>
 
                 {canDeleteOrder && (
-                  <button onClick={(e) => { e.stopPropagation(); onDeleteOrder(order.id); }} className="mt-auto w-full bg-red-50 text-red-600 px-3 py-1.5 md:py-2 rounded-lg text-[10px] md:text-xs font-bold hover:bg-red-100 transition border border-red-200 flex items-center justify-center gap-2">
+                  <button onClick={(e) => { e.stopPropagation(); onDeleteOrder(order.id); }} className="mt-auto w-full bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 px-3 py-1.5 md:py-2 rounded-lg text-[10px] md:text-xs font-bold hover:bg-red-100 dark:hover:bg-red-900/40 transition border border-red-200 dark:border-red-900/50 flex items-center justify-center gap-2">
                     <Trash2 className="w-3 h-3 md:w-3.5 md:h-3.5"/> Hapus Pesanan
                   </button>
                 )}
               </div>
              );
           })}
-          {filteredOrders.length === 0 && <div className="col-span-full text-center text-slate-400 py-12 border-2 border-dashed border-slate-200 rounded-xl bg-slate-50 text-xs">Tidak ada pesanan aktif sesuai filter</div>}
+          {filteredOrders.length === 0 && <div className="col-span-full text-center text-slate-400 dark:text-slate-500 py-12 border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-xl bg-slate-50 dark:bg-slate-900/50 text-xs">Tidak ada pesanan aktif sesuai filter</div>}
       </div>
     </div>
   );

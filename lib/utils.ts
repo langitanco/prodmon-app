@@ -75,7 +75,6 @@ export const formatDate = (dateStr: string) => {
 };
 
 export const getDeadlineStatus = (deadlineStr: string, status: OrderStatus) => {
-  // Jika status sudah Selesai atau Kirim, tidak perlu dianggap overdue meskipun tanggal lewat
   if (status === 'Selesai' || status === 'Kirim') return 'safe';
   
   const deadline = new Date(deadlineStr);
@@ -90,17 +89,38 @@ export const getDeadlineStatus = (deadlineStr: string, status: OrderStatus) => {
   return 'safe';
 };
 
+/**
+ * Mendapatkan class warna Tailwind untuk status pesanan.
+ * Mendukung Dark Mode secara otomatis.
+ */
 export const getStatusColor = (status: OrderStatus | string) => { 
   switch (status) {
-    case 'Pesanan Masuk': return 'bg-gray-100 text-gray-800 border-gray-300';
-    case 'On Process': return 'bg-blue-100 text-blue-800 border-blue-300';
-    case 'Finishing': return 'bg-purple-100 text-purple-800 border-purple-300';
-    case 'Revisi': return 'bg-yellow-100 text-yellow-800 border-yellow-300';
-    case 'Ada Kendala': return 'bg-orange-100 text-orange-800 border-orange-300';
-    case 'Kirim': return 'bg-cyan-100 text-cyan-800 border-cyan-300';
-    case 'Selesai': return 'bg-emerald-100 text-emerald-800 border-emerald-300';
-    case 'Telat': return 'bg-red-100 text-red-800 border-red-300'; 
-    default: return 'bg-gray-100 text-gray-800';
+    case 'Pesanan Masuk': 
+      return 'bg-gray-100 text-gray-800 border-gray-300 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700';
+    
+    case 'On Process': 
+      return 'bg-blue-100 text-blue-800 border-blue-300 dark:bg-blue-900/40 dark:text-blue-300 dark:border-blue-800';
+    
+    case 'Finishing': 
+      return 'bg-purple-100 text-purple-800 border-purple-300 dark:bg-purple-900/40 dark:text-purple-300 dark:border-purple-800';
+    
+    case 'Revisi': 
+      return 'bg-yellow-100 text-yellow-800 border-yellow-300 dark:bg-yellow-900/40 dark:text-yellow-300 dark:border-yellow-800';
+    
+    case 'Ada Kendala': 
+      return 'bg-orange-100 text-orange-800 border-orange-300 dark:bg-orange-900/40 dark:text-orange-300 dark:border-orange-800';
+    
+    case 'Kirim': 
+      return 'bg-cyan-100 text-cyan-800 border-cyan-300 dark:bg-cyan-900/40 dark:text-cyan-300 dark:border-cyan-800';
+    
+    case 'Selesai': 
+      return 'bg-emerald-100 text-emerald-800 border-emerald-300 dark:bg-emerald-900/40 dark:text-emerald-300 dark:border-emerald-800';
+    
+    case 'Telat': 
+      return 'bg-red-100 text-red-800 border-red-300 dark:bg-red-900/40 dark:text-red-300 dark:border-red-800'; 
+    
+    default: 
+      return 'bg-gray-100 text-gray-800 dark:bg-slate-800 dark:text-slate-300';
   }
 };
 

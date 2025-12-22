@@ -1,5 +1,5 @@
-// app/components/dashboard/Dashboard.tsx - PART 1
-// VERSI ULTRA OPTIMASI - Komponen Utama & Logic
+// app/components/dashboard/Dashboard.tsx
+// VERSI ULTRA OPTIMASI - DARK MODE SUPPORT
 
 'use client';
 
@@ -140,9 +140,10 @@ export default function Dashboard({ role, orders, onSelectOrder }: DashboardProp
   }, [orders]);
 
   const activeItem = activeIndex !== null ? productionTypeData[activeIndex] : null;
+  // Gunakan 'currentColor' sebagai default agar bisa dikontrol oleh Tailwind (text-slate-800 dark:text-white)
   const centerValue = activeItem ? activeItem.value : stats.totalOrders;
   const centerLabel = activeItem ? activeItem.name : 'TOTAL ORDER';
-  const centerColor = activeItem ? COLORS[activeIndex! % COLORS.length] : '#1e293b';
+  const centerColor = activeItem ? COLORS[activeIndex! % COLORS.length] : undefined; 
 
   return (
     <div className="space-y-4 md:space-y-6 pb-10">
@@ -178,8 +179,8 @@ export default function Dashboard({ role, orders, onSelectOrder }: DashboardProp
 // ==========================================
 const HeroSectionOptimized = memo(({ stats }: { stats: any }) => {
   return (
-    <div className="relative rounded-3xl overflow-hidden shadow-2xl">
-      {/* Background - SIMPLIFIED */}
+    <div className="relative rounded-3xl overflow-hidden shadow-2xl dark:shadow-slate-900/50">
+      {/* Background - Hero Section selalu Dark/Gradient, tidak perlu diubah */}
       <div className="absolute inset-0 bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
         {/* Pattern sederhana */}
         <div className="absolute inset-0 opacity-5" style={{
@@ -309,24 +310,33 @@ function formatDateDiff(dateStr: string) {
 // ==========================================
 const ChartBarMemo = memo(({ monthlyData }: { monthlyData: any[] }) => {
   return (
-    <div className="lg:col-span-2 bg-white p-4 md:p-6 rounded-2xl border border-slate-200">
+    <div className="lg:col-span-2 bg-white dark:bg-slate-900 p-4 md:p-6 rounded-2xl border border-slate-200 dark:border-slate-700 transition-colors duration-200">
         <div className="flex items-center justify-between mb-4 md:mb-6">
             <div>
-                <h3 className="font-bold text-slate-800 text-base md:text-lg flex items-center gap-2">
-                    <Package className="w-4 h-4 md:w-5 md:h-5 text-blue-600" /> Tren Volume (PCS)
+                <h3 className="font-bold text-slate-800 dark:text-slate-100 text-base md:text-lg flex items-center gap-2">
+                    <Package className="w-4 h-4 md:w-5 md:h-5 text-blue-600 dark:text-blue-400" /> Tren Volume (PCS)
                 </h3>
-                <p className="text-[10px] md:text-xs text-slate-500">Jumlah item masuk 6 bulan terakhir</p>
+                <p className="text-[10px] md:text-xs text-slate-500 dark:text-slate-400">Jumlah item masuk 6 bulan terakhir</p>
             </div>
         </div>
         <div className="h-[200px] md:h-[300px] w-full">
             <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={monthlyData} margin={{ top: 10, right: 0, left: -10, bottom: 0 }}>
-                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
-                    <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fill: '#64748b', fontSize: 10}} dy={10} />
-                    <YAxis axisLine={false} tickLine={false} tick={{fill: '#64748b', fontSize: 10}} />
+                    {/* Menggunakan strokeOpacity agar grid terlihat oke di light/dark mode tanpa logic ribet */}
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#94a3b8" strokeOpacity={0.2} />
+                    {/* Tick fill menggunakan warna Slate-400 (#94a3b8) agar terlihat di background gelap & terang */}
+                    <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fill: '#94a3b8', fontSize: 10}} dy={10} />
+                    <YAxis axisLine={false} tickLine={false} tick={{fill: '#94a3b8', fontSize: 10}} />
                     <RechartsTooltip 
-                        cursor={{fill: '#f1f5f9'}}
-                        contentStyle={{borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)', fontSize: '12px'}}
+                        cursor={{fill: 'currentColor', opacity: 0.1}} // Adaptif
+                        contentStyle={{
+                            borderRadius: '8px', 
+                            border: 'none', 
+                            boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)', 
+                            fontSize: '12px',
+                            backgroundColor: '#fff', // Default tooltip tetap putih agar kontras standar
+                            color: '#1e293b'
+                        }}
                         formatter={(value: number) => [`${value} Pcs`, 'Total']}
                     />
                     <Bar dataKey="pcs" fill="#3b82f6" radius={[4, 4, 0, 0]} barSize={30} name="Total PCS" />
@@ -350,12 +360,12 @@ const ChartPieMemo = memo(({
   centerColor 
 }: any) => {
   return (
-    <div className="bg-white p-4 md:p-6 rounded-2xl border border-slate-200 flex flex-col">
+    <div className="bg-white dark:bg-slate-900 p-4 md:p-6 rounded-2xl border border-slate-200 dark:border-slate-700 flex flex-col transition-colors duration-200">
         <div className="mb-2 md:mb-4">
-            <h3 className="font-bold text-slate-800 text-base md:text-lg flex items-center gap-2">
-                <PieIcon className="w-4 h-4 md:w-5 md:h-5 text-purple-600" /> Jenis Produksi
+            <h3 className="font-bold text-slate-800 dark:text-slate-100 text-base md:text-lg flex items-center gap-2">
+                <PieIcon className="w-4 h-4 md:w-5 md:h-5 text-purple-600 dark:text-purple-400" /> Jenis Produksi
             </h3>
-            <p className="text-[10px] md:text-xs text-slate-500">Distribusi tipe order keseluruhan</p>
+            <p className="text-[10px] md:text-xs text-slate-500 dark:text-slate-400">Distribusi tipe order keseluruhan</p>
         </div>
         <div className="flex-1 min-h-[200px] md:min-h-[250px] relative">
             <ResponsiveContainer width="100%" height="100%">
@@ -370,19 +380,20 @@ const ChartPieMemo = memo(({
                         dataKey="value"
                         onMouseEnter={(_, index) => setActiveIndex(index)} 
                         onMouseLeave={() => setActiveIndex(null)}
+                        stroke="none"
                     >
                         {productionTypeData.map((entry: any, index: number) => (
                             <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} stroke="none" />
                         ))}
                     </Pie>
-                    <Legend verticalAlign="bottom" height={36} iconType="circle" wrapperStyle={{fontSize: '10px'}} />
+                    <Legend verticalAlign="bottom" height={36} iconType="circle" wrapperStyle={{fontSize: '10px', color: '#94a3b8'}} />
                 </PieChart>
             </ResponsiveContainer>
             
             <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-center pointer-events-none pb-6">
                 <span 
-                    className="text-2xl md:text-3xl font-extrabold transition-colors duration-300"
-                    style={{ color: centerColor }}
+                    className="text-2xl md:text-3xl font-extrabold transition-colors duration-300 text-slate-800 dark:text-white"
+                    style={{ color: centerColor || 'currentColor' }}
                 >
                     {centerValue}
                 </span>
@@ -401,21 +412,21 @@ ChartPieMemo.displayName = 'ChartPieMemo';
 // ==========================================
 const ActionListOptimized = memo(({ actionItems, onSelectOrder }: { actionItems: any[], onSelectOrder: (id: string) => void }) => {
   return (
-    <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
-      <div className="p-4 md:p-5 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
-           <h3 className="font-bold text-slate-800 text-sm md:text-base flex items-center gap-2">
+    <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-700 overflow-hidden transition-colors duration-200">
+      <div className="p-4 md:p-5 border-b border-slate-100 dark:border-slate-700 flex justify-between items-center bg-slate-50/50 dark:bg-slate-700/50">
+           <h3 className="font-bold text-slate-800 dark:text-slate-100 text-sm md:text-base flex items-center gap-2">
               <AlertCircle className="w-4 h-4 text-red-500"/> Perlu Tindakan Segera
            </h3>
-           <span className="text-[10px] bg-slate-200 text-slate-600 px-2 py-0.5 rounded-full font-bold">{actionItems.length} Isu</span>
+           <span className="text-[10px] bg-slate-200 dark:bg-slate-600 text-slate-600 dark:text-slate-200 px-2 py-0.5 rounded-full font-bold">{actionItems.length} Isu</span>
       </div>
       
-      <div className="divide-y divide-slate-50">
+      <div className="divide-y divide-slate-50 dark:divide-slate-700">
            {actionItems.slice(0, 10).map((item: any) => (
               <ActionRowMemo key={item.uniqueKey} item={item} onSelectOrder={onSelectOrder} />
            ))}
            
            {actionItems.length === 0 && (
-               <div className="p-6 md:p-8 text-center flex flex-col items-center text-slate-400">
+               <div className="p-6 md:p-8 text-center flex flex-col items-center text-slate-400 dark:text-slate-500">
                   <CheckCircle2 className="w-8 h-8 md:w-10 md:h-10 mb-2 text-green-400 opacity-50" />
                   <p className="text-xs md:text-sm">Aman! Tidak ada kendala, telat, atau urgent.</p>
                </div>
@@ -438,30 +449,31 @@ const ActionRowMemo = memo(({ item, onSelectOrder }: { item: any, onSelectOrder:
     let icon = null;
     let textColor = '';
 
+    // Menambahkan kelas dark: pada badge agar tidak terlalu terang di mode gelap
     switch (type) {
         case 'KENDALA':
             indicatorColor = 'bg-purple-600';
-            badgeClass = 'bg-purple-100 text-purple-700 border-purple-200';
-            icon = <AlertTriangle className="w-3.5 h-3.5 text-purple-600 flex-shrink-0" />;
-            textColor = 'text-purple-700';
+            badgeClass = 'bg-purple-100 text-purple-700 border-purple-200 dark:bg-purple-900/30 dark:text-purple-300 dark:border-purple-700/50';
+            icon = <AlertTriangle className="w-3.5 h-3.5 text-purple-600 dark:text-purple-400 flex-shrink-0" />;
+            textColor = 'text-purple-700 dark:text-purple-300';
             break;
         case 'REVISI':
             indicatorColor = 'bg-rose-500';
-            badgeClass = 'bg-rose-100 text-rose-700 border-rose-200';
-            icon = <AlertCircle className="w-3.5 h-3.5 text-rose-600 flex-shrink-0" />;
-            textColor = 'text-rose-700';
+            badgeClass = 'bg-rose-100 text-rose-700 border-rose-200 dark:bg-rose-900/30 dark:text-rose-300 dark:border-rose-700/50';
+            icon = <AlertCircle className="w-3.5 h-3.5 text-rose-600 dark:text-rose-400 flex-shrink-0" />;
+            textColor = 'text-rose-700 dark:text-rose-300';
             break;
         case 'TELAT':
             indicatorColor = 'bg-red-600';
-            badgeClass = 'bg-red-100 text-red-700 border-red-200';
-            icon = <Clock className="w-3.5 h-3.5 text-red-600 flex-shrink-0" />;
-            textColor = 'text-red-700';
+            badgeClass = 'bg-red-100 text-red-700 border-red-200 dark:bg-red-900/30 dark:text-red-300 dark:border-red-700/50';
+            icon = <Clock className="w-3.5 h-3.5 text-red-600 dark:text-red-400 flex-shrink-0" />;
+            textColor = 'text-red-700 dark:text-red-300';
             break;
         case 'URGENT':
             indicatorColor = 'bg-orange-400';
-            badgeClass = 'bg-orange-100 text-orange-700 border-orange-200';
-            icon = <TrendingUp className="w-3.5 h-3.5 text-orange-600 flex-shrink-0" />;
-            textColor = 'text-orange-700';
+            badgeClass = 'bg-orange-100 text-orange-700 border-orange-200 dark:bg-orange-900/30 dark:text-orange-300 dark:border-orange-700/50';
+            icon = <TrendingUp className="w-3.5 h-3.5 text-orange-600 dark:text-orange-400 flex-shrink-0" />;
+            textColor = 'text-orange-700 dark:text-orange-300';
             break;
     }
 
@@ -469,41 +481,32 @@ const ActionRowMemo = memo(({ item, onSelectOrder }: { item: any, onSelectOrder:
         e.stopPropagation(); 
         setIsSharing(true);
         
-        // 1. Buat elemen container
         const ticketElement = document.createElement('div');
         
-        // PERBAIKAN PENTING:
-        // Jangan gunakan left: -9999px. Browser modern sering skip rendering area itu.
-        // Taruh di belakang layar (z-index negative) tapi tetap di viewport.
         Object.assign(ticketElement.style, {
             position: 'fixed',
             top: '0',
             left: '0',
-            zIndex: '-9999', // Di belakang segalanya
-            width: '600px',  // Lebar fix sesuai desain ShareTicket
+            zIndex: '-9999',
+            width: '600px',
             height: 'auto',
-            visibility: 'visible', // Harus visible agar bisa dicapture
-            background: '#ffffff'  // Pastikan background putih, bukan transparan
+            visibility: 'visible',
+            background: '#ffffff'
         });
 
         document.body.appendChild(ticketElement);
         
-        // 2. Render komponen React ke dalam elemen tersebut
         const root = (await import('react-dom/client')).createRoot(ticketElement);
         root.render(<ShareTicket item={item} />);
         
-        // 3. Beri waktu React & Tailwind untuk render sepenuhnya
-        // Naikkan ke 300ms - 500ms untuk keamanan (terutama di HP yang lambat)
         await new Promise(resolve => setTimeout(resolve, 500));
         
         try {
-            // 4. Capture
             const dataUrl = await toPng(ticketElement, { 
                 cacheBust: true, 
                 backgroundColor: '#ffffff',
-                pixelRatio: 2, // Kualitas tinggi (Retina)
-                width: 600,    // Paksa lebar capture
-                // Filter node yang tidak perlu jika ada
+                pixelRatio: 2, 
+                width: 600,
             });
 
             const blob = await (await fetch(dataUrl)).blob();
@@ -511,7 +514,7 @@ const ActionRowMemo = memo(({ item, onSelectOrder }: { item: any, onSelectOrder:
 
             if (navigator.share) {
                 await navigator.share({
-                    title: `Laporan Langitan: ${type}`, // Branding kamu
+                    title: `Laporan Langitan: ${type}`, 
                     text: `Detail laporan produksi untuk pesanan ${order.nama_pemesan}`,
                     files: [file],
                 });
@@ -525,8 +528,6 @@ const ActionRowMemo = memo(({ item, onSelectOrder }: { item: any, onSelectOrder:
             console.error('Gagal membuat gambar:', err);
             alert('Gagal generate gambar. Coba lagi.');
         } finally {
-            // 5. Cleanup
-            // Gunakan timeout kecil saat unmount agar tidak crash di beberapa browser mobile
             setTimeout(() => {
                 root.unmount();
                 if (document.body.contains(ticketElement)) {
@@ -539,15 +540,15 @@ const ActionRowMemo = memo(({ item, onSelectOrder }: { item: any, onSelectOrder:
 
     return (
         <div 
-            className="group p-3 md:p-4 flex items-center justify-between hover:bg-slate-50 transition cursor-pointer relative" 
+            className="group p-3 md:p-4 flex items-center justify-between hover:bg-slate-50 dark:hover:bg-slate-700/40 transition cursor-pointer relative" 
             onClick={() => onSelectOrder(order.id)}
         >
-            <div className="flex flex-1 items-center gap-3 bg-white pr-4 py-2 rounded-md h-full">
+            <div className="flex flex-1 items-center gap-3 bg-white dark:bg-slate-900 pr-4 py-2 rounded-md h-full transition-colors">
                 <div className={`w-1.5 self-stretch rounded-full ${indicatorColor} flex-shrink-0`}></div>
                 <div className="flex-1 min-w-0 py-1"> 
                     <div className="flex items-center gap-2">
-                        <p className="font-bold text-slate-800 text-xs md:text-sm line-clamp-1">{order.nama_pemesan}</p>
-                        <span className="text-[10px] text-slate-400 font-mono hidden md:inline-block">#{order.kode_produksi}</span>
+                        <p className="font-bold text-slate-800 dark:text-slate-100 text-xs md:text-sm line-clamp-1">{order.nama_pemesan}</p>
+                        <span className="text-[10px] text-slate-400 dark:text-slate-500 font-mono hidden md:inline-block">#{order.kode_produksi}</span>
                     </div>
                     <div className={`flex items-start gap-1.5 mt-1 ${textColor}`}>
                         {icon}
@@ -560,7 +561,7 @@ const ActionRowMemo = memo(({ item, onSelectOrder }: { item: any, onSelectOrder:
                     <span className={`text-[10px] md:text-xs font-bold px-2 py-1 rounded border ${badgeClass}`}>
                         {type}
                     </span>
-                    <p className="text-[9px] md:text-[10px] text-slate-400 mt-1.5 font-medium">
+                    <p className="text-[9px] md:text-[10px] text-slate-400 dark:text-slate-500 mt-1.5 font-medium">
                       Deadline: {new Date(order.deadline).toLocaleDateString('id-ID', {day: 'numeric', month: 'short'})}
                     </p>
                 </div>
@@ -569,7 +570,7 @@ const ActionRowMemo = memo(({ item, onSelectOrder }: { item: any, onSelectOrder:
             <button 
                 onClick={handleShare}
                 disabled={isSharing}
-                className="ml-2 p-2 text-slate-300 hover:text-blue-600 hover:bg-blue-50 rounded-full transition-all flex-shrink-0 self-center active:scale-90"
+                className="ml-2 p-2 text-slate-300 dark:text-slate-600 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-slate-700 rounded-full transition-all flex-shrink-0 self-center active:scale-90"
                 style={{ WebkitTapHighlightColor: 'transparent' }}
             >
                 {isSharing ? <Loader2 className="w-5 h-5 animate-spin" /> : <Share2 className="w-5 h-5" />}
@@ -584,6 +585,8 @@ ActionRowMemo.displayName = 'ActionRowMemo';
 // ==========================================
 // SHARE TICKET COMPONENT
 // ==========================================
+// CATATAN: ShareTicket sengaja dipaksa LIGHT MODE agar hasil gambar yang di-share tetap bersih/putih seperti kertas,
+// terlepas dari apakah user sedang menggunakan mode gelap atau tidak.
 function ShareTicket({ item }: { item: any }) {
     const { order, type, detail } = item;
     
@@ -624,8 +627,9 @@ function ShareTicket({ item }: { item: any }) {
             break;
     }
 
+    // Class 'bg-white text-slate-800' ditambahkan eksplisit untuk override dark mode parent
     return (
-        <div className="w-[600px] bg-white p-8 rounded-3xl border border-slate-200 shadow-xl font-sans">
+        <div className="w-[600px] bg-white text-slate-800 p-8 rounded-3xl border border-slate-200 shadow-xl font-sans">
             {/* HEADER */}
             <div className="flex justify-between items-start mb-6 border-b border-slate-100 pb-4">
                 <div>

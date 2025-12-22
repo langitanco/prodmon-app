@@ -4,6 +4,9 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 
+// ✅ IMPORT THEME PROVIDER (BARU)
+import { ThemeProvider } from "next-themes";
+
 // ✅ 1. IMPORT KOMPONEN FCM MANAGER DI SINI
 import FCMManager from "@/app/components/misc/FCMManager"; 
 
@@ -28,14 +31,20 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
+    // ✅ TAMBAHKAN suppressHydrationWarning (WAJIB UNTUK NEXT-THEMES)
+    <html lang="en" suppressHydrationWarning>
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
-        {/* ✅ 2. PASANG KOMPONEN DI SINI AGAR BERJALAN OTOMATIS */}
-        <FCMManager />
-        
-        {children}
+        {/* ✅ BUNGKUS KONTEN DENGAN THEME PROVIDER */}
+        <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
+          
+          {/* ✅ 2. PASANG KOMPONEN DI SINI AGAR BERJALAN OTOMATIS */}
+          <FCMManager />
+          
+          {children}
+          
+        </ThemeProvider>
       </body>
     </html>
   );
