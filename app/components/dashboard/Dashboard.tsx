@@ -330,12 +330,12 @@ const ChartBarMemo = memo(({ monthlyData }: { monthlyData: any[] }) => {
                     <RechartsTooltip 
                         cursor={{fill: 'currentColor', opacity: 0.1}} // Adaptif
                         contentStyle={{
-                            borderRadius: '8px', 
+                            borderRadius: '12px', 
                             border: 'none', 
-                            boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)', 
-                            fontSize: '12px',
-                            backgroundColor: '#fff', // Default tooltip tetap putih agar kontras standar
-                            color: '#1e293b'
+                            boxShadow: '0 10px 15px -3px rgba(0,0,0,0.1)', 
+                            fontSize: '10px',
+                            backgroundColor: 'rgb(30, 41, 59)', // slate-800 for dark mode feel
+                            color: '#fff'
                         }}
                         formatter={(value: number) => [`${value} Pcs`, 'Total']}
                     />
