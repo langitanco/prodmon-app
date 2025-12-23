@@ -61,7 +61,7 @@ export default function Header({
     // HEADER CONTAINER: Tambahkan dark:bg-slate-900 dan dark:border-slate-800
     <header className={`
       sticky top-0 h-20 px-4 md:px-10 flex items-center justify-between transition-all duration-300
-      z-20 border-b border-transparent dark:border-slate-800
+      z-20 border-b border-transparent dark:border-transparent
       ${sidebarOpen 
         ? 'bg-gray-100/40 backdrop-blur-xl dark:bg-slate-900/80' // Dark mode backdrop
         : 'bg-gray-100 dark:bg-slate-950' // Dark mode solid
