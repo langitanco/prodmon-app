@@ -26,6 +26,7 @@ const CHANGELOG: ChangelogEntry[] = [
     date: "2025-12-22",
     changes: [
       "New Theme, Support Darkmode.",
+      "Menambahkan persetujuan proofing sebelum produksi massal, tim produksi tidak akan bisa melanjutkan step sebelum mendapatkan persetujuan proofing.",
     ],
   },
 
