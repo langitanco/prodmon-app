@@ -13,7 +13,7 @@ interface ChangelogEntry {
 
 const APP_INFO = {
   name: "LCO SuperApp",
-  version: "V.8.6",
+  version: "V.9.0",
   purpose: "Aplikasi produksi Sablon, Langitan.co.",
   creator: "Tim Developer Langitan.co",
   creationDate: "Desember 2025",
@@ -21,6 +21,14 @@ const APP_INFO = {
 
 // --- DATA RIWAYAT UPDATE ---
 const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: "9.0",
+    date: "2025-12-22",
+    changes: [
+      "New Theme, Support Darkmode.",
+    ],
+  },
+
   {
     version: "8.5",
     date: "2025-12-22",

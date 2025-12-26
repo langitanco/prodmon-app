@@ -1,4 +1,4 @@
-// app/page.tsx - FULL FIX & OPTIMIZED
+// app/page.tsx - FIX LOGIKA UPLOAD PROOFING
 'use client';
 
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
@@ -39,6 +39,9 @@ const SettingsPage = dynamic(() => import('@/app/components/settings/SettingsPag
 import { UserData, Order, ProductionTypeData, DEFAULT_PERMISSIONS, OrderStatus } from '@/types';
 import { DEFAULT_PRODUCTION_TYPES } from '@/lib/utils';
 import { triggerOrderNotifications } from '@/lib/orderLogic';
+
+// Icon Import untuk Loading Overlay
+import { Loader2 } from 'lucide-react';
 
 interface CurrentUser extends UserData {
   id: string; 
@@ -240,16 +243,19 @@ export default function ProductionApp() {
   }, [orders]);
 
   // ===============================================
-  // 🟢 LOGIKA UPDATE STATUS (FIX ERROR 400 DB)
+  // 🟢 LOGIKA UPDATE STATUS (DIUPDATE UNTUK MENDUKUNG PROOFING)
   // ===============================================
   const checkAutoStatus = useCallback(async (orderData: Order) => {
     const oldStatus = orderData.status as OrderStatus;
     const hasUnresolvedKendala = orderData.kendala?.some((k: any) => !k.isResolved);
     
-    let normalStatus = 'Pesanan Masuk';
-    const steps = orderData.jenis_produksi === 'manual' ? orderData.steps_manual : orderData.steps_dtf;
+    // Gunakan 'as any' pada steps untuk menghindari error TypeScript
+    const steps = (orderData.jenis_produksi === 'manual' ? orderData.steps_manual : orderData.steps_dtf) as any[];
+    
     const productionDone = steps?.every((s: any) => s.isCompleted);
     
+    let normalStatus = 'Pesanan Masuk';
+
     if (!orderData.link_approval?.link) normalStatus = 'Pesanan Masuk';
     else if (!productionDone) normalStatus = 'On Process';
     else if (!orderData.finishing_qc?.isPassed || !orderData.finishing_packing?.isPacked) {
@@ -259,13 +265,13 @@ export default function ProductionApp() {
     
     const finalStatus = (hasUnresolvedKendala ? 'Ada Kendala' : normalStatus) as OrderStatus;
     
-    // 🔥 PENTING: BERSIHKAN PAYLOAD DARI DATA JOIN (assigned_user)
+    // 🔥 PENTING: BERSIHKAN PAYLOAD DARI DATA JOIN
     const payload: any = { ...orderData, status: finalStatus };
     delete payload.assigned_user; // Hapus data join
-    delete payload.id;            // Hapus ID (tidak perlu di update)
+    delete payload.id;            // Hapus ID
     delete payload.created_at; 
 
-    console.log('📦 Saving to DB:', payload);
+    // console.log('📦 Saving Order:', payload);
 
     const { error } = await supabase.from('orders').update(payload).eq('id', orderData.id);
     
@@ -280,11 +286,10 @@ export default function ProductionApp() {
   }, [supabase, fetchOrders, fetchNotifications, showAlert]);
 
   // ===============================================
-  // 🟢 LOGIKA UPLOAD BARU (USE REF + PDF LIMIT)
+  // 🟢 LOGIKA UPLOAD BARU (FIX PROOFING REVISI)
   // ===============================================
   const triggerUpload = useCallback((targetType: string, stepId?: string, kendalaId?: string) => {
     setUploadContext({ type: targetType, stepId, kendalaId });
-    // Timeout agar state context siap sebelum file dialog muncul
     setTimeout(() => {
         if (fileInputRef.current) {
             fileInputRef.current.value = ''; 
@@ -300,13 +305,11 @@ export default function ProductionApp() {
       setIsUploading(true);
       let processedFile = file;
 
-      // 1. KOMPRESI GAMBAR
       if (file.type.startsWith('image/')) {
         try { 
           processedFile = await imageCompression(file, { maxSizeMB: 1, maxWidthOrHeight: 1920, useWebWorker: true }); 
         } catch (error) { console.error("Kompresi gagal, pakai asli", error); }
       } 
-      // 2. VALIDASI UKURAN PDF (Max 15MB) - JANGAN DIKOMPRES
       else if (file.type === 'application/pdf') {
          const MAX_MB = 15;
          if (file.size > MAX_MB * 1024 * 1024) {
@@ -316,7 +319,6 @@ export default function ProductionApp() {
          }
       }
 
-      // 3. UPLOAD KE SUPABASE
       const fileName = `${selectedOrderId}/${Date.now()}.${processedFile.name.split('.').pop()}`;
       const { error: uploadError } = await supabase.storage.from('production-proofs').upload(fileName, processedFile, { upsert: false });
       
@@ -328,7 +330,6 @@ export default function ProductionApp() {
 
       const { data: urlData } = supabase.storage.from('production-proofs').getPublicUrl(fileName);
       
-      // 4. UPDATE STATE LOKAL & DB
       const order = orders.find(o => o.id === selectedOrderId); 
       if (!order) { setIsUploading(false); return; }
       
@@ -336,11 +337,29 @@ export default function ProductionApp() {
       const common = { fileUrl: urlData.publicUrl, timestamp: new Date().toLocaleString(), uploadedBy: currentUser?.name };
       
       if (uploadContext.type === 'approval') updatedOrder.link_approval = { link: urlData.publicUrl, by: currentUser?.name, timestamp: common.timestamp };
-      else if (uploadContext.type === 'step' && uploadContext.stepId) {
-         const steps = updatedOrder.jenis_produksi === 'manual' ? updatedOrder.steps_manual : updatedOrder.steps_dtf;
-         const idx = steps.findIndex((s: any) => s.id === uploadContext.stepId); 
-         if (idx >= 0) steps[idx] = { ...steps[idx], isCompleted: true, ...common };
-      } else if (uploadContext.type === 'packing') updatedOrder.finishing_packing = { isPacked: true, ...common };
+        else if (uploadContext.type === 'step' && uploadContext.stepId) {
+          const steps = updatedOrder.jenis_produksi === 'manual' ? updatedOrder.steps_manual : updatedOrder.steps_dtf;
+          const idx = steps.findIndex((s: any) => s.id === uploadContext.stepId); 
+          
+          if (idx >= 0) {
+            const stepName = steps[idx].name.toLowerCase();
+            const isProofing = stepName.includes('proofing');
+
+            steps[idx] = { 
+              ...steps[idx], 
+              fileUrl: urlData.publicUrl,  // Update file URL baru
+              timestamp: common.timestamp,
+              uploadedBy: currentUser?.name,
+              // 🔥 PENTING: Jika proofing, jangan langsung completed
+              // Jika upload ulang karena revisi, hapus catatan revisi & tunggu ACC lagi
+              isCompleted: !isProofing,
+              // Hapus catatan revisi setelah upload ulang
+              proofing_note: isProofing ? undefined : steps[idx].proofing_note
+            };
+          }
+        } 
+      
+      else if (uploadContext.type === 'packing') updatedOrder.finishing_packing = { isPacked: true, ...common };
       else if (uploadContext.type === 'shipping_kirim') updatedOrder.shipping.bukti_kirim = urlData.publicUrl;
       else if (uploadContext.type === 'shipping_terima') updatedOrder.shipping.bukti_terima = urlData.publicUrl;
       else if (uploadContext.type === 'kendala_bukti' && uploadContext.kendalaId) { 
@@ -356,10 +375,8 @@ export default function ProductionApp() {
       showAlert('Sukses', 'File terupload');
   };
 
-  // CRUD HANDLERS (Create, Edit, Delete...)
+  // CRUD HANDLERS
   const handleCreateOrder = useCallback(async (formData: any) => {
-    // ... Logika create (sama seperti sebelumnya, disederhanakan di sini)
-    // Gunakan logika create yang sudah ada
     const payload: any = {
       kode_produksi: generateProductionCode(),
       nama_pemesan: formData.nama,
@@ -373,7 +390,8 @@ export default function ProductionApp() {
       steps_manual: [
         { id: 'm1', name: 'Pecah Gambar (PDF)', type: 'upload_pdf', isCompleted: false },
         { id: 'm2', name: 'Print Film', type: 'upload_image', isCompleted: false },
-        { id: 'm3', name: 'Proofing', type: 'upload_image', isCompleted: false },
+        // Pastikan nama step ini mengandung kata "Proofing" agar fitur jalan
+        { id: 'm3', name: 'Proofing', type: 'upload_image', isCompleted: false }, 
         { id: 'm4', name: 'Produksi Massal', type: 'upload_image', isCompleted: false }
       ],
       steps_dtf: [
@@ -450,7 +468,7 @@ export default function ProductionApp() {
   return (
     <div className="h-screen overflow-hidden bg-gray-100 dark:bg-slate-950 flex flex-col md:flex-row font-sans text-slate-800 dark:text-slate-100 relative">
        
-       {/* 🚀 HIDDEN INPUT UNTUK UPLOAD (PERBAIKAN UTAMA) */}
+       {/* 🚀 HIDDEN INPUT UNTUK UPLOAD */}
        <input type="file" ref={fileInputRef} className="hidden" accept="image/*,application/pdf" onChange={handleFileChange} />
        
        {isUploading && (
@@ -498,6 +516,3 @@ export default function ProductionApp() {
     </div>
   );
 }
-
-// Icon Import untuk Loading Overlay
-import { Loader2 } from 'lucide-react';
