@@ -1,10 +1,10 @@
-// app/components/layout/Sidebar.tsx - UPDATE DESAIN PROFIL BAWAH
+// app/components/layout/Sidebar.tsx - UPDATE MENU LOG AKTIVITAS + PERMISSION CHECK
 'use client';
 
 import React, { memo } from 'react';
 import { 
   Home, ClipboardList, Settings, Calculator, Trash2, Info, X, DollarSign, LogOut,
-  Archive 
+  Archive, Activity // Import icon Activity untuk menu log
 } from 'lucide-react';
 import { UserData } from '@/types';
 
@@ -20,6 +20,7 @@ interface SidebarProps {
 
 export default function Sidebar({ sidebarOpen, setSidebarOpen, currentUser, activeTab, handleNav, onLogout, onOpenProfile }: SidebarProps) {
   
+  // Fungsi helper cek permission page
   const canAccess = (page: string) => currentUser.permissions?.pages?.[page as keyof typeof currentUser.permissions.pages];
 
   const menuGroups = [
@@ -28,12 +29,16 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen, currentUser, acti
       items: [
         { id: 'dashboard', label: 'Dashboard', icon: Home, visible: canAccess('dashboard') },
         { id: 'orders', label: 'Pesanan Aktif', icon: ClipboardList, visible: canAccess('orders') },
-        { id: 'completed_orders', label: 'Pesanan Selesai', icon: Archive, visible: canAccess('orders') }, 
+        // 🔒 UPDATE: Cek permission 'completed_orders'
+        { id: 'completed_orders', label: 'Pesanan Selesai', icon: Archive, visible: canAccess('completed_orders') }, 
       ]
     },
     {
       title: 'ALAT PRODUKSI',
       items: [
+        // 🔒 UPDATE: Cek permission 'activity_logs'
+        { id: 'logs', label: 'Log Aktivitas', icon: Activity, visible: canAccess('activity_logs') }, 
+        
         { id: 'kalkulator', label: 'Kalkulator', icon: Calculator, visible: canAccess('kalkulator') },
         { id: 'config_harga', label: 'Config Harga', icon: DollarSign, visible: canAccess('config_harga') },
       ]
@@ -41,9 +46,6 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen, currentUser, acti
     {
       title: 'LAINNYA',
       items: [
-        // Note: Settings dipindah ke bawah profil, tapi menu ini tetap ada untuk akses cepat jika user mau
-        // Jika ingin benar-benar mirip desain referensi (hanya di profil), item 'settings' bisa di-hide/hapus di sini.
-        // Saya biarkan dulu agar user punya opsi, tapi fokus utama ada di profil bawah.
         { id: 'settings', label: 'Pengaturan Admin', icon: Settings, visible: canAccess('settings') },
         { id: 'trash', label: 'Sampah', icon: Trash2, visible: canAccess('trash') },
         { id: 'about', label: 'Tentang App', icon: Info, visible: true },
@@ -114,7 +116,7 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen, currentUser, acti
         {/* MENU LIST */}
         <div className="flex-1 overflow-y-auto px-4 py-2 space-y-6 custom-scrollbar">
           
-          {/* Profile Mobile (Tetap Sederhana untuk Hemat Layar HP) */}
+          {/* Profile Mobile */}
           <ProfileCardMobileMemo 
             currentUser={currentUser}
             onOpenProfile={onOpenProfile}
@@ -139,7 +141,7 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen, currentUser, acti
           ))}
         </div>
 
-        {/* PROFILE BAWAH (Desktop - SESUAI REQUEST DESAIN BARU) */}
+        {/* PROFILE BAWAH (Desktop) */}
         <ProfileCardDesktopMemo
           currentUser={currentUser}
           onOpenProfile={onOpenProfile}
@@ -152,7 +154,7 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen, currentUser, acti
 }
 
 // ==========================================
-// MEMOIZED COMPONENTS (DARK MODE SUPPORT)
+// MEMOIZED COMPONENTS
 // ==========================================
 
 const ProfileCardMobileMemo = memo(({ currentUser, onOpenProfile }: { currentUser: UserData, onOpenProfile: () => void }) => {
@@ -196,7 +198,6 @@ const MenuItemMemo = memo(({ item, isActive, onClick }: { item: any, isActive: b
 });
 MenuItemMemo.displayName = 'MenuItemMemo';
 
-// 🟢 KOMPONEN PROFIL BARU SESUAI DESAIN "CATALOG"
 const ProfileCardDesktopMemo = memo(({ currentUser, onOpenProfile, onLogout }: { currentUser: UserData, onOpenProfile: () => void, onLogout: () => void }) => {
   return (
     <div className="p-4 border-t border-slate-100 dark:border-slate-800 hidden md:block mt-auto">
@@ -221,7 +222,7 @@ const ProfileCardDesktopMemo = memo(({ currentUser, onOpenProfile, onLogout }: {
              </div>
           </div>
 
-          {/* Baris 2: Tombol Aksi (Setting & Logout) di Bawah */}
+          {/* Baris 2: Tombol Aksi (Setting & Logout) */}
           <div className="flex items-center gap-2">
              <button 
                onClick={onOpenProfile} 

@@ -274,6 +274,8 @@ export default function SettingsPage({ users, productionTypes, onSaveUser, onDel
                           labels={{
                               dashboard: 'Dashboard',
                               orders: 'List Pesanan',
+                              completed_orders: 'Menu Pesanan Selesai', // 🟢 BARU
+                              activity_logs: 'Menu Log Aktivitas',     // 🟢 BARU
                               kalkulator: 'Kalkulator',
                               settings: 'Menu Settings',
                               trash: 'Menu Sampah',

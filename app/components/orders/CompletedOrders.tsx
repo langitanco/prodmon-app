@@ -1,4 +1,4 @@
-// app/components/orders/CompletedOrders.tsx - V.8.1
+// app/components/orders/CompletedOrders.tsx - V.8.2 (Layout Fix)
 
 'use client';
 
@@ -113,18 +113,20 @@ export default function CompletedOrders({ orders }: CompletedOrdersProps) {
            <p className="text-slate-500 dark:text-slate-400 text-sm">Rekapitulasi pesanan yang telah rampung</p>
         </div>
         
-        <div className="flex flex-row gap-2 w-full md:w-auto">
+        {/* CONTROL BAR (FILTER & SEARCH) - UPDATED FOR MOBILE SYMMETRY */}
+        <div className="grid grid-cols-2 gap-3 md:flex md:flex-row w-full md:w-auto h-10">
+            
             {/* DROPDOWN FILTER BULAN */}
-            <div className="relative h-10">
+            <div className="relative h-full w-full">
               <div className="absolute inset-y-0 left-0 pl-2.5 flex items-center pointer-events-none">
                  <Calendar className="h-4 w-4 text-slate-400" />
               </div>
               <select
                 value={selectedMonth}
                 onChange={(e) => setSelectedMonth(e.target.value)}
-                className="pl-9 pr-8 py-2 border border-slate-200 dark:border-slate-700 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500 bg-white dark:bg-slate-800 dark:text-slate-200 appearance-none cursor-pointer h-full"
+                className="h-full w-full pl-9 pr-8 border border-slate-200 dark:border-slate-700 rounded-lg text-xs md:text-sm focus:outline-none focus:ring-2 focus:ring-green-500 bg-white dark:bg-slate-800 dark:text-slate-200 appearance-none cursor-pointer"
               >
-                <option value="all">Semua Bulan</option>
+                <option value="all">Semua</option>
                 {MONTH_NAMES.map((month, index) => (
                   <option key={index} value={index}>{month}</option>
                 ))}
@@ -135,14 +137,14 @@ export default function CompletedOrders({ orders }: CompletedOrdersProps) {
             </div>
 
             {/* SEARCH INPUT */}
-            <div className="relative flex-1 md:w-64">
+            <div className="relative h-full w-full md:w-64">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                 <input 
                   type="text" 
-                  placeholder="Cari nama / kode..." 
+                  placeholder="Cari..." 
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-9 pr-4 py-2 border border-slate-200 dark:border-slate-700 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500 w-full bg-white dark:bg-slate-800 dark:text-slate-200 placeholder-slate-400 dark:placeholder-slate-500 h-10"
+                  className="h-full w-full pl-9 pr-4 border border-slate-200 dark:border-slate-700 rounded-lg text-xs md:text-sm focus:outline-none focus:ring-2 focus:ring-green-500 bg-white dark:bg-slate-800 dark:text-slate-200 placeholder-slate-400 dark:placeholder-slate-500"
                 />
             </div>
         </div>
@@ -209,8 +211,9 @@ export default function CompletedOrders({ orders }: CompletedOrdersProps) {
 
       {/* TABEL DATA */}
       <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden flex flex-col">
-        <div className="overflow-x-auto overflow-y-auto max-h-[60vh] min-h-[300px] custom-scrollbar"> 
-          <table className="w-full text-left border-collapse whitespace-nowrap relative">
+        <div className="overflow-x-auto overflow-y-auto max-h-[60vh] min-h-[300px] custom-scrollbar relative"> 
+          <table className="w-full text-left border-collapse whitespace-nowrap">
+            {/* STICKY HEADER */}
             <thead className="sticky top-0 z-10 shadow-sm">
               <tr className="bg-slate-50 dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 text-[10px] md:text-xs text-slate-500 dark:text-slate-400 uppercase font-bold tracking-wider">
                 <th className="px-4 py-3 md:px-6 md:py-4 bg-inherit">No. Order</th>
@@ -251,15 +254,18 @@ export default function CompletedOrders({ orders }: CompletedOrdersProps) {
                   </tr>
                 ))
               ) : (
+                // 🟢 EMPTY STATE: FIXED CENTER POSITION ON MOBILE
                 <tr>
-                  <td colSpan={6} className="px-6 py-12 text-center text-slate-400">
-                    <div className="flex flex-col items-center justify-center gap-2">
-                        <Package className="w-8 h-8 opacity-20" />
-                        <p className="dark:text-slate-500">
-                          {selectedMonth !== 'all' 
-                            ? `Tidak ada pesanan selesai di bulan ${MONTH_NAMES[parseInt(selectedMonth)]}.` 
-                            : 'Belum ada data pesanan selesai yang ditemukan.'}
-                        </p>
+                  <td colSpan={6} className="p-0 border-none">
+                    <div className="sticky left-0 w-[calc(100vw-3.5rem)] md:w-full min-h-[300px] flex flex-col items-center justify-center gap-3 px-4">
+                        <Package className="w-12 h-12 opacity-20 text-slate-600 dark:text-slate-400" />
+                        <div className="text-center">
+                            <p className="text-slate-600 dark:text-slate-500 font-medium">
+                              {selectedMonth !== 'all' 
+                                ? `Tidak ada pesanan selesai di bulan ${MONTH_NAMES[parseInt(selectedMonth)]}.` 
+                                : 'Belum ada data pesanan selesai yang ditemukan.'}
+                            </p>
+                        </div>
                     </div>
                   </td>
                 </tr>

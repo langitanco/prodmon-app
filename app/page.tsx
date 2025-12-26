@@ -1,4 +1,4 @@
-// app/page.tsx - FIX LOGIKA UPLOAD PROOFING
+// app/page.tsx - FIX LOGIKA UPLOAD + FITUR LOG R&D + VIEW LOGS + LOG DELETE/RESTORE + PERMISSION CHECK
 'use client';
 
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
@@ -22,6 +22,7 @@ const Dashboard = dynamic(() => import('@/app/components/dashboard/Dashboard'), 
 // Apps & Config - Lazy load
 const CalculatorView = dynamic(() => import('@/app/components/apps/CalculatorView'));
 const ConfigPriceView = dynamic(() => import('@/app/components/apps/ConfigPriceView'));
+const ActivityLogView = dynamic(() => import('@/app/components/apps/ActivityLogView')); 
 const AboutView = dynamic(() => import('@/app/components/misc/AboutView'));
 
 // ORDERS - Lazy load
@@ -67,7 +68,7 @@ export default function ProductionApp() {
   const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null);
   const [loadingUser, setLoadingUser] = useState(true);
   
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'orders' | 'completed_orders' | 'settings' | 'trash' | 'kalkulator' | 'config_harga' | 'about'>('dashboard');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'orders' | 'logs' | 'completed_orders' | 'settings' | 'trash' | 'kalkulator' | 'config_harga' | 'about'>('dashboard');
   
   const [orders, setOrders] = useState<Order[]>([]);
   const [usersList, setUsersList] = useState<UserData[]>([]);
@@ -78,7 +79,7 @@ export default function ProductionApp() {
   const [showProfileModal, setShowProfileModal] = useState(false);
   const [notifications, setNotifications] = useState<Notification[]>([]);
 
-  // --- STATE BARU: UPLOAD VIA REF (SOLUSI LEMOT/GAGAL) ---
+  // --- STATE BARU: UPLOAD VIA REF ---
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [uploadContext, setUploadContext] = useState<UploadContextState | null>(null);
   const [isUploading, setIsUploading] = useState(false);
@@ -243,7 +244,47 @@ export default function ProductionApp() {
   }, [orders]);
 
   // ===============================================
-  // 🟢 LOGIKA UPDATE STATUS (DIUPDATE UNTUK MENDUKUNG PROOFING)
+  // 🟢 FUNGSI PENCATATAN LOG (R&D)
+  // ===============================================
+  const writeLog = useCallback(async ({
+    order,
+    category,
+    event,
+    ket = '-',
+    newVal = '',
+    isSystem = false,
+    meta = {}
+  }: {
+    order: Order,
+    category: 'STATUS' | 'FILE' | 'KENDALA' | 'QC' | 'REVISI' | 'SISTEM',
+    event: string,
+    ket?: string,
+    newVal?: string,
+    isSystem?: boolean,
+    meta?: any
+  }) => {
+    if (!currentUser && !isSystem) return;
+
+    // Ambil status lama dari object order yang dikirim (sebagai 'old_value')
+    // new_value adalah status setelah update
+    const { error } = await supabase.from('order_logs').insert([{
+      order_id: order.id,
+      kode_produksi: order.kode_produksi,
+      category: category,
+      event_name: event,
+      description: ket,
+      old_value: order.status,
+      new_value: newVal || order.status,
+      oleh: isSystem ? 'Sistem' : (currentUser?.name || 'Unknown'),
+      metadata: meta
+    }]);
+
+    if (error) console.error("Gagal mencatat log R&D:", error);
+  }, [currentUser, supabase]);
+
+
+  // ===============================================
+  // 🟢 LOGIKA UPDATE STATUS + LOG R&D
   // ===============================================
   const checkAutoStatus = useCallback(async (orderData: Order) => {
     const oldStatus = orderData.status as OrderStatus;
@@ -276,6 +317,18 @@ export default function ProductionApp() {
     const { error } = await supabase.from('orders').update(payload).eq('id', orderData.id);
     
     if (!error) { 
+      // 🚀 [BARU] CATAT LOG JIKA STATUS BERUBAH
+      if (oldStatus !== finalStatus) {
+        await writeLog({
+          order: orderData, // kirim object lama untuk ambil old_status
+          category: 'STATUS',
+          event: 'Perubahan Status Otomatis',
+          ket: `Status berubah dari ${oldStatus} menjadi ${finalStatus}`,
+          newVal: finalStatus,
+          isSystem: true
+        });
+      }
+
       fetchOrders(); 
       await triggerOrderNotifications({ ...orderData, status: finalStatus }, oldStatus);
       await fetchNotifications();
@@ -283,10 +336,10 @@ export default function ProductionApp() {
       console.error('DB Error:', error);
       showAlert('Error Database', error.message, 'error');
     }
-  }, [supabase, fetchOrders, fetchNotifications, showAlert]);
+  }, [supabase, fetchOrders, fetchNotifications, showAlert, writeLog]);
 
   // ===============================================
-  // 🟢 LOGIKA UPLOAD BARU (FIX PROOFING REVISI)
+  // 🟢 LOGIKA UPLOAD BARU + LOG R&D
   // ===============================================
   const triggerUpload = useCallback((targetType: string, stepId?: string, kendalaId?: string) => {
     setUploadContext({ type: targetType, stepId, kendalaId });
@@ -332,6 +385,15 @@ export default function ProductionApp() {
       
       const order = orders.find(o => o.id === selectedOrderId); 
       if (!order) { setIsUploading(false); return; }
+
+      // 🚀 [BARU] CATAT LOG UPLOAD BERHASIL
+      await writeLog({
+        order: order,
+        category: 'FILE',
+        event: `Upload File ${uploadContext.type}`,
+        ket: `Nama File: ${processedFile.name}`,
+        meta: { url: urlData.publicUrl, context: uploadContext }
+      });
       
       let updatedOrder = JSON.parse(JSON.stringify(order));
       const common = { fileUrl: urlData.publicUrl, timestamp: new Date().toLocaleString(), uploadedBy: currentUser?.name };
@@ -390,7 +452,6 @@ export default function ProductionApp() {
       steps_manual: [
         { id: 'm1', name: 'Pecah Gambar (PDF)', type: 'upload_pdf', isCompleted: false },
         { id: 'm2', name: 'Print Film', type: 'upload_image', isCompleted: false },
-        // Pastikan nama step ini mengandung kata "Proofing" agar fitur jalan
         { id: 'm3', name: 'Proofing', type: 'upload_image', isCompleted: false }, 
         { id: 'm4', name: 'Produksi Massal', type: 'upload_image', isCompleted: false }
       ],
@@ -404,9 +465,20 @@ export default function ProductionApp() {
       kendala: []
     };
     const { data, error } = await supabase.from('orders').insert([payload]).select().single();
-    if (!error) { await fetchOrders(); setView('list'); showAlert('Sukses', 'Pesanan dibuat'); triggerOrderNotifications(data); }
+    if (!error) { 
+        // 🚀 [BARU] LOG ORDER BARU
+        await writeLog({
+            order: data, 
+            category: 'STATUS', 
+            event: 'Pesanan Masuk', 
+            ket: 'Pesanan baru dibuat',
+            isSystem: true 
+        });
+        
+        await fetchOrders(); setView('list'); showAlert('Sukses', 'Pesanan dibuat'); triggerOrderNotifications(data); 
+    }
     else showAlert('Error', error.message, 'error');
-  }, [generateProductionCode, supabase, fetchOrders, showAlert]);
+  }, [generateProductionCode, supabase, fetchOrders, showAlert, writeLog]);
 
   const handleEditOrder = useCallback(async (d: any) => {
     if (!selectedOrderId) return;
@@ -419,20 +491,114 @@ export default function ProductionApp() {
     }
   }, [selectedOrderId, supabase, orders, fetchOrders, showAlert, checkAutoStatus]);
 
+  // ===============================================
+  // 🟢 [UPDATE] SOFT DELETE + LOG
+  // ===============================================
   const handleDeleteOrder = useCallback(async (id: string) => {
+    const orderToDelete = orders.find(o => o.id === id); // Cari data order untuk log
+    
     showConfirm('Hapus?', 'Pindah ke sampah.', async () => {
       const { error } = await supabase.from('orders').update({ deleted_at: new Date().toISOString() }).eq('id', id);
-      if (!error) { await fetchOrders(); setView('list'); showAlert('Sukses', 'Dihapus'); }
+      if (!error) { 
+        // 🚀 Catat Log saat dihapus (soft delete)
+        if (orderToDelete) {
+          await writeLog({
+            order: orderToDelete,
+            category: 'STATUS',
+            event: 'Pesanan Dihapus',
+            ket: 'Pesanan dipindahkan ke sampah',
+            newVal: 'Sampah'
+          });
+        }
+        await fetchOrders(); setView('list'); showAlert('Sukses', 'Dihapus'); 
+      }
     });
-  }, [showConfirm, supabase, fetchOrders, showAlert]);
+  }, [showConfirm, supabase, fetchOrders, showAlert, orders, writeLog]);
 
+  // ===============================================
+  // 🟢 [UPDATE] RESTORE + LOG
+  // ===============================================
   const handleRestoreOrder = useCallback(async (id: string) => {
-    await supabase.from('orders').update({ deleted_at: null }).eq('id', id); fetchOrders(); showAlert('Sukses', 'Dipulihkan');
-  }, [supabase, fetchOrders, showAlert]);
+    const orderToRestore = orders.find(o => o.id === id); // Cari data order untuk log
 
+    const { error } = await supabase.from('orders').update({ deleted_at: null }).eq('id', id); 
+    if(!error) {
+       // 🚀 Catat Log saat dipulihkan
+       if (orderToRestore) {
+          await writeLog({
+            order: orderToRestore,
+            category: 'STATUS',
+            event: 'Pesanan Dipulihkan',
+            ket: 'Pesanan dikembalikan dari sampah',
+            newVal: orderToRestore.status
+          });
+       }
+       fetchOrders(); showAlert('Sukses', 'Dipulihkan');
+    }
+  }, [supabase, fetchOrders, showAlert, orders, writeLog]);
+
+  // ===============================================
+  // 🟢 [UPDATE] HAPUS PERMANEN + HAPUS LOG
+  // ===============================================
   const handlePermanentDelete = useCallback(async (id: string) => {
-    showConfirm('Hapus Permanen?', 'Data hilang selamanya.', async () => {
-      await supabase.from('orders').delete().eq('id', id); fetchOrders(); showAlert('Sukses', 'Terhapus Permanen');
+    showConfirm('Hapus Permanen?', 'Data dan semua file lampiran akan hilang selamanya.', async () => {
+      setIsUploading(true); // Gunakan overlay loading
+      
+      try {
+        // 1. Ambil data order lengkap untuk mendapatkan daftar path file
+        const { data: orderData } = await supabase
+          .from('orders')
+          .select('link_approval, steps_manual, steps_dtf, finishing_packing, shipping, kendala')
+          .eq('id', id)
+          .single();
+
+        if (orderData) {
+          const BUCKET_NAME = 'production-proofs';
+          const filesToDelete: string[] = [];
+
+          // Helper untuk ekstrak path dari data (URL ke Path Storage)
+          const extractPath = (rawPath: string) => {
+            if (typeof rawPath !== 'string' || !rawPath.includes(`/${BUCKET_NAME}/`)) return;
+            const path = decodeURIComponent(rawPath).split(`/${BUCKET_NAME}/`)[1]?.split('?')[0];
+            if (path) filesToDelete.push(path);
+          };
+
+          // Gali semua file dari kolom-kolom terkait
+          const processData = (obj: any) => {
+            if (!obj) return;
+            if (typeof obj === 'string') extractPath(obj);
+            else if (Array.isArray(obj)) obj.forEach(processData);
+            else if (typeof obj === 'object') Object.values(obj).forEach(processData);
+          };
+
+          processData(orderData);
+
+          // 2. Jika ada file, hapus dari Storage
+          if (filesToDelete.length > 0) {
+            console.log("Menghapus file dari storage:", filesToDelete);
+            await supabase.storage.from(BUCKET_NAME).remove(filesToDelete);
+          }
+        }
+
+        // 🚀 3. Hapus Log Terkait (Hard Delete Log)
+        // Agar tidak meninggalkan sampah log untuk order yang sudah tidak ada
+        const { error: logError } = await supabase.from('order_logs').delete().eq('order_id', id);
+        if (logError) console.error("Gagal menghapus log:", logError);
+
+        // 4. Hapus baris dari Database Orders
+        const { error: dbError } = await supabase.from('orders').delete().eq('id', id);
+        
+        if (!dbError) {
+          await fetchOrders();
+          showAlert('Sukses', 'Order dan file terkait telah dihapus selamanya');
+        } else {
+          throw dbError;
+        }
+      } catch (err: any) {
+        showAlert('Gagal Hapus', err.message, 'error');
+      } finally {
+        setIsUploading(false);
+      }
     });
   }, [showConfirm, supabase, fetchOrders, showAlert]);
 
@@ -501,10 +667,33 @@ export default function ProductionApp() {
                     {view === 'list' && <OrderList role={currentUser.role} orders={activeOrders} productionTypes={productionTypes} onSelectOrder={(id) => { setSelectedOrderId(id); setView('detail'); }} onNewOrder={() => setView('create')} onDeleteOrder={handleDeleteOrder} currentUser={currentUser} />}
                     {view === 'create' && <CreateOrder users={usersList} productionTypes={productionTypes} onCancel={() => setView('list')} onSubmit={handleCreateOrder} />}
                     {view === 'edit' && selectedOrderId && <EditOrder users={usersList} order={orders.find(o => o.id === selectedOrderId)!} productionTypes={productionTypes} onCancel={() => setView('detail')} onSubmit={handleEditOrder} />}
-                    {view === 'detail' && selectedOrderId && <OrderDetail currentUser={currentUser} order={orders.find(o => o.id === selectedOrderId)!} onBack={() => { setSelectedOrderId(null); setView('list'); }} onEdit={() => setView('edit')} onTriggerUpload={triggerUpload} onUpdateOrder={checkAutoStatus} onDelete={handleDeleteOrder} onConfirm={showConfirm} />}
+                    {/* 👇 Pass writeLog sebagai prop onLogActivity ke OrderDetail */}
+                    {view === 'detail' && selectedOrderId && <OrderDetail 
+                        currentUser={currentUser} 
+                        order={orders.find(o => o.id === selectedOrderId)!} 
+                        onBack={() => { setSelectedOrderId(null); setView('list'); }} 
+                        onEdit={() => setView('edit')} 
+                        onTriggerUpload={triggerUpload} 
+                        onUpdateOrder={checkAutoStatus} 
+                        onDelete={handleDeleteOrder} 
+                        onConfirm={showConfirm}
+                        // Jika OrderDetail mendukung pencatatan log internal (misal: tombol revisi), gunakan prop ini
+                        // @ts-ignore (Abaikan jika prop belum didefinisikan di OrderDetail)
+                        onLogActivity={writeLog} 
+                    />}
                   </>
                 )}
-                {activeTab === 'completed_orders' && <CompletedOrders orders={activeOrders} />}
+                
+                {/* 🔒 UPDATE PERMISSION CHECK: COMPLETED ORDERS */}
+                {activeTab === 'completed_orders' && currentUser.permissions?.pages?.completed_orders && (
+                   <CompletedOrders orders={activeOrders} />
+                )}
+                
+                {/* 🔒 UPDATE PERMISSION CHECK: LOGS */}
+                {activeTab === 'logs' && currentUser.permissions?.pages?.activity_logs && (
+                    <ActivityLogView />
+                )}
+
                 {activeTab === 'trash' && <TrashView orders={orders.filter(o => o.deleted_at)} onRestore={handleRestoreOrder} onPermanentDelete={handlePermanentDelete} />}
                 {activeTab === 'settings' && <SettingsPage users={usersList} productionTypes={productionTypes} onSaveUser={handleSaveUser} onDeleteUser={handleDeleteUser} onSaveProductionType={handleSaveType} onDeleteProductionType={handleDeleteType} />}
                 {activeTab === 'kalkulator' && <CalculatorView />}

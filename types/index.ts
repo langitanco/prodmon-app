@@ -7,6 +7,10 @@ export interface UserPermissions {
   pages: {
     dashboard: boolean;
     orders: boolean;
+    // 👇 TAMBAHAN BARU
+    completed_orders: boolean; 
+    activity_logs: boolean;
+    // 👆
     kalkulator: boolean;
     settings: boolean;
     trash: boolean;
@@ -51,7 +55,19 @@ export interface UserPermissions {
 
 // Default Permissions
 export const DEFAULT_PERMISSIONS: UserPermissions = {
-  pages: { dashboard: true, orders: true, kalkulator: true, settings: false, trash: false, config_harga: false, about: true },
+  pages: { 
+    dashboard: true, 
+    orders: true, 
+    // 👇 TAMBAHAN BARU (DEFAULT FALSE)
+    completed_orders: false, 
+    activity_logs: false,
+    // 👆
+    kalkulator: true, 
+    settings: false, 
+    trash: false, 
+    config_harga: false, 
+    about: true 
+  },
   orders: { create: false, edit: false, delete: false, restore: false, permanent_delete: false },
   prod_manual: { step_process: false, upload_approval: false, access_files: true, delete_files: false },
   prod_dtf: { step_process: false, upload_approval: false, access_files: true, delete_files: false },
