@@ -4,7 +4,6 @@ on:
   schedule:
     # Jalan setiap hari Senin jam 00:00 UTC (07:00 WIB)
     - cron: '0 0 * * 1'
-  # Memungkinkan jalan manual
   workflow_dispatch:
 
 jobs:
@@ -17,40 +16,30 @@ jobs:
 
       - name: Install PostgreSQL 17 Client
         run: |
-          # Setup Repository PostgreSQL Resmi
           sudo install -d /usr/share/postgresql-common/pgdg
           sudo curl -o /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc --fail https://www.postgresql.org/media/keys/ACCC4CF8.asc
           sudo sh -c 'echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] https://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" > /etc/apt/sources.list.d/pgdg.list'
-          
-          # Update dan Install Client versi 17
           sudo apt-get update
           sudo apt-get install -y postgresql-client-17
 
-      - name: Run Backup (Force v17)
+      - name: Run Backup (Force Version 17)
         env:
           DATABASE_URL: ${{ secrets.SUPABASE_DB_URL }}
         run: |
           TIMESTAMP=$(date +%Y-%m-%d_%H-%M-%S)
           FILENAME="backup_langitan_$TIMESTAMP.sql"
           
-          echo "Starting backup for $FILENAME..."
+          echo "Starting backup..."
           
-          # PERUBAHAN PENTING DI SINI:
-          # Kita panggil langsung binary v17 menggunakan path lengkapnya
-          # agar tidak tertukar dengan v16 bawaan
-          
+          # PERHATIKAN BARIS INI:
+          # Kita panggil file .exe versi 17 secara LANGSUNG (Path Lengkap)
           /usr/lib/postgresql/17/bin/pg_dump "$DATABASE_URL" -F p -f "$FILENAME"
           
-          # Zip file
           zip "$FILENAME.zip" "$FILENAME"
-          
-          # Hapus file mentah
           rm "$FILENAME"
           
-          # Simpan nama file ke variabel
           echo "BACKUP_FILE=$FILENAME.zip" >> $GITHUB_ENV
-          
-          echo "Backup completed!"
+          echo "Backup Selesai!"
 
       - name: Upload to GitHub Artifacts
         uses: actions/upload-artifact@v4
