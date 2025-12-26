@@ -1,0 +1,55 @@
+name: Weekly Supabase Backup
+
+on:
+  schedule:
+    # Jalan setiap hari Senin jam 00:00 UTC (07:00 WIB)
+    - cron: '0 0 * * 1'
+  # Memungkinkan Anda menjalankan backup secara manual dari tab Actions jika butuh dadakan
+  workflow_dispatch:
+
+jobs:
+  backup_database:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install PostgreSQL Client
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y postgresql-client
+
+      - name: Run Backup (pg_dump)
+        env:
+          # Mengambil URL database dari GitHub Secrets (Settingan aman)
+          DATABASE_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: |
+          # Membuat nama file unik berdasarkan tanggal & jam
+          TIMESTAMP=$(date +%Y-%m-%d_%H-%M-%S)
+          FILENAME="backup_langitan_$TIMESTAMP.sql"
+          
+          echo "Starting backup for $FILENAME..."
+          
+          # Perintah inti: Mengambil data dari Supabase
+          # Menggunakan parameter standard pg_dump
+          pg_dump "$DATABASE_URL" -F p -f "$FILENAME"
+          
+          # Kompres file agar ukurannya kecil (zip)
+          zip "$FILENAME.zip" "$FILENAME"
+          
+          # Hapus file mentah .sql (sisakan yang .zip saja)
+          rm "$FILENAME"
+          
+          # Simpan nama file ke environment variable agar bisa dibaca step selanjutnya
+          echo "BACKUP_FILE=$FILENAME.zip" >> $GITHUB_ENV
+          
+          echo "Backup completed and zipped!"
+
+      - name: Upload to GitHub Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: db-backup-${{ github.run_id }}
+          path: ${{ env.BACKUP_FILE }}
+          # File akan disimpan di GitHub selama 90 hari (batas maksimal gratis)
+          retention-days: 90
