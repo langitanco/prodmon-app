@@ -98,7 +98,7 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen, currentUser, acti
                      SuperApp
                    </span>
                    <span className="text-[9px] text-slate-300 dark:text-slate-600 font-medium tracking-tight">
-                     Version 9.0
+                     Version 9.5
                    </span>
                 </div>
              </div>

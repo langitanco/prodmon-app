@@ -257,6 +257,10 @@ export default function SettingsPage({ users, productionTypes, onSaveUser, onDel
                                 <option value="produksi">Produksi</option>
                                 <option value="qc">QC</option>
                                 <option value="manager">Manager</option>
+                                {/* TAMBAHKAN DUA OPSI INI 👇 */}
+                                <option value="produksi">Produksi</option>
+                                <option value="pengiriman">Staff Pengiriman (Khusus Kirim)</option>
+                                <option value="produksi_logistik">Produksi & Pengiriman (Double Job)</option>
                             </select>
                          </div>
                       </div>

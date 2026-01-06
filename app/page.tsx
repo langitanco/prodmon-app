@@ -286,41 +286,78 @@ export default function ProductionApp() {
   // ===============================================
   // 🟢 LOGIKA UPDATE STATUS + LOG R&D
   // ===============================================
-  const checkAutoStatus = useCallback(async (orderData: Order) => {
+  // Ganti seluruh fungsi checkAutoStatus di app/page.tsx dengan ini:
+
+const checkAutoStatus = useCallback(async (orderData: Order) => {
+    // 1. Ambil status lama untuk notifikasi
     const oldStatus = orderData.status as OrderStatus;
     const hasUnresolvedKendala = orderData.kendala?.some((k: any) => !k.isResolved);
     
-    // Gunakan 'as any' pada steps untuk menghindari error TypeScript
-    const steps = (orderData.jenis_produksi === 'manual' ? orderData.steps_manual : orderData.steps_dtf) as any[];
+    // 2. DETEKSI JENIS PRODUKSI (Fix Bug Case Sensitive)
+    // Mengubah ke huruf kecil agar 'DTF', 'dtf', 'Digital' terbaca sama
+    const type = orderData.jenis_produksi?.toLowerCase() || '';
+    const isManual = type.includes('manual') || type.includes('sablon');
     
-    const productionDone = steps?.every((s: any) => s.isCompleted);
+    // 3. AMBIL STEPS YANG BENAR
+    // Menggunakan 'any' agar aman dari error TypeScript saat akses array
+    const steps = (isManual ? orderData.steps_manual : orderData.steps_dtf) as any[];
     
+    // 4. CEK APAKAH PRODUKSI SELESAI?
+    // Validasi: Array harus ada, tidak kosong, dan semua isCompleted = true
+    const productionDone = Array.isArray(steps) && steps.length > 0 && steps.every((s: any) => s.isCompleted);
+
+    // 5. TENTUKAN STATUS BARU (Logic Hierarchy)
     let normalStatus = 'Pesanan Masuk';
 
-    if (!orderData.link_approval?.link) normalStatus = 'Pesanan Masuk';
-    else if (!productionDone) normalStatus = 'On Process';
-    else if (!orderData.finishing_qc?.isPassed || !orderData.finishing_packing?.isPacked) {
-      normalStatus = (orderData.finishing_qc?.isPassed === false && orderData.finishing_qc?.notes) ? 'Revisi' : 'Finishing';
-    } else if (!orderData.shipping?.bukti_terima) normalStatus = 'Kirim';
-    else normalStatus = 'Selesai';
+    // Hierarchy Level 1: Belum ada desain
+    if (!orderData.link_approval?.link) {
+      normalStatus = 'Pesanan Masuk';
+    } 
+    // Hierarchy Level 2: Produksi Belum Selesai
+    else if (!productionDone) {
+      normalStatus = 'On Process';
+    } 
+    // Hierarchy Level 3: Masuk Fase Finishing (QC & Packing)
+    // Logika: Jika QC Passed ATAU QC ada notes (revisi) ATAU Packing sudah
+    else if (
+        !orderData.finishing_qc?.isPassed || 
+        !orderData.finishing_packing?.isPacked
+    ) {
+      // Jika QC Gagal dan ada catatan -> Status Revisi
+      if (orderData.finishing_qc?.isPassed === false && orderData.finishing_qc?.notes) {
+        normalStatus = 'Revisi';
+      } else {
+        // Default ke Finishing (untuk menunggu QC atau Packing)
+        normalStatus = 'Finishing';
+      }
+    } 
+    // Hierarchy Level 4: Pengiriman
+    else if (!orderData.shipping?.bukti_terima) {
+      normalStatus = 'Kirim';
+    } 
+    // Hierarchy Level 5: Selesai
+    else {
+      normalStatus = 'Selesai';
+    }
     
+    // 6. OVERRIDE JIKA ADA KENDALA
     const finalStatus = (hasUnresolvedKendala ? 'Ada Kendala' : normalStatus) as OrderStatus;
     
-    // 🔥 PENTING: BERSIHKAN PAYLOAD DARI DATA JOIN
+    // 7. BERSIHKAN DATA SEBELUM UPDATE KE DB
     const payload: any = { ...orderData, status: finalStatus };
-    delete payload.assigned_user; // Hapus data join
-    delete payload.id;            // Hapus ID
+    delete payload.assigned_user; // Hapus data join relasi
+    delete payload.id;            // ID tidak boleh diupdate
     delete payload.created_at; 
 
-    // console.log('📦 Saving Order:', payload);
+    // console.log('Updating Status:', oldStatus, '->', finalStatus); // Debugging
 
     const { error } = await supabase.from('orders').update(payload).eq('id', orderData.id);
     
     if (!error) { 
-      // 🚀 [BARU] CATAT LOG JIKA STATUS BERUBAH
+      // Catat Log jika status berubah
       if (oldStatus !== finalStatus) {
         await writeLog({
-          order: orderData, // kirim object lama untuk ambil old_status
+          order: orderData,
           category: 'STATUS',
           event: 'Perubahan Status Otomatis',
           ket: `Status berubah dari ${oldStatus} menjadi ${finalStatus}`,
@@ -333,8 +370,9 @@ export default function ProductionApp() {
       await triggerOrderNotifications({ ...orderData, status: finalStatus }, oldStatus);
       await fetchNotifications();
     } else {
-      console.error('DB Error:', error);
-      showAlert('Error Database', error.message, 'error');
+      // Debugging yang lebih detail
+      console.error('DB Error Details:', JSON.stringify(error, null, 2)); 
+      showAlert('Error Database', error.message || error.details || 'Gagal menyimpan data', 'error');
     }
   }, [supabase, fetchOrders, fetchNotifications, showAlert, writeLog]);
 
