@@ -1,4 +1,4 @@
-// app/page.tsx - FIX LOGIKA UPLOAD + FITUR LOG R&D + VIEW LOGS + LOG DELETE/RESTORE + PERMISSION CHECK
+// app/page.tsx
 'use client';
 
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
@@ -24,6 +24,8 @@ const CalculatorView = dynamic(() => import('@/app/components/apps/CalculatorVie
 const ConfigPriceView = dynamic(() => import('@/app/components/apps/ConfigPriceView'));
 const ActivityLogView = dynamic(() => import('@/app/components/apps/ActivityLogView')); 
 const AboutView = dynamic(() => import('@/app/components/misc/AboutView'));
+// 🟢 NEW: Import Calendar View
+const CalendarView = dynamic(() => import('@/app/components/apps/CalendarView'));
 
 // ORDERS - Lazy load
 const OrderList = dynamic(() => import('@/app/components/orders/OrderList'));
@@ -68,7 +70,8 @@ export default function ProductionApp() {
   const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null);
   const [loadingUser, setLoadingUser] = useState(true);
   
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'orders' | 'logs' | 'completed_orders' | 'settings' | 'trash' | 'kalkulator' | 'config_harga' | 'about'>('dashboard');
+  // 🟢 UPDATE: Menambahkan 'calendar' ke tipe activeTab
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'orders' | 'calendar' | 'logs' | 'completed_orders' | 'settings' | 'trash' | 'kalkulator' | 'config_harga' | 'about'>('dashboard');
   
   const [orders, setOrders] = useState<Order[]>([]);
   const [usersList, setUsersList] = useState<UserData[]>([]);
@@ -265,8 +268,6 @@ export default function ProductionApp() {
   }) => {
     if (!currentUser && !isSystem) return;
 
-    // Ambil status lama dari object order yang dikirim (sebagai 'old_value')
-    // new_value adalah status setelah update
     const { error } = await supabase.from('order_logs').insert([{
       order_id: order.id,
       kode_produksi: order.kode_produksi,
@@ -286,75 +287,52 @@ export default function ProductionApp() {
   // ===============================================
   // 🟢 LOGIKA UPDATE STATUS + LOG R&D
   // ===============================================
-  // Ganti seluruh fungsi checkAutoStatus di app/page.tsx dengan ini:
-
-const checkAutoStatus = useCallback(async (orderData: Order) => {
-    // 1. Ambil status lama untuk notifikasi
+  const checkAutoStatus = useCallback(async (orderData: Order) => {
     const oldStatus = orderData.status as OrderStatus;
     const hasUnresolvedKendala = orderData.kendala?.some((k: any) => !k.isResolved);
     
-    // 2. DETEKSI JENIS PRODUKSI (Fix Bug Case Sensitive)
-    // Mengubah ke huruf kecil agar 'DTF', 'dtf', 'Digital' terbaca sama
     const type = orderData.jenis_produksi?.toLowerCase() || '';
     const isManual = type.includes('manual') || type.includes('sablon');
     
-    // 3. AMBIL STEPS YANG BENAR
-    // Menggunakan 'any' agar aman dari error TypeScript saat akses array
     const steps = (isManual ? orderData.steps_manual : orderData.steps_dtf) as any[];
     
-    // 4. CEK APAKAH PRODUKSI SELESAI?
-    // Validasi: Array harus ada, tidak kosong, dan semua isCompleted = true
     const productionDone = Array.isArray(steps) && steps.length > 0 && steps.every((s: any) => s.isCompleted);
 
-    // 5. TENTUKAN STATUS BARU (Logic Hierarchy)
     let normalStatus = 'Pesanan Masuk';
 
-    // Hierarchy Level 1: Belum ada desain
     if (!orderData.link_approval?.link) {
       normalStatus = 'Pesanan Masuk';
     } 
-    // Hierarchy Level 2: Produksi Belum Selesai
     else if (!productionDone) {
       normalStatus = 'On Process';
     } 
-    // Hierarchy Level 3: Masuk Fase Finishing (QC & Packing)
-    // Logika: Jika QC Passed ATAU QC ada notes (revisi) ATAU Packing sudah
     else if (
         !orderData.finishing_qc?.isPassed || 
         !orderData.finishing_packing?.isPacked
     ) {
-      // Jika QC Gagal dan ada catatan -> Status Revisi
       if (orderData.finishing_qc?.isPassed === false && orderData.finishing_qc?.notes) {
         normalStatus = 'Revisi';
       } else {
-        // Default ke Finishing (untuk menunggu QC atau Packing)
         normalStatus = 'Finishing';
       }
     } 
-    // Hierarchy Level 4: Pengiriman
     else if (!orderData.shipping?.bukti_terima) {
       normalStatus = 'Kirim';
     } 
-    // Hierarchy Level 5: Selesai
     else {
       normalStatus = 'Selesai';
     }
     
-    // 6. OVERRIDE JIKA ADA KENDALA
     const finalStatus = (hasUnresolvedKendala ? 'Ada Kendala' : normalStatus) as OrderStatus;
     
-    // 7. BERSIHKAN DATA SEBELUM UPDATE KE DB
     const payload: any = { ...orderData, status: finalStatus };
-    delete payload.assigned_user; // Hapus data join relasi
-    delete payload.id;            // ID tidak boleh diupdate
+    delete payload.assigned_user; 
+    delete payload.id;            
     delete payload.created_at; 
-
-    // console.log('Updating Status:', oldStatus, '->', finalStatus); // Debugging
 
     const { error } = await supabase.from('orders').update(payload).eq('id', orderData.id);
     
     if (!error) { 
-      // Catat Log jika status berubah
       if (oldStatus !== finalStatus) {
         await writeLog({
           order: orderData,
@@ -370,7 +348,6 @@ const checkAutoStatus = useCallback(async (orderData: Order) => {
       await triggerOrderNotifications({ ...orderData, status: finalStatus }, oldStatus);
       await fetchNotifications();
     } else {
-      // Debugging yang lebih detail
       console.error('DB Error Details:', JSON.stringify(error, null, 2)); 
       showAlert('Error Database', error.message || error.details || 'Gagal menyimpan data', 'error');
     }
@@ -424,7 +401,6 @@ const checkAutoStatus = useCallback(async (orderData: Order) => {
       const order = orders.find(o => o.id === selectedOrderId); 
       if (!order) { setIsUploading(false); return; }
 
-      // 🚀 [BARU] CATAT LOG UPLOAD BERHASIL
       await writeLog({
         order: order,
         category: 'FILE',
@@ -447,13 +423,10 @@ const checkAutoStatus = useCallback(async (orderData: Order) => {
 
             steps[idx] = { 
               ...steps[idx], 
-              fileUrl: urlData.publicUrl,  // Update file URL baru
+              fileUrl: urlData.publicUrl, 
               timestamp: common.timestamp,
               uploadedBy: currentUser?.name,
-              // 🔥 PENTING: Jika proofing, jangan langsung completed
-              // Jika upload ulang karena revisi, hapus catatan revisi & tunggu ACC lagi
               isCompleted: !isProofing,
-              // Hapus catatan revisi setelah upload ulang
               proofing_note: isProofing ? undefined : steps[idx].proofing_note
             };
           }
@@ -504,7 +477,6 @@ const checkAutoStatus = useCallback(async (orderData: Order) => {
     };
     const { data, error } = await supabase.from('orders').insert([payload]).select().single();
     if (!error) { 
-        // 🚀 [BARU] LOG ORDER BARU
         await writeLog({
             order: data, 
             category: 'STATUS', 
@@ -529,16 +501,12 @@ const checkAutoStatus = useCallback(async (orderData: Order) => {
     }
   }, [selectedOrderId, supabase, orders, fetchOrders, showAlert, checkAutoStatus]);
 
-  // ===============================================
-  // 🟢 [UPDATE] SOFT DELETE + LOG
-  // ===============================================
   const handleDeleteOrder = useCallback(async (id: string) => {
-    const orderToDelete = orders.find(o => o.id === id); // Cari data order untuk log
+    const orderToDelete = orders.find(o => o.id === id); 
     
     showConfirm('Hapus?', 'Pindah ke sampah.', async () => {
       const { error } = await supabase.from('orders').update({ deleted_at: new Date().toISOString() }).eq('id', id);
       if (!error) { 
-        // 🚀 Catat Log saat dihapus (soft delete)
         if (orderToDelete) {
           await writeLog({
             order: orderToDelete,
@@ -553,15 +521,11 @@ const checkAutoStatus = useCallback(async (orderData: Order) => {
     });
   }, [showConfirm, supabase, fetchOrders, showAlert, orders, writeLog]);
 
-  // ===============================================
-  // 🟢 [UPDATE] RESTORE + LOG
-  // ===============================================
   const handleRestoreOrder = useCallback(async (id: string) => {
-    const orderToRestore = orders.find(o => o.id === id); // Cari data order untuk log
+    const orderToRestore = orders.find(o => o.id === id); 
 
     const { error } = await supabase.from('orders').update({ deleted_at: null }).eq('id', id); 
     if(!error) {
-       // 🚀 Catat Log saat dipulihkan
        if (orderToRestore) {
           await writeLog({
             order: orderToRestore,
@@ -575,15 +539,11 @@ const checkAutoStatus = useCallback(async (orderData: Order) => {
     }
   }, [supabase, fetchOrders, showAlert, orders, writeLog]);
 
-  // ===============================================
-  // 🟢 [UPDATE] HAPUS PERMANEN + HAPUS LOG
-  // ===============================================
   const handlePermanentDelete = useCallback(async (id: string) => {
     showConfirm('Hapus Permanen?', 'Data dan semua file lampiran akan hilang selamanya.', async () => {
-      setIsUploading(true); // Gunakan overlay loading
+      setIsUploading(true); 
       
       try {
-        // 1. Ambil data order lengkap untuk mendapatkan daftar path file
         const { data: orderData } = await supabase
           .from('orders')
           .select('link_approval, steps_manual, steps_dtf, finishing_packing, shipping, kendala')
@@ -594,14 +554,12 @@ const checkAutoStatus = useCallback(async (orderData: Order) => {
           const BUCKET_NAME = 'production-proofs';
           const filesToDelete: string[] = [];
 
-          // Helper untuk ekstrak path dari data (URL ke Path Storage)
           const extractPath = (rawPath: string) => {
             if (typeof rawPath !== 'string' || !rawPath.includes(`/${BUCKET_NAME}/`)) return;
             const path = decodeURIComponent(rawPath).split(`/${BUCKET_NAME}/`)[1]?.split('?')[0];
             if (path) filesToDelete.push(path);
           };
 
-          // Gali semua file dari kolom-kolom terkait
           const processData = (obj: any) => {
             if (!obj) return;
             if (typeof obj === 'string') extractPath(obj);
@@ -611,19 +569,14 @@ const checkAutoStatus = useCallback(async (orderData: Order) => {
 
           processData(orderData);
 
-          // 2. Jika ada file, hapus dari Storage
           if (filesToDelete.length > 0) {
-            console.log("Menghapus file dari storage:", filesToDelete);
             await supabase.storage.from(BUCKET_NAME).remove(filesToDelete);
           }
         }
 
-        // 🚀 3. Hapus Log Terkait (Hard Delete Log)
-        // Agar tidak meninggalkan sampah log untuk order yang sudah tidak ada
         const { error: logError } = await supabase.from('order_logs').delete().eq('order_id', id);
         if (logError) console.error("Gagal menghapus log:", logError);
 
-        // 4. Hapus baris dari Database Orders
         const { error: dbError } = await supabase.from('orders').delete().eq('id', id);
         
         if (!dbError) {
@@ -640,7 +593,6 @@ const checkAutoStatus = useCallback(async (orderData: Order) => {
     });
   }, [showConfirm, supabase, fetchOrders, showAlert]);
 
-  // Settings Handlers
   const handleSaveUser = useCallback(async (u: any) => {
     const p: any = { name: u.name, role: u.role, username: u.username }; 
     if (u.permissions) p.permissions = u.permissions; 
@@ -672,7 +624,6 @@ const checkAutoStatus = useCallback(async (orderData: Order) => {
   return (
     <div className="h-screen overflow-hidden bg-gray-100 dark:bg-slate-950 flex flex-col md:flex-row font-sans text-slate-800 dark:text-slate-100 relative">
        
-       {/* 🚀 HIDDEN INPUT UNTUK UPLOAD */}
        <input type="file" ref={fileInputRef} className="hidden" accept="image/*,application/pdf" onChange={handleFileChange} />
        
        {isUploading && (
@@ -696,7 +647,7 @@ const checkAutoStatus = useCallback(async (orderData: Order) => {
           <Header currentUser={currentUser} onToggleSidebar={() => setSidebarOpen(true)} onLogout={handleLogout} sidebarOpen={sidebarOpen} currentPage={activeTab} notifications={notifications} onNotificationClick={handleNotificationClick} />
           
           <main className="flex-1 overflow-y-auto px-4 md:px-6 py-2 md:py-3 pb-32 relative bg-gray-100 dark:bg-slate-950 no-scrollbar">
-             <div className="max-w-7xl mx-auto">
+             <div className="max-w-7xl mx-auto h-full">
                 {activeTab === 'dashboard' && currentUser.permissions?.pages?.dashboard && (
                   <Dashboard role={currentUser.role} orders={activeOrders} onSelectOrder={(id) => { setSelectedOrderId(id); setView('detail'); setActiveTab('orders'); }} />
                 )}
@@ -705,7 +656,6 @@ const checkAutoStatus = useCallback(async (orderData: Order) => {
                     {view === 'list' && <OrderList role={currentUser.role} orders={activeOrders} productionTypes={productionTypes} onSelectOrder={(id) => { setSelectedOrderId(id); setView('detail'); }} onNewOrder={() => setView('create')} onDeleteOrder={handleDeleteOrder} currentUser={currentUser} />}
                     {view === 'create' && <CreateOrder users={usersList} productionTypes={productionTypes} onCancel={() => setView('list')} onSubmit={handleCreateOrder} />}
                     {view === 'edit' && selectedOrderId && <EditOrder users={usersList} order={orders.find(o => o.id === selectedOrderId)!} productionTypes={productionTypes} onCancel={() => setView('detail')} onSubmit={handleEditOrder} />}
-                    {/* 👇 Pass writeLog sebagai prop onLogActivity ke OrderDetail */}
                     {view === 'detail' && selectedOrderId && <OrderDetail 
                         currentUser={currentUser} 
                         order={orders.find(o => o.id === selectedOrderId)!} 
@@ -715,19 +665,28 @@ const checkAutoStatus = useCallback(async (orderData: Order) => {
                         onUpdateOrder={checkAutoStatus} 
                         onDelete={handleDeleteOrder} 
                         onConfirm={showConfirm}
-                        // Jika OrderDetail mendukung pencatatan log internal (misal: tombol revisi), gunakan prop ini
-                        // @ts-ignore (Abaikan jika prop belum didefinisikan di OrderDetail)
+                        // @ts-ignore
                         onLogActivity={writeLog} 
                     />}
                   </>
                 )}
                 
-                {/* 🔒 UPDATE PERMISSION CHECK: COMPLETED ORDERS */}
                 {activeTab === 'completed_orders' && currentUser.permissions?.pages?.completed_orders && (
                    <CompletedOrders orders={activeOrders} />
                 )}
+
+                {/* 🟢 NEW: RENDER COMPONENT KALENDER */}
+                {activeTab === 'calendar' && (
+                    <CalendarView 
+                        orders={activeOrders} 
+                        onSelectOrder={(id) => { 
+                            setSelectedOrderId(id); 
+                            setView('detail'); 
+                            setActiveTab('orders'); 
+                        }} 
+                    />
+                )}
                 
-                {/* 🔒 UPDATE PERMISSION CHECK: LOGS */}
                 {activeTab === 'logs' && currentUser.permissions?.pages?.activity_logs && (
                     <ActivityLogView />
                 )}

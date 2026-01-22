@@ -13,7 +13,7 @@ interface ChangelogEntry {
 
 const APP_INFO = {
   name: "LCO SuperApp",
-  version: "V.9.5",
+  version: "V.10.0",
   purpose: "Aplikasi produksi Sablon, Langitan.co.",
   creator: "Tim Developer Langitan.co",
   creationDate: "Desember 2025",
@@ -21,6 +21,18 @@ const APP_INFO = {
 
 // --- DATA RIWAYAT UPDATE ---
 const CHANGELOG: ChangelogEntry[] = [
+
+{
+    version: "10.0",
+    date: "2026-01-22",
+    changes: [
+      "Menambahkan Menu Kalender Produksi",
+      "Perbaikan tampilan Kalender Hybrid: Mode Desktop menampilkan list lengkap, Mode Mobile menggunakan indikator titik (dots) yang responsif.",
+      "Fitur Agenda baru yang terintegrasi database (Supabase), kini mendukung input Waktu, Lokasi, dan Label Warna.",
+      "Optimasi UI/UX Kalender: Perbaikan isu layout terpotong, performa modal lebih ringan, dan penyelarasan warna indikator.",
+    ],
+  },
+
   {
     version: "9.5",
     date: "2025-12-26",
