@@ -1,4 +1,4 @@
-// app/components/orders/CompletedOrders.tsx - V.8.2 (Layout Fix)
+// app/components/orders/CompletedOrders.tsx - V.8.3 (Add Action Button)
 
 'use client';
 
@@ -7,11 +7,13 @@ import { Order } from '@/types';
 import { 
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer 
 } from 'recharts';
-import { Archive, CheckCircle2, Package, Search, ChevronLeft, ChevronRight, ChevronDown, Check, Calendar } from 'lucide-react'; 
+import { Archive, CheckCircle2, Package, Search, ChevronLeft, ChevronRight, ChevronDown, Check, Calendar, Eye } from 'lucide-react'; 
 import { formatDate } from '@/lib/utils'; 
 
 interface CompletedOrdersProps {
   orders: Order[];
+  // 🟢 Menambahkan prop onSelectOrder agar tombol berfungsi
+  onSelectOrder: (id: string) => void;
 }
 
 const MONTH_NAMES = [
@@ -19,7 +21,7 @@ const MONTH_NAMES = [
   'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'
 ];
 
-export default function CompletedOrders({ orders }: CompletedOrdersProps) {
+export default function CompletedOrders({ orders, onSelectOrder }: CompletedOrdersProps) {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedMonth, setSelectedMonth] = useState('all');
   const [currentPage, setCurrentPage] = useState(1);
@@ -113,7 +115,7 @@ export default function CompletedOrders({ orders }: CompletedOrdersProps) {
            <p className="text-slate-500 dark:text-slate-400 text-sm">Rekapitulasi pesanan yang telah rampung</p>
         </div>
         
-        {/* CONTROL BAR (FILTER & SEARCH) - UPDATED FOR MOBILE SYMMETRY */}
+        {/* CONTROL BAR */}
         <div className="grid grid-cols-2 gap-3 md:flex md:flex-row w-full md:w-auto h-10">
             
             {/* DROPDOWN FILTER BULAN */}
@@ -196,7 +198,7 @@ export default function CompletedOrders({ orders }: CompletedOrdersProps) {
                                 border: 'none', 
                                 boxShadow: '0 10px 15px -3px rgba(0,0,0,0.1)', 
                                 fontSize: '10px',
-                                backgroundColor: 'rgb(30, 41, 59)', // slate-800 for dark mode feel
+                                backgroundColor: 'rgb(30, 41, 59)', 
                                 color: '#fff'
                             }}
                             itemStyle={{color: '#10b981', fontWeight: 'bold'}}
@@ -220,8 +222,10 @@ export default function CompletedOrders({ orders }: CompletedOrdersProps) {
                 <th className="px-4 py-3 md:px-6 md:py-4 bg-inherit">Pemesan</th>
                 <th className="px-4 py-3 md:px-6 md:py-4 bg-inherit">Jenis Produksi</th>
                 <th className="px-4 py-3 md:px-6 md:py-4 bg-inherit text-center">Jml (Pcs)</th>
-                <th className="px-4 py-3 md:px-6 md:py-4 bg-inherit">Tgl. Selesai (Est)</th>
+                <th className="px-4 py-3 md:px-6 md:py-4 bg-inherit">Tgl. Selesai</th>
                 <th className="px-4 py-3 md:px-6 md:py-4 bg-inherit text-center">Status</th>
+                {/* 🟢 KOLOM AKSI BARU */}
+                <th className="px-4 py-3 md:px-6 md:py-4 bg-inherit text-center sticky right-0 bg-slate-50 dark:bg-slate-800 shadow-l">Aksi</th>
               </tr>
             </thead>
             
@@ -251,12 +255,23 @@ export default function CompletedOrders({ orders }: CompletedOrdersProps) {
                              Selesai <CheckCircle2 className="w-3 h-3" />
                         </span>
                     </td>
+                    {/* 🟢 TOMBOL AKSI */}
+                    <td className="px-4 py-3 md:px-6 md:py-4 text-center sticky right-0 bg-white dark:bg-slate-900 group-hover:bg-slate-50 dark:group-hover:bg-slate-800/50 transition-colors">
+                        <button 
+                            onClick={() => onSelectOrder(order.id)}
+                            className="p-2 rounded-lg bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-900/40 transition border border-blue-100 dark:border-blue-900/50 flex items-center justify-center gap-1.5 mx-auto"
+                            title="Lihat Detail Pesanan"
+                        >
+                            <Eye className="w-4 h-4" /> 
+                            <span className="hidden md:inline text-[10px] font-bold">Detail</span>
+                        </button>
+                    </td>
                   </tr>
                 ))
               ) : (
-                // 🟢 EMPTY STATE: FIXED CENTER POSITION ON MOBILE
+                // EMPTY STATE
                 <tr>
-                  <td colSpan={6} className="p-0 border-none">
+                  <td colSpan={7} className="p-0 border-none">
                     <div className="sticky left-0 w-[calc(100vw-3.5rem)] md:w-full min-h-[300px] flex flex-col items-center justify-center gap-3 px-4">
                         <Package className="w-12 h-12 opacity-20 text-slate-600 dark:text-slate-400" />
                         <div className="text-center">

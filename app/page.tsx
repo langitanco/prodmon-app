@@ -1,4 +1,4 @@
-// app/page.tsx
+// app/page.tsx - V.10.1 (Fix Prop CompletedOrders)
 'use client';
 
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
@@ -24,7 +24,6 @@ const CalculatorView = dynamic(() => import('@/app/components/apps/CalculatorVie
 const ConfigPriceView = dynamic(() => import('@/app/components/apps/ConfigPriceView'));
 const ActivityLogView = dynamic(() => import('@/app/components/apps/ActivityLogView')); 
 const AboutView = dynamic(() => import('@/app/components/misc/AboutView'));
-// 🟢 NEW: Import Calendar View
 const CalendarView = dynamic(() => import('@/app/components/apps/CalendarView'));
 
 // ORDERS - Lazy load
@@ -70,7 +69,6 @@ export default function ProductionApp() {
   const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null);
   const [loadingUser, setLoadingUser] = useState(true);
   
-  // 🟢 UPDATE: Menambahkan 'calendar' ke tipe activeTab
   const [activeTab, setActiveTab] = useState<'dashboard' | 'orders' | 'calendar' | 'logs' | 'completed_orders' | 'settings' | 'trash' | 'kalkulator' | 'config_harga' | 'about'>('dashboard');
   
   const [orders, setOrders] = useState<Order[]>([]);
@@ -671,11 +669,18 @@ export default function ProductionApp() {
                   </>
                 )}
                 
+                {/* 🟢 UPDATE: TAMBAHKAN PROP onSelectOrder */}
                 {activeTab === 'completed_orders' && currentUser.permissions?.pages?.completed_orders && (
-                   <CompletedOrders orders={activeOrders} />
+                   <CompletedOrders 
+                      orders={activeOrders} 
+                      onSelectOrder={(id) => {
+                         setSelectedOrderId(id);
+                         setView('detail');
+                         setActiveTab('orders'); // Pindah ke tab order aktif untuk melihat detail
+                      }}
+                   />
                 )}
 
-                {/* 🟢 NEW: RENDER COMPONENT KALENDER */}
                 {activeTab === 'calendar' && (
                     <CalendarView 
                         orders={activeOrders} 
