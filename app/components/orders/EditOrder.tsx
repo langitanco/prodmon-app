@@ -18,7 +18,8 @@ export default function EditOrder({ order, productionTypes, users, onCancel, onS
     jumlah: order.jumlah.toString(), 
     deadline: order.deadline, 
     type: order.jenis_produksi,
-    assigned_to: order.assigned_to || '' 
+    assigned_to: order.assigned_to || '',
+    helper_id: order.helper_id || '' // 🟢 UPDATE: Load Helper ID
   });
   
   const isDisabled = !form.nama || !form.hp || !form.deadline || !form.jumlah || !form.assigned_to;
@@ -72,7 +73,7 @@ export default function EditOrder({ order, productionTypes, users, onCancel, onS
             </select>
           </div>
           <div>
-            <label className="block text-[10px] md:text-xs font-bold text-slate-700 dark:text-slate-400 uppercase mb-1 md:mb-2">Penanggung Jawab</label>
+            <label className="block text-[10px] md:text-xs font-bold text-blue-600 dark:text-blue-400 uppercase mb-1 md:mb-2">Penanggung Jawab</label>
             <select 
               className="w-full border-2 border-slate-200 dark:border-slate-700 p-2 md:p-3 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none font-medium bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 text-sm" 
               value={form.assigned_to} 
@@ -84,6 +85,21 @@ export default function EditOrder({ order, productionTypes, users, onCancel, onS
               ))}
             </select>
           </div>
+        </div>
+
+        {/* 🟢 UPDATE: Edit Helper */}
+        <div>
+          <label className="block text-[10px] md:text-xs font-bold text-orange-600 dark:text-orange-400 uppercase mb-1 md:mb-2">Helper (Opsional)</label>
+          <select 
+              className="w-full border-2 border-slate-200 dark:border-slate-700 p-2 md:p-3 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none font-medium bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 text-sm" 
+              value={form.helper_id} 
+              onChange={e=>setForm({...form, helper_id: e.target.value})}
+            >
+              <option value="">-- Tidak Ada Helper --</option>
+              {users.map((user) => (
+                <option key={user.id} value={user.id}>{user.name} ({user.role})</option>
+              ))}
+            </select>
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 md:gap-5">

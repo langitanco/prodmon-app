@@ -3,7 +3,7 @@
 import React, { useState } from 'react';
 import { formatDate, getDeadlineStatus, getStatusColor, MONTHS } from '@/lib/utils';
 import { Order, ProductionTypeData, UserData } from '@/types';
-import { BarChart3, Calendar, ClipboardList, Clock, FileText, Trash2, User } from 'lucide-react'; 
+import { BarChart3, Calendar, ClipboardList, Clock, FileText, Trash2, User, Users } from 'lucide-react'; 
 
 interface OrderListProps {
   role: string;
@@ -59,7 +59,7 @@ export default function OrderList({ role, orders, productionTypes, onSelectOrder
        {/* HEADER & FILTER */}
        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-3 md:gap-4">
         
-        {/* JUDUL: HIDDEN SAAT MOBILE, DARK MODE SUPPORT */}
+        {/* JUDUL */}
         <div className="hidden md:block">
           <h2 className="text-xl md:text-2xl font-bold text-slate-800 dark:text-white">Daftar Pesanan</h2>
           <p className="text-xs md:text-sm text-slate-500 dark:text-slate-400 mt-0.5 md:mt-1 font-medium">Kelola {filteredOrders.length} pesanan aktif</p>
@@ -161,10 +161,21 @@ export default function OrderList({ role, orders, productionTypes, onSelectOrder
                     <div className="flex justify-between items-start mb-1 md:mb-4 mt-1">
                       <div className="flex flex-col gap-1">
                           <span className="text-[10px] md:text-xs font-mono font-bold text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 md:px-2 md:py-1 rounded-md h-fit w-fit">#{order.kode_produksi}</span>
+                          
                           {isManagement && (
-                             <div className="flex items-center gap-1 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400 px-1.5 py-0.5 rounded border border-blue-100 dark:border-blue-900/30 w-fit">
-                                <User className="w-3 h-3"/>
-                                <span className="text-[10px] font-bold truncate max-w-[100px]">{order.assigned_user?.name || 'No PIC'}</span>
+                             <div className="flex flex-col gap-1 mt-1">
+                                {/* PJ BADGE */}
+                                <div className="flex items-center gap-1 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400 px-1.5 py-0.5 rounded border border-blue-100 dark:border-blue-900/30 w-fit">
+                                    <User className="w-3 h-3"/>
+                                    <span className="text-[10px] font-bold truncate max-w-[100px]">{order.assigned_user?.name || 'No PIC'}</span>
+                                </div>
+                                {/* 🟢 UPDATE: HELPER BADGE */}
+                                {order.helper_user && (
+                                    <div className="flex items-center gap-1 bg-orange-50 dark:bg-orange-900/20 text-orange-700 dark:text-orange-400 px-1.5 py-0.5 rounded border border-orange-100 dark:border-orange-900/30 w-fit">
+                                        <Users className="w-3 h-3"/>
+                                        <span className="text-[10px] font-bold truncate max-w-[100px]">{order.helper_user.name}</span>
+                                    </div>
+                                )}
                              </div>
                           )}
                       </div>

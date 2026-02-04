@@ -26,6 +26,9 @@ const ActivityLogView = dynamic(() => import('@/app/components/apps/ActivityLogV
 const AboutView = dynamic(() => import('@/app/components/misc/AboutView'));
 const CalendarView = dynamic(() => import('@/app/components/apps/CalendarView'));
 
+// 🟢 UPDATE: Import SalaryView
+const SalaryView = dynamic(() => import('@/app/components/apps/SalaryView'));
+
 // ORDERS - Lazy load
 const OrderList = dynamic(() => import('@/app/components/orders/OrderList'));
 const CreateOrder = dynamic(() => import('@/app/components/orders/CreateOrder'));
@@ -69,7 +72,8 @@ export default function ProductionApp() {
   const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null);
   const [loadingUser, setLoadingUser] = useState(true);
   
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'orders' | 'calendar' | 'logs' | 'completed_orders' | 'settings' | 'trash' | 'kalkulator' | 'config_harga' | 'about'>('dashboard');
+  // 🟢 UPDATE: Tambahkan 'salary' di tipe activeTab
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'orders' | 'calendar' | 'logs' | 'completed_orders' | 'settings' | 'trash' | 'kalkulator' | 'config_harga' | 'about' | 'salary'>('dashboard');
   
   const [orders, setOrders] = useState<Order[]>([]);
   const [usersList, setUsersList] = useState<UserData[]>([]);
@@ -173,9 +177,10 @@ export default function ProductionApp() {
   }, [supabase]);
 
   const fetchOrders = useCallback(async () => {
+    // 🟢 UPDATE QUERY: Tambahkan helper_user:users!helper_id ( name )
     const { data } = await supabase
       .from('orders')
-      .select(`*, assigned_user:users!assigned_to ( name )`) 
+      .select(`*, assigned_user:users!assigned_to ( name ), helper_user:users!helper_id ( name )`) 
       .order('created_at', { ascending: false });
       
     if (data) setOrders(data.map((o: any) => ({ ...o, kendala: Array.isArray(o.kendala) ? o.kendala : [] })));
@@ -325,6 +330,10 @@ export default function ProductionApp() {
     
     const payload: any = { ...orderData, status: finalStatus };
     delete payload.assigned_user; 
+    
+    // 🟢 UPDATE: Hapus data join helper_user sebelum update
+    delete payload.helper_user; 
+    
     delete payload.id;            
     delete payload.created_at; 
 
@@ -456,7 +465,11 @@ export default function ProductionApp() {
       tanggal_masuk: new Date().toISOString().split('T')[0],
       deadline: formData.deadline,
       jenis_produksi: formData.type,
-      assigned_to: formData.assigned_to || null, 
+      assigned_to: formData.assigned_to || null,
+      
+      // 🟢 UPDATE: Tambahkan helper_id 
+      helper_id: formData.helper_id || null, 
+      
       status: 'Pesanan Masuk',
       steps_manual: [
         { id: 'm1', name: 'Pecah Gambar (PDF)', type: 'upload_pdf', isCompleted: false },
@@ -490,7 +503,16 @@ export default function ProductionApp() {
 
   const handleEditOrder = useCallback(async (d: any) => {
     if (!selectedOrderId) return;
-    const updates = { nama_pemesan: d.nama, no_hp: d.hp, jumlah: parseInt(d.jumlah), deadline: d.deadline, jenis_produksi: d.type, assigned_to: d.assigned_to || null };
+    const updates = { 
+        nama_pemesan: d.nama, 
+        no_hp: d.hp, 
+        jumlah: parseInt(d.jumlah), 
+        deadline: d.deadline, 
+        jenis_produksi: d.type, 
+        assigned_to: d.assigned_to || null,
+        // 🟢 UPDATE: Tambahkan helper_id
+        helper_id: d.helper_id || null
+    };
     const { error } = await supabase.from('orders').update(updates).eq('id', selectedOrderId);
     if (!error) {
        const old = orders.find(o => o.id === selectedOrderId);
@@ -690,6 +712,11 @@ export default function ProductionApp() {
                             setActiveTab('orders'); 
                         }} 
                     />
+                )}
+
+                {/* 🟢 UPDATE: RENDER HALAMAN GAJI */}
+                {activeTab === 'salary' && currentUser.permissions?.pages?.salary && (
+                    <SalaryView users={usersList} orders={orders} />
                 )}
                 
                 {activeTab === 'logs' && currentUser.permissions?.pages?.activity_logs && (

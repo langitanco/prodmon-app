@@ -4,7 +4,7 @@
 import React, { memo } from 'react';
 import { 
   Home, ClipboardList, Settings, Calculator, Trash2, Info, X, DollarSign, LogOut,
-  Archive, Activity, CalendarDays // 🟢 Import Icon CalendarDays
+  Archive, Activity, CalendarDays, Banknote // 🟢 UPDATE: Tambahkan Banknote
 } from 'lucide-react';
 import { UserData } from '@/types';
 
@@ -40,6 +40,9 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen, currentUser, acti
         
         { id: 'kalkulator', label: 'Kalkulator', icon: Calculator, visible: canAccess('kalkulator') },
         { id: 'config_harga', label: 'Config Harga', icon: DollarSign, visible: canAccess('config_harga') },
+        
+        // 🟢 NEW: MENU GAJI (Hanya baris ini yang ditambah)
+        { id: 'salary', label: 'Gaji & Upah', icon: Banknote, visible: canAccess('salary') },
       ]
     },
     {

@@ -13,7 +13,7 @@ interface ChangelogEntry {
 
 const APP_INFO = {
   name: "LCO SuperApp",
-  version: "V.10.0",
+  version: "V.10.5",
   purpose: "Aplikasi produksi Sablon, Langitan.co.",
   creator: "Tim Developer Langitan.co",
   creationDate: "Desember 2025",
@@ -23,6 +23,17 @@ const APP_INFO = {
 const CHANGELOG: ChangelogEntry[] = [
 
 {
+  
+  
+    version: "10.5",
+    date: "2026-02-04",
+    changes: [
+      "Penambahan menu gaji.",
+      "Penambahan fitur helper untuk setiap produksi.",
+    ],
+  },
+
+  {
     version: "10.0",
     date: "2026-01-22",
     changes: [

@@ -17,7 +17,8 @@ export default function CreateOrder({ productionTypes, users, onCancel, onSubmit
     jumlah: '', 
     deadline: new Date().toISOString().split('T')[0], 
     type: productionTypes[0]?.value || 'manual',
-    assigned_to: '' 
+    assigned_to: '',
+    helper_id: '' // 🟢 UPDATE: State untuk Helper
   });
 
   useEffect(() => { 
@@ -26,6 +27,7 @@ export default function CreateOrder({ productionTypes, users, onCancel, onSubmit
     setForm(f => ({ ...f, deadline: d.toISOString().split('T')[0] })); 
   }, []);
 
+  // Helper opsional, jadi tidak masuk validasi isDisabled
   const isDisabled = !form.nama || !form.hp || !form.deadline || !form.jumlah || !form.assigned_to;
 
   return (
@@ -77,7 +79,7 @@ export default function CreateOrder({ productionTypes, users, onCancel, onSubmit
             </select>
           </div>
           <div>
-            <label className="block text-[10px] md:text-xs font-bold text-slate-700 dark:text-slate-400 uppercase mb-1 md:mb-2">Penanggung Jawab</label>
+            <label className="block text-[10px] md:text-xs font-bold text-blue-600 dark:text-blue-400 uppercase mb-1 md:mb-2">Penanggung Jawab (Wajib)</label>
             <select 
               className="w-full border-2 border-slate-200 dark:border-slate-700 p-2 md:p-3 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none font-medium bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 text-sm" 
               value={form.assigned_to} 
@@ -89,6 +91,22 @@ export default function CreateOrder({ productionTypes, users, onCancel, onSubmit
               ))}
             </select>
           </div>
+        </div>
+
+        {/* 🟢 UPDATE: Input Helper (Opsional) */}
+        <div>
+          <label className="block text-[10px] md:text-xs font-bold text-orange-600 dark:text-orange-400 uppercase mb-1 md:mb-2">Helper / Pembantu (Opsional)</label>
+          <select 
+              className="w-full border-2 border-slate-200 dark:border-slate-700 p-2 md:p-3 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none font-medium bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 text-sm" 
+              value={form.helper_id} 
+              onChange={e=>setForm({...form, helper_id: e.target.value})}
+            >
+              <option value="" className="dark:bg-slate-800">-- Tidak Ada Helper --</option>
+              {users.map((user) => (
+                <option key={user.id} value={user.id} className="dark:bg-slate-800">{user.name} ({user.role})</option>
+              ))}
+            </select>
+            <p className="text-[10px] text-slate-400 mt-1">Helper akan ikut terhitung di menu gaji jika dipilih.</p>
         </div>
 
         <div>

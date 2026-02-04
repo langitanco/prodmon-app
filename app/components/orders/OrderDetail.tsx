@@ -5,7 +5,7 @@ import { formatDate, getStatusColor, openWA, getDeadlineStatus } from '@/lib/uti
 import { Order, UserData, KendalaNote } from '@/types';
 import { 
   AlertTriangle, Camera, CheckCircle, ChevronRight, Eye, MessageSquare, 
-  Package, Pencil, Phone, Trash2, Upload, X, Clock, User, Send, ThumbsUp, ThumbsDown
+  Package, Pencil, Phone, Trash2, Upload, X, Clock, User, Send, ThumbsUp, ThumbsDown, Users
 } from 'lucide-react';
 
 interface OrderDetailProps {
@@ -61,17 +61,15 @@ export default function OrderDetail({ currentUser, order, onBack, onEdit, onTrig
   const canResetQC = isSupervisor || perms?.finishing?.qc_reset;
   const canDeleteFinishingFile = isSupervisor || perms?.finishing?.delete_files;
 
-  // --- HANDLERS ---
+  // --- HANDLERS (Tidak berubah) ---
   const handleStatusStep = (stepId: string) => {
     const updated = JSON.parse(JSON.stringify(order));
-    // Gunakan any agar bisa akses properti dinamis
     const steps = (isManual ? updated.steps_manual : updated.steps_dtf) as any[];
     const idx = steps.findIndex((s: any) => s.id === stepId);
     if (idx >= 0) { 
       steps[idx].isCompleted = true; 
       steps[idx].uploadedBy = currentUser.name; 
       steps[idx].timestamp = new Date().toLocaleString(); 
-      // Hapus note revisi jika sudah di-approve
       if (steps[idx].proofing_note) delete steps[idx].proofing_note;
     }
     const allDone = steps.every((s: any) => s.isCompleted);
@@ -81,17 +79,13 @@ export default function OrderDetail({ currentUser, order, onBack, onEdit, onTrig
 
   const handleSaveProofingRevisi = () => {
     if (!proofingRevisiNote.trim() || !proofingStepId) return;
-
     const updated = JSON.parse(JSON.stringify(order));
-    // Gunakan any agar TypeScript tidak protes soal 'proofing_note'
     const steps = (isManual ? updated.steps_manual : updated.steps_dtf) as any[];
     const idx = steps.findIndex((s: any) => s.id === proofingStepId);
-
     if (idx >= 0) {
         steps[idx].proofing_note = proofingRevisiNote;
         steps[idx].isCompleted = false; 
     }
-
     onUpdateOrder(updated);
     setProofingRevisiNote('');
     setProofingStepId(null);
@@ -207,6 +201,22 @@ export default function OrderDetail({ currentUser, order, onBack, onEdit, onTrig
               <span className={isLate ? 'text-red-600 dark:text-red-400 font-bold' : ''}>{formatDate(order.deadline)}</span>
               <button onClick={() => openWA(order.no_hp)} className="bg-green-600 text-white px-2 py-1 rounded-lg text-[10px] font-bold flex items-center gap-1"> <Phone className="w-3 h-3"/> WA </button>
             </div>
+            
+            {/* 🟢 UPDATE: MENAMPILKAN PJ & HELPER DI DETAIL */}
+            {isManagement && (
+               <div className="mt-3 flex items-center gap-3">
+                 <div className="flex items-center gap-1.5 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400 px-2 py-1 rounded-lg border border-blue-100 dark:border-blue-900/40 w-fit">
+                    <User className="w-3.5 h-3.5"/>
+                    <span className="text-xs font-bold">PJ: {order.assigned_user?.name || '-'}</span>
+                 </div>
+                 {order.helper_user && (
+                    <div className="flex items-center gap-1.5 bg-orange-50 dark:bg-orange-900/20 text-orange-700 dark:text-orange-400 px-2 py-1 rounded-lg border border-orange-100 dark:border-orange-900/40 w-fit">
+                        <Users className="w-3.5 h-3.5"/>
+                        <span className="text-xs font-bold">Helper: {order.helper_user.name}</span>
+                    </div>
+                 )}
+               </div>
+            )}
         </div>
 
         <div className="flex flex-col gap-2 items-end w-full md:w-auto">
@@ -214,7 +224,7 @@ export default function OrderDetail({ currentUser, order, onBack, onEdit, onTrig
                {order.status}
             </div>
             {isLate && (
-               <div className="px-4 py-2 rounded-xl font-black text-xs md:text-sm border border-red-200 bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-400 dark:border-red-800 uppercase tracking-wider text-center w-full md:w-auto">
+               <div className="px-4 py-2 rounded-xl font-black text-xs md:text-sm border border-red-200 bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-100 dark:border-red-800 uppercase tracking-wider text-center w-full md:w-auto">
                   TELAT DEADLINE
                </div>
             )}
@@ -358,13 +368,10 @@ export default function OrderDetail({ currentUser, order, onBack, onEdit, onTrig
          {currentSteps?.map((s) => {
             const step = s as any;
 
-            // LOGIKA KHUSUS UNTUK STEP "PROOFING"
             const isProofingStep = step.name.toLowerCase().includes('proofing');
             const hasFileUploaded = !!step.fileUrl;
             const isStepCompleted = step.isCompleted;
             const hasRevisionNote = step.proofing_note;
-            
-            // 🔥 FITUR BARU: Cek apakah dalam mode revisi
             const isInRevisionMode = hasRevisionNote && !isStepCompleted;
             
             const showProofingActions = isProofingStep && hasFileUploaded && !isStepCompleted && isManagement && !isInRevisionMode;
@@ -378,7 +385,6 @@ export default function OrderDetail({ currentUser, order, onBack, onEdit, onTrig
                      {step.name}
                   </div>
                   
-                  {/* Tampilkan Note Revisi jika ada */}
                   {hasRevisionNote && !step.isCompleted && (
                      <div className="mt-1.5 bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-400 text-xs px-3 py-2 rounded-lg border border-red-100 dark:border-red-900/50 flex items-start gap-2">
                         <AlertTriangle className="w-3.5 h-3.5 flex-shrink-0 mt-0.5"/>
@@ -402,7 +408,6 @@ export default function OrderDetail({ currentUser, order, onBack, onEdit, onTrig
                   )}
                   </div>
                   
-                  {/* TOMBOL ACTIONS */}
                   {step.isCompleted ? (
                   <div className="flex items-center gap-2 bg-green-50 dark:bg-green-900/20 px-3 py-1.5 rounded-lg border border-green-100 dark:border-green-900/40">
                      <CheckCircle className="w-4 h-4 text-green-600 dark:text-green-400"/>
@@ -418,7 +423,6 @@ export default function OrderDetail({ currentUser, order, onBack, onEdit, onTrig
                   </div>
                   ) : (
                   <>
-                     {/* 🔥 FITUR BARU: Jika step proofing dalam mode revisi, tampilkan tombol upload untuk tim produksi */}
                      {isProofingStep && isInRevisionMode && canUpdateStep ? (
                         <button 
                         onClick={() => onTriggerUpload('step', step.id)} 
@@ -467,7 +471,6 @@ export default function OrderDetail({ currentUser, order, onBack, onEdit, onTrig
                   )}
                </div>
 
-               {/* FORM INPUT REVISI KHUSUS STEP PROOFING */}
                {isEditingRevisi && (
                   <div className="mt-2 p-3 bg-slate-50 dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700 animate-in fade-in slide-in-from-top-1">
                   <label className="text-[10px] font-bold text-slate-500 uppercase mb-1 block">
