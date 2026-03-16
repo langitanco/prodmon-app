@@ -4,7 +4,7 @@
 import React, { memo } from 'react';
 import { 
   Home, ClipboardList, Settings, Calculator, Trash2, Info, X, DollarSign, LogOut,
-  Archive, Activity, CalendarDays, Banknote // 🟢 UPDATE: Tambahkan Banknote
+  Archive, Activity, CalendarDays, Banknote, Receipt // 🟢 UPDATE: Tambahkan Receipt
 } from 'lucide-react';
 import { UserData } from '@/types';
 
@@ -41,8 +41,12 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen, currentUser, acti
         { id: 'kalkulator', label: 'Kalkulator', icon: Calculator, visible: canAccess('kalkulator') },
         { id: 'config_harga', label: 'Config Harga', icon: DollarSign, visible: canAccess('config_harga') },
         
-        // 🟢 NEW: MENU GAJI (Hanya baris ini yang ditambah)
+        // 🟢 NEW: MENU GAJI
         { id: 'salary', label: 'Gaji & Upah', icon: Banknote, visible: canAccess('salary') },
+        
+        // 🟢 NEW: MENU GENERATOR NOTA (Hanya baris ini yang ditambah)
+        // NOTE: Menggunakan type as any sementara agar tidak error di TypeScript jika types.ts belum di-update
+        { id: 'nota', label: 'Generator Nota', icon: Receipt, visible: (currentUser.permissions?.pages as any)?.nota },
       ]
     },
     {

@@ -25,9 +25,10 @@ const ConfigPriceView = dynamic(() => import('@/app/components/apps/ConfigPriceV
 const ActivityLogView = dynamic(() => import('@/app/components/apps/ActivityLogView')); 
 const AboutView = dynamic(() => import('@/app/components/misc/AboutView'));
 const CalendarView = dynamic(() => import('@/app/components/apps/CalendarView'));
-
-// 🟢 UPDATE: Import SalaryView
 const SalaryView = dynamic(() => import('@/app/components/apps/SalaryView'));
+
+// 🟢 UPDATE: Import NotaView
+const NotaView = dynamic(() => import('@/app/components/apps/NotaView'));
 
 // ORDERS - Lazy load
 const OrderList = dynamic(() => import('@/app/components/orders/OrderList'));
@@ -72,8 +73,8 @@ export default function ProductionApp() {
   const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null);
   const [loadingUser, setLoadingUser] = useState(true);
   
-  // 🟢 UPDATE: Tambahkan 'salary' di tipe activeTab
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'orders' | 'calendar' | 'logs' | 'completed_orders' | 'settings' | 'trash' | 'kalkulator' | 'config_harga' | 'about' | 'salary'>('dashboard');
+  // 🟢 UPDATE: Tambahkan 'nota' di tipe activeTab
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'orders' | 'calendar' | 'logs' | 'completed_orders' | 'settings' | 'trash' | 'kalkulator' | 'config_harga' | 'about' | 'salary' | 'nota'>('dashboard');
   
   const [orders, setOrders] = useState<Order[]>([]);
   const [usersList, setUsersList] = useState<UserData[]>([]);
@@ -714,9 +715,13 @@ export default function ProductionApp() {
                     />
                 )}
 
-                {/* 🟢 UPDATE: RENDER HALAMAN GAJI */}
                 {activeTab === 'salary' && currentUser.permissions?.pages?.salary && (
                     <SalaryView users={usersList} orders={orders} />
+                )}
+
+                {/* 🟢 BARU: RENDER HALAMAN NOTA (Dengan type assertion sbg backup jika types.ts blm diupdate) */}
+                {activeTab === 'nota' && (currentUser.permissions?.pages as any)?.nota && (
+                    <NotaView />
                 )}
                 
                 {activeTab === 'logs' && currentUser.permissions?.pages?.activity_logs && (

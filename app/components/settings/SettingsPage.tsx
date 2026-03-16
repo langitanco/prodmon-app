@@ -257,8 +257,6 @@ export default function SettingsPage({ users, productionTypes, onSaveUser, onDel
                                 <option value="produksi">Produksi</option>
                                 <option value="qc">QC</option>
                                 <option value="manager">Manager</option>
-                                {/* TAMBAHKAN DUA OPSI INI 👇 */}
-                                <option value="produksi">Produksi</option>
                                 <option value="pengiriman">Staff Pengiriman (Khusus Kirim)</option>
                                 <option value="produksi_logistik">Produksi & Pengiriman (Double Job)</option>
                             </select>
@@ -280,7 +278,8 @@ export default function SettingsPage({ users, productionTypes, onSaveUser, onDel
                               orders: 'List Pesanan',
                               completed_orders: 'Menu Pesanan Selesai', 
                               activity_logs: 'Menu Log Aktivitas',
-                              salary: 'Menu Gaji & Upah', // 🟢 BARU: HANYA INI YANG DITAMBAH
+                              salary: 'Menu Gaji & Upah',
+                              nota: 'Menu Generator Nota', // 🟢 UPDATE: TAMBAHAN MENU NOTA
                               kalkulator: 'Kalkulator',
                               settings: 'Menu Settings',
                               trash: 'Menu Sampah',
