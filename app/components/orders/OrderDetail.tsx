@@ -1,14 +1,14 @@
 // app/components/orders/OrderDetail.tsx
-
-import React, { useState, useRef } from 'react';
-import { formatDate, getStatusColor, openWA, getDeadlineStatus } from '@/lib/utils';
-import { Order, UserData, KendalaNote } from '@/types';
-import { toJpeg } from 'html-to-image'; 
-import jsPDF from 'jspdf'; 
-import { 
-  AlertTriangle, Camera, CheckCircle, ChevronRight, Eye, MessageSquare, 
-  Package, Pencil, Phone, Trash2, Upload, X, Clock, User, Send, ThumbsUp, ThumbsDown, Users, Printer
-} from 'lucide-react';
+import React, { useRef, useState } from 'react';
+import { Order, UserData } from '@/types';
+import { toJpeg } from 'html-to-image';
+import jsPDF from 'jspdf';
+import { useOrderDetail } from '@/hooks/useOrderDetail';
+import LabelPengiriman from './detail/LabelPengiriman';
+import OrderDetailHeader from './detail/OrderDetailHeader';
+import StepApproval from './detail/StepApproval';
+import StepProduksi from './detail/StepProduksi';
+import StepFinishing from './detail/StepFinishing';
 
 interface OrderDetailProps {
   currentUser: UserData;
@@ -21,44 +21,31 @@ interface OrderDetailProps {
   onConfirm: (title: string, msg: string, action: () => void) => void;
 }
 
-export default function OrderDetail({ currentUser, order, onBack, onEdit, onTriggerUpload, onUpdateOrder, onDelete, onConfirm }: OrderDetailProps) {
-  const [qcNote, setQcNote] = useState(order.finishing_qc.notes || '');
-  const [kendalaNote, setKendalaNote] = useState('');
-  const [showKendalaForm, setShowKendalaForm] = useState(false);
-  
-  // -- STATE UNTUK FITUR PROOFING --
-  const [proofingRevisiNote, setProofingRevisiNote] = useState('');
-  const [proofingStepId, setProofingStepId] = useState<string | null>(null);
-
-  // -- STATE & REF UNTUK LABEL PENGIRIMAN --
+export default function OrderDetail({
+  currentUser, order, onBack, onEdit,
+  onTriggerUpload, onUpdateOrder, onDelete, onConfirm,
+}: OrderDetailProps) {
   const labelRef = useRef<HTMLDivElement>(null);
   const [isPrintingLabel, setIsPrintingLabel] = useState(false);
 
-  // --- LOGIKA HAK AKSES ---
+  // ─── Hak Akses ───────────────────────────────────────────────────────────
   const isSupervisor = currentUser.role === 'supervisor';
   const isManagement = ['admin', 'manager', 'supervisor'].includes(currentUser.role);
-  
   const perms = currentUser.permissions;
-
   const jenisProd = order.jenis_produksi?.toLowerCase() || '';
   const isManual = jenisProd === 'manual' || jenisProd === 'sablon';
   const isDTF = jenisProd === 'dtf' || jenisProd === 'digital';
   const prodPerms = isManual ? perms?.prod_manual : (isDTF ? perms?.prod_dtf : null);
 
-  // --- LOGIKA STATUS & KONDISI ---
   const currentStatus = order.status;
-  const isLate = getDeadlineStatus(order.deadline, order.status) === 'overdue';
-  const isRevisi = currentStatus === 'Revisi';
-  
   const currentSteps = isManual ? order.steps_manual : order.steps_dtf;
   const isProductionFinished = currentSteps && currentSteps.length > 0 && currentSteps.every(s => s.isCompleted);
+  const isRevisi = currentStatus === 'Revisi';
 
-  // --- IZIN TOMBOL ---
   const canUpdateStep = isSupervisor || (prodPerms?.step_process && (currentStatus === 'On Process' || currentStatus === 'Revisi' || currentStatus === 'Ada Kendala'));
   const canCheckQC = isSupervisor || (perms?.finishing?.qc_check && (currentStatus === 'Finishing' || isProductionFinished));
   const canUpdatePacking = isSupervisor || (perms?.finishing?.packing_update && order.finishing_qc.isPassed);
   const canUpdateShipping = isSupervisor || (perms?.finishing?.shipping_update && (currentStatus === 'Kirim' || currentStatus === 'Selesai'));
-
   const canEditOrderInfo = isSupervisor || perms?.orders?.edit;
   const canDeleteOrder = isSupervisor || perms?.orders?.delete;
   const canUploadApproval = isSupervisor || perms?.orders?.edit;
@@ -67,33 +54,32 @@ export default function OrderDetail({ currentUser, order, onBack, onEdit, onTrig
   const canResetQC = isSupervisor || perms?.finishing?.qc_reset;
   const canDeleteFinishingFile = isSupervisor || perms?.finishing?.delete_files;
 
-  // --- FUNGSI CETAK LABEL (MENAMPILKAN PREVIEW DI TAB BARU) ---
+  // ─── Hook ─────────────────────────────────────────────────────────────────
+  const {
+    qcNote, setQcNote,
+    kendalaNote, setKendalaNote,
+    showKendalaForm, setShowKendalaForm,
+    proofingRevisiNote, setProofingRevisiNote,
+    proofingStepId, setProofingStepId,
+    handleStatusStep, handleSaveProofingRevisi,
+    handleQC, handleDeleteQC, handleRevisiSelesai,
+    handleAddKendala, handleResolveKendala, handleDeleteKendala,
+    handleFileDelete,
+  } = useOrderDetail({ order, currentUser, onUpdateOrder, onConfirm });
+
+  // ─── Print Label ──────────────────────────────────────────────────────────
   const handlePrintLabel = async () => {
     if (!labelRef.current) return;
     setIsPrintingLabel(true);
     try {
-      await new Promise(resolve => setTimeout(resolve, 150)); 
-      
-      const dataUrl = await toJpeg(labelRef.current, { 
-          pixelRatio: 2, 
-          quality: 0.9,
-          cacheBust: true,
-          backgroundColor: '#ffffff'
+      await new Promise(resolve => setTimeout(resolve, 150));
+      const dataUrl = await toJpeg(labelRef.current, {
+        pixelRatio: 2, quality: 0.9, cacheBust: true, backgroundColor: '#ffffff',
       });
-      
-      const pdf = new jsPDF({
-        orientation: 'landscape', 
-        unit: 'mm',
-        format: [165, 107.5] 
-      });
-
+      const pdf = new jsPDF({ orientation: 'landscape', unit: 'mm', format: [165, 107.5] });
       pdf.addImage(dataUrl, 'JPEG', 0, 0, 165, 107.5);
-      
-      // Blob url untuk preview di tab baru
-      const pdfBlob = pdf.output('blob');
-      const pdfUrl = URL.createObjectURL(pdfBlob);
+      const pdfUrl = URL.createObjectURL(pdf.output('blob'));
       window.open(pdfUrl, '_blank');
-      
     } catch (error) {
       console.error('Gagal membuat Label PDF:', error);
       alert('Terjadi kesalahan saat mengekspor Label PDF.');
@@ -102,651 +88,72 @@ export default function OrderDetail({ currentUser, order, onBack, onEdit, onTrig
     }
   };
 
-  // --- HANDLERS ---
-  const handleStatusStep = (stepId: string) => {
-    const updated = JSON.parse(JSON.stringify(order));
-    const steps = (isManual ? updated.steps_manual : updated.steps_dtf) as any[];
-    const idx = steps.findIndex((s: any) => s.id === stepId);
-    if (idx >= 0) { 
-      steps[idx].isCompleted = true; 
-      steps[idx].uploadedBy = currentUser.name; 
-      steps[idx].timestamp = new Date().toLocaleString(); 
-      if (steps[idx].proofing_note) delete steps[idx].proofing_note;
-    }
-    const allDone = steps.every((s: any) => s.isCompleted);
-    if (allDone && updated.status === 'On Process') { updated.status = 'Finishing'; }
-    onUpdateOrder(updated);
-  };
-
-  const handleSaveProofingRevisi = () => {
-    if (!proofingRevisiNote.trim() || !proofingStepId) return;
-    const updated = JSON.parse(JSON.stringify(order));
-    const steps = (isManual ? updated.steps_manual : updated.steps_dtf) as any[];
-    const idx = steps.findIndex((s: any) => s.id === proofingStepId);
-    if (idx >= 0) {
-        steps[idx].proofing_note = proofingRevisiNote;
-        steps[idx].isCompleted = false; 
-    }
-    onUpdateOrder(updated);
-    setProofingRevisiNote('');
-    setProofingStepId(null);
-  };
-
-  const handleQC = (pass: boolean) => {
-    const updated = JSON.parse(JSON.stringify(order));
-    updated.finishing_qc = { isPassed: pass, notes: pass ? 'Lolos QC' : qcNote, checkedBy: currentUser.name, timestamp: new Date().toLocaleString() };
-    if (!pass) updated.status = 'Revisi';
-    onUpdateOrder(updated); 
-  };
-
-  const handleDeleteQC = () => {
-    if (!onConfirm) return;
-    onConfirm('Reset Status QC?', 'Status QC akan dikembalikan ke belum dicek.', () => {
-      const updated = JSON.parse(JSON.stringify(order));
-      updated.finishing_qc = { isPassed: false, notes: '', checkedBy: '', timestamp: '' };
-      onUpdateOrder(updated);
-    });
-  };
-
-  const handleRevisiSelesai = () => {
-    if (!onConfirm) return;
-    onConfirm('Selesaikan Revisi?', 'Status akan kembali ke On Process.', () => {
-        const updated = JSON.parse(JSON.stringify(order));
-        updated.status = 'On Process'; 
-        updated.finishing_qc.isPassed = false; 
-        onUpdateOrder(updated);
-    });
-  };
-
-  const handleAddKendala = () => {
-    if (!kendalaNote.trim()) return;
-    const updated = JSON.parse(JSON.stringify(order));
-    if (!updated.kendala) updated.kendala = [];
-    updated.kendala.push({ id: Date.now().toString(), notes: kendalaNote, reportedBy: currentUser.name, timestamp: new Date().toLocaleString(), isResolved: false });
-    updated.status = 'Ada Kendala'; 
-    onUpdateOrder(updated);
-    setKendalaNote('');
-    setShowKendalaForm(false);
-  };
-
-  const handleResolveKendala = (kendalaId: string) => {
-    const updated = JSON.parse(JSON.stringify(order));
-    const idx = updated.kendala.findIndex((k: KendalaNote) => k.id === kendalaId);
-    if (idx >= 0) {
-      updated.kendala[idx].isResolved = true;
-      updated.kendala[idx].resolvedBy = currentUser.name;
-      updated.kendala[idx].resolvedTimestamp = new Date().toLocaleString();
-    }
-    const stillHasKendala = updated.kendala.some((k: any) => !k.isResolved);
-    if (!stillHasKendala) {
-        const steps = isManual ? updated.steps_manual : updated.steps_dtf;
-        const allStepsDone = steps && steps.every((s:any) => s.isCompleted);
-        updated.status = allStepsDone ? 'Finishing' : 'On Process';
-    }
-    onUpdateOrder(updated);
-  };
-
-  const handleDeleteKendala = (kendalaId: string) => {
-      if (!onConfirm) return;
-      onConfirm('Hapus Laporan?', 'Laporan kendala ini akan dihapus permanen.', () => {
-        const updated = JSON.parse(JSON.stringify(order));
-        updated.kendala = updated.kendala.filter((k: KendalaNote) => k.id !== kendalaId);
-        if (updated.kendala.length === 0 || updated.kendala.every((k:any) => k.isResolved)) {
-            if (updated.status === 'Ada Kendala') {
-                 const steps = isManual ? updated.steps_manual : updated.steps_dtf;
-                 const allStepsDone = steps && steps.every((s:any) => s.isCompleted);
-                 updated.status = allStepsDone ? 'Finishing' : 'On Process';
-            }
-        }
-        onUpdateOrder(updated);
-      });
-  };
-
-  const handleFileDelete = (field: string, isStep = false, stepId?: string) => {
-      if (!onConfirm) return;
-      onConfirm('Hapus File/Bukti?', 'File tidak bisa dikembalikan.', () => {
-        const updated = JSON.parse(JSON.stringify(order));
-        if (isStep && stepId) {
-          const steps = isManual ? updated.steps_manual : updated.steps_dtf;
-          const idx = steps.findIndex((s: any) => s.id === stepId);
-          if(idx>=0) { steps[idx].isCompleted=false; steps[idx].fileUrl=null; }
-        } 
-        else if (field === 'approval') updated.link_approval = null;
-        else if (field === 'packing') { updated.finishing_packing.isPacked=false; updated.finishing_packing.fileUrl=null; }
-        else if (field === 'shipping_kirim') updated.shipping.bukti_kirim=null; 
-        else if (field === 'shipping_terima') updated.shipping.bukti_terima=null;
-        onUpdateOrder(updated);
-      });
-  }
-
   return (
     <div className="space-y-4 md:space-y-6 pb-24 relative">
-      
-      {/* 🟢 UPDATE: TEMPLATE RAHASIA LABEL PENGIRIMAN */}
-      <div className="fixed left-[-9999px] top-[-9999px] z-[-1]">
-          <div 
-             ref={labelRef} 
-             className="bg-white text-black border border-black flex flex-col relative"
-             style={{ 
-               width: '165mm', 
-               height: '107.5mm', 
-               boxSizing: 'border-box',
-               fontFamily: "'Inter', sans-serif" 
-             }}
-          >
-              {/* Main Content Area */}
-              <div className="flex-1 flex flex-col p-6 pb-2">
-                  {/* Header: Menggunakan Gambar dari folder Public (Diperbarui dengan p-[4mm] untuk celah pinggir) */}
-                  <div className="h-[22mm] w-full mb-2 p-[4mm]">
-                      <img 
-                          src="/header-pengiriman.png" 
-                          alt="Header Pengiriman" 
-                          className="h-full w-auto object-contain object-left" 
-                          crossOrigin="anonymous"
-                          onError={(e) => {
-                              (e.target as HTMLImageElement).src = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+ip1sAAAAASUVORK5CYII=';
-                          }}
-                      />
-                  </div>
 
-                  {/* Spacer (Mendorong pengirim & penerima ke bawah) */}
-                  <div className="flex-1"></div>
+      <LabelPengiriman order={order} labelRef={labelRef} />
 
-                  {/* Sender & Receiver Info (Posisi Fixed dengan ukuran Tinggi Tetap h-[35mm] dan items-start) */}
-                  <div className="flex justify-between items-start w-full h-[35mm]">
-                      {/* Kiri: Pengirim */}
-                      <div className="w-[45%] text-left flex flex-col h-full">
-                          <p className="text-[10px] font-bold text-gray-700 mb-1 uppercase tracking-widest">Pengirim :</p>
-                          <h1 className="text-2xl font-semibold text-gray-900 mb-1">Langitan.co</h1>
-                          <div className="mt-1">
-                              <p className="text-[10px] leading-tight text-gray-700">
-                                  Jl. Raya Widang - Babat PO BOX 02 Babat<br/>
-                                  Mandungan, Widang, Tuban, Jawa Timur
-                              </p>
-                              <p className="text-[10px] font-bold text-black mt-1">+62 851-8466-6545</p>
-                          </div>
-                      </div>
+      <OrderDetailHeader
+        order={order}
+        currentUser={currentUser}
+        isPrintingLabel={isPrintingLabel}
+        canEditOrderInfo={!!canEditOrderInfo}
+        canDeleteOrder={!!canDeleteOrder}
+        onBack={onBack}
+        onEdit={onEdit}
+        onDelete={onDelete}
+        onPrintLabel={handlePrintLabel}
+      />
 
-                      {/* Garis Tengah Vertikal */}
-                      <div className="w-[2px] bg-black h-full"></div>
+      <StepApproval
+        order={order}
+        canUploadApproval={!!canUploadApproval}
+        canDeleteApprovalFile={!!canDeleteApprovalFile}
+        onTriggerUpload={onTriggerUpload}
+        onFileDelete={handleFileDelete}
+      />
 
-                      {/* Kanan: Penerima */}
-                      <div className="w-[45%] text-right flex flex-col items-end h-full">
-                          <p className="text-[10px] font-bold text-gray-700 mb-1 uppercase tracking-widest">Penerima :</p>
-                          <h1 className="text-2xl font-semibold text-gray-900 mb-1 leading-tight">{order.nama_pemesan}</h1>
-                          <div className="mt-1 w-full flex flex-col items-end">
-                              <p className="text-[10px] leading-tight text-gray-700 text-right w-full">
-                                  {order.alamat_pemesan ? (
-                                      order.alamat_pemesan.split('\n').map((line, i) => (
-                                          <React.Fragment key={i}>
-                                              {line}<br/>
-                                          </React.Fragment>
-                                      ))
-                                  ) : (
-                                      'Alamat lengkap belum dicantumkan'
-                                  )}
-                              </p>
-                              <p className="text-[10px] font-bold text-black mt-1">{order.no_hp}</p>
-                          </div>
-                      </div>
-                  </div>
-              </div>
+      <StepProduksi
+        order={order}
+        currentUser={currentUser}
+        isManual={isManual}
+        canUpdateStep={!!canUpdateStep}
+        isSupervisor={isSupervisor}
+        isManagement={isManagement}
+        kendalaNote={kendalaNote}
+        setKendalaNote={setKendalaNote}
+        showKendalaForm={showKendalaForm}
+        setShowKendalaForm={setShowKendalaForm}
+        proofingRevisiNote={proofingRevisiNote}
+        setProofingRevisiNote={setProofingRevisiNote}
+        proofingStepId={proofingStepId}
+        setProofingStepId={setProofingStepId}
+        onTriggerUpload={onTriggerUpload}
+        onStatusStep={handleStatusStep}
+        onSaveProofingRevisi={handleSaveProofingRevisi}
+        onAddKendala={handleAddKendala}
+        onResolveKendala={handleResolveKendala}
+        onDeleteKendala={handleDeleteKendala}
+        onFileDelete={handleFileDelete}
+      />
 
-              {/* Footer: Kotak Peringatan (Rata Tengah Tanpa Garis Putus) */}
-              <div className="border-t border-black p-2 flex justify-center items-center h-[12mm]">
-                  <p className="text-[10px] font-bold text-gray-900 leading-tight m-0 text-center uppercase tracking-wider">
-                      Mohon untuk melakukan video unboxing ya, Tanpa bukti video unboxing komplain tidak diterima
-                  </p>
-              </div>
-          </div>
-      </div>
+      <StepFinishing
+        order={order}
+        isRevisi={isRevisi}
+        canCheckQC={!!canCheckQC}
+        canUpdatePacking={!!canUpdatePacking}
+        canUpdateShipping={!!canUpdateShipping}
+        canResetQC={!!canResetQC}
+        canDeleteFinishingFile={!!canDeleteFinishingFile}
+        qcNote={qcNote}
+        setQcNote={setQcNote}
+        onQC={handleQC}
+        onDeleteQC={handleDeleteQC}
+        onRevisiSelesai={handleRevisiSelesai}
+        onTriggerUpload={onTriggerUpload}
+        onFileDelete={handleFileDelete}
+      />
 
-      {/* HEADER ACTIONS */}
-      <div className="flex items-center justify-between flex-wrap gap-3">
-        <button onClick={onBack} className="text-xs md:text-sm text-slate-500 dark:text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 flex items-center gap-2 font-bold p-2 -ml-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition">
-          <ChevronRight className="w-4 h-4 md:w-5 md:h-5 rotate-180"/> Kembali
-        </button>
-        <div className="flex gap-2">
-          {/* TOMBOL CETAK LABEL KIRIM DI HEADER */}
-          <button 
-             onClick={handlePrintLabel} 
-             disabled={isPrintingLabel}
-             className="bg-emerald-600 text-white px-3 py-1.5 rounded-lg text-xs md:text-sm font-bold flex items-center gap-2 hover:bg-emerald-700 shadow-sm transition disabled:opacity-50"
-          > 
-             <Printer className="w-3 h-3"/> {isPrintingLabel ? 'Memproses...' : 'Label Kirim'} 
-          </button>
-          
-          {canEditOrderInfo && <button onClick={onEdit} className="bg-blue-600 text-white px-3 py-1.5 rounded-lg text-xs md:text-sm font-bold flex items-center gap-2 hover:bg-blue-700 shadow-sm transition"> <Pencil className="w-3 h-3"/> Edit </button>}
-          {canDeleteOrder && <button onClick={() => onDelete(order.id)} className="bg-red-600 text-white px-3 py-1.5 rounded-lg text-xs md:text-sm font-bold flex items-center gap-2 hover:bg-red-700 shadow-sm transition"> <Trash2 className="w-3 h-3"/> Hapus </button>}
-        </div>
-      </div>
-      
-      {/* HEADER INFO & STATUS */}
-      <div className="bg-white dark:bg-slate-900 p-4 md:p-6 rounded-2xl border dark:border-slate-800 shadow-sm flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-        <div className="flex-1">
-            <h1 className="text-xl md:text-2xl font-extrabold text-slate-800 dark:text-white mb-1">{order.nama_pemesan}</h1>
-            <div className="text-xs md:text-sm text-slate-500 dark:text-slate-400 font-medium flex flex-wrap gap-2 md:gap-3 items-center">
-              <span className="bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded font-mono text-slate-600 dark:text-slate-300">#{order.kode_produksi}</span>
-              <span>{order.jumlah} Pcs</span>
-              <span className={isLate ? 'text-red-600 dark:text-red-400 font-bold' : ''}>{formatDate(order.deadline)}</span>
-              <button onClick={() => openWA(order.no_hp)} className="bg-green-600 text-white px-2 py-1 rounded-lg text-[10px] font-bold flex items-center gap-1"> <Phone className="w-3 h-3"/> WA </button>
-            </div>
-            
-            {isManagement && (
-               <div className="mt-3 flex items-center gap-3">
-                 <div className="flex items-center gap-1.5 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400 px-2 py-1 rounded-lg border border-blue-100 dark:border-blue-900/40 w-fit">
-                    <User className="w-3.5 h-3.5"/>
-                    <span className="text-xs font-bold">PJ: {order.assigned_user?.name || '-'}</span>
-                 </div>
-                 {order.helper_user && (
-                    <div className="flex items-center gap-1.5 bg-orange-50 dark:bg-orange-900/20 text-orange-700 dark:text-orange-400 px-2 py-1 rounded-lg border border-orange-100 dark:border-orange-900/40 w-fit">
-                        <Users className="w-3.5 h-3.5"/>
-                        <span className="text-xs font-bold">Helper: {order.helper_user.name}</span>
-                    </div>
-                 )}
-               </div>
-            )}
-        </div>
-
-        <div className="flex flex-col gap-2 items-end w-full md:w-auto">
-            <div className={`px-4 py-2 rounded-xl font-black text-xs md:text-sm border uppercase tracking-wider text-center w-full md:w-auto shadow-sm ${getStatusColor(order.status)}`}>
-               {order.status}
-            </div>
-            {isLate && (
-               <div className="px-4 py-2 rounded-xl font-black text-xs md:text-sm border border-red-200 bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-100 dark:border-red-800 uppercase tracking-wider text-center w-full md:w-auto">
-                  TELAT DEADLINE
-               </div>
-            )}
-        </div>
-      </div>
-
-      {/* --- STEP 1: APPROVAL DESAIN --- */}
-      <div className="bg-white dark:bg-slate-900 p-4 md:p-6 rounded-2xl border dark:border-slate-800 shadow-sm">
-          <h3 className="font-bold text-slate-800 dark:text-white mb-4 flex items-center gap-2 text-sm md:text-lg"> 
-            <div className="bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-400 w-8 h-8 rounded-full flex items-center justify-center text-sm">1</div> Approval Desain
-          </h3>
-          
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-4 last:border-0 gap-3">
-              <div>
-                 {order.link_approval?.link ? (
-                    <>
-                       <div className="font-bold text-sm md:text-base text-slate-800 dark:text-slate-200">File Desain Terupload</div>
-                       <div className="text-[10px] text-slate-500 dark:text-slate-400">Oleh: {order.link_approval.by} | {order.link_approval.timestamp}</div>
-                       <a href={order.link_approval.link} target="_blank" className="text-[10px] text-blue-600 dark:text-blue-400 font-bold flex items-center gap-1 mt-1 hover:underline">
-                          <Eye className="w-3.5 h-3.5"/> Lihat File
-                       </a>
-                    </>
-                 ) : (
-                    <>
-                       <div className="font-bold text-sm md:text-base text-slate-400 dark:text-slate-600">File Desain</div>
-                       <div className="text-[10px] text-slate-400 dark:text-slate-600 italic">Belum ada file yang diupload...</div>
-                    </>
-                 )}
-              </div>
-
-              <div className="flex items-center gap-2">
-                 {order.link_approval?.link ? (
-                    <>
-                       <div className="flex items-center gap-2 bg-green-50 dark:bg-green-900/20 px-3 py-1.5 rounded-lg border border-green-100 dark:border-green-900/40">
-                          <CheckCircle className="w-4 h-4 text-green-600 dark:text-green-400"/> 
-                          <span className="text-[10px] font-bold text-green-700 dark:text-green-400 uppercase">SELESAI</span>
-                       </div>
-                       {canDeleteApprovalFile && (
-                          <button 
-                             onClick={() => handleFileDelete('approval')} 
-                             className="text-red-400 hover:text-red-600 transition ml-1 p-1"
-                          >
-                             <Trash2 className="w-4 h-4"/>
-                          </button>
-                       )}
-                    </>
-                 ) : (
-                    canUploadApproval && (
-                       <button 
-                          onClick={() => onTriggerUpload('approval')} 
-                          className="bg-white dark:bg-slate-800 border-2 border-slate-200 dark:border-slate-700 px-4 py-2 rounded-lg text-xs font-bold text-slate-600 dark:text-slate-300 flex items-center justify-center gap-2 hover:bg-slate-50 dark:hover:bg-slate-700 transition w-full sm:w-auto"
-                       >
-                          <Upload className="w-4 h-4"/> Upload File
-                       </button>
-                    )
-                 )}
-              </div>
-          </div>
-      </div>
-
-      {/* --- STEP 2: PRODUKSI --- */}
-      <div className="bg-white dark:bg-slate-900 p-4 md:p-6 rounded-2xl border dark:border-slate-800 shadow-sm">
-      <div className="flex justify-between items-center mb-4">
-         <h3 className="font-bold text-slate-800 dark:text-white flex items-center gap-2 text-sm md:text-lg">
-            <div className="bg-slate-100 dark:bg-slate-800 w-8 h-8 rounded-full flex items-center justify-center text-sm">2</div>
-            Produksi ({order.jenis_produksi})
-         </h3>
-         {canUpdateStep && (
-            <button 
-            onClick={() => setShowKendalaForm(!showKendalaForm)} 
-            className="text-xs bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700 px-3 py-1.5 rounded-lg font-bold flex items-center gap-1.5 hover:bg-slate-200 dark:hover:bg-slate-700 transition"
-            >
-            <MessageSquare className="w-3.5 h-3.5"/> {showKendalaForm ? 'Tutup Laporan' : 'Lapor Kendala'}
-            </button>
-         )}
-      </div>
-
-      {showKendalaForm && (
-         <div className="mb-6 p-4 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 animate-in fade-in slide-in-from-top-2">
-            <h4 className="text-xs font-bold text-slate-700 dark:text-slate-400 uppercase mb-2">Form Laporan Kendala</h4>
-            <div className="flex gap-2">
-            <input 
-               type="text" 
-               placeholder="Tulis detail kendala" 
-               className="flex-1 text-sm px-3 py-2 text-slate-800 dark:text-slate-100 border border-slate-300 dark:border-slate-600 rounded-lg outline-none focus:border-blue-500 dark:bg-slate-900" 
-               value={kendalaNote} 
-               onChange={e => setKendalaNote(e.target.value)} 
-            />
-            <button 
-               onClick={handleAddKendala} 
-               disabled={!kendalaNote.trim()} 
-               className="bg-blue-600 text-white px-4 py-2 rounded-lg font-bold text-xs hover:bg-blue-700 disabled:opacity-50 flex items-center gap-2"
-            >
-               <Send className="w-3 h-3"/> Kirim
-            </button>
-            </div>
-         </div>
-      )}
-
-      {order.kendala && order.kendala.some(k => !k.isResolved) && (
-         <div className="mb-6 space-y-3">
-            {order.kendala.filter(k => !k.isResolved).map((k) => (
-            <div key={k.id} className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-3 md:p-4 shadow-sm flex flex-col sm:flex-row gap-3">
-               <div className="flex items-start gap-3 flex-1">
-                  <div className="bg-orange-100 dark:bg-orange-900/30 p-2 rounded-full flex-shrink-0">
-                  <AlertTriangle className="w-4 h-4 text-orange-600 dark:text-orange-400"/>
-                  </div>
-                  <div>
-                  <p className="font-bold text-slate-800 dark:text-slate-200 text-sm mb-1">{k.notes}</p>
-                  <div className="flex flex-wrap items-center gap-3 text-[10px] text-slate-500 dark:text-slate-400">
-                     <span className="flex items-center gap-1"><User className="w-3 h-3"/> {k.reportedBy}</span>
-                     <span className="flex items-center gap-1"><Clock className="w-3 h-3"/> {k.timestamp}</span>
-                  </div>
-                  </div>
-               </div>
-
-               <div className="flex items-center justify-end gap-2 w-full sm:w-auto border-t sm:border-t-0 border-slate-100 dark:border-slate-700 pt-2 sm:pt-0 mt-1 sm:mt-0">
-                  {canUpdateStep && (
-                  <button 
-                     onClick={() => handleResolveKendala(k.id)} 
-                     className="bg-green-50 dark:bg-green-900/30 text-green-700 dark:text-green-400 border border-green-200 dark:border-green-800 text-[10px] px-3 py-1.5 rounded-lg font-bold hover:bg-green-100 transition whitespace-nowrap"
-                  >
-                     ✓ Selesaikan
-                  </button>
-                  )}
-                  {isSupervisor && (
-                  <button 
-                     onClick={() => handleDeleteKendala(k.id)} 
-                     className="text-slate-400 hover:text-red-500 p-1.5 rounded-lg transition"
-                  >
-                     <Trash2 className="w-4 h-4"/>
-                  </button>
-                  )}
-               </div>
-            </div>
-            ))}
-         </div>
-      )}
-
-      <div className="space-y-4">
-         {currentSteps?.map((s) => {
-            const step = s as any;
-
-            const isProofingStep = step.name.toLowerCase().includes('proofing');
-            const hasFileUploaded = !!step.fileUrl;
-            const isStepCompleted = step.isCompleted;
-            const hasRevisionNote = step.proofing_note;
-            const isInRevisionMode = hasRevisionNote && !isStepCompleted;
-            
-            const showProofingActions = isProofingStep && hasFileUploaded && !isStepCompleted && isManagement && !isInRevisionMode;
-            const isEditingRevisi = proofingStepId === step.id;
-
-            return (
-            <div key={step.id} className="flex flex-col border-b border-slate-100 dark:border-slate-800 pb-4 last:border-0 gap-3">
-               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                  <div className="flex-1">
-                  <div className={`font-bold text-sm md:text-base ${step.isCompleted ? 'text-slate-800 dark:text-slate-200' : 'text-slate-400 dark:text-slate-600'}`}>
-                     {step.name}
-                  </div>
-                  
-                  {hasRevisionNote && !step.isCompleted && (
-                     <div className="mt-1.5 bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-400 text-xs px-3 py-2 rounded-lg border border-red-100 dark:border-red-900/50 flex items-start gap-2">
-                        <AlertTriangle className="w-3.5 h-3.5 flex-shrink-0 mt-0.5"/>
-                        <div>
-                        <span className="font-bold block text-[10px] uppercase">Catatan Revisi:</span>
-                        {step.proofing_note}
-                        </div>
-                     </div>
-                  )}
-
-                  {step.isCompleted && (
-                     <div className="text-[10px] text-slate-500 dark:text-slate-400">
-                        Oleh: {step.uploadedBy} | {step.timestamp}
-                     </div>
-                  )}
-                  
-                  {step.fileUrl && (
-                     <a href={step.fileUrl} target="_blank" className="text-[10px] text-blue-600 dark:text-blue-400 font-bold flex items-center gap-1 mt-1 hover:underline">
-                        <Eye className="w-3.5 h-3.5"/> Lihat Bukti
-                     </a>
-                  )}
-                  </div>
-                  
-                  {step.isCompleted ? (
-                  <div className="flex items-center gap-2 bg-green-50 dark:bg-green-900/20 px-3 py-1.5 rounded-lg border border-green-100 dark:border-green-900/40">
-                     <CheckCircle className="w-4 h-4 text-green-600 dark:text-green-400"/>
-                     <span className="text-[10px] font-bold text-green-700 dark:text-green-400 uppercase">SELESAI</span>
-                     {canDeleteStepFile && (
-                        <button 
-                        onClick={() => handleFileDelete('step', true, step.id)} 
-                        className="text-red-400 hover:text-red-600 transition ml-2"
-                        >
-                        <Trash2 className="w-3.5 h-3.5"/>
-                        </button>
-                     )}
-                  </div>
-                  ) : (
-                  <>
-                     {isProofingStep && isInRevisionMode && canUpdateStep ? (
-                        <button 
-                        onClick={() => onTriggerUpload('step', step.id)} 
-                        className="bg-orange-600 text-white border-2 border-orange-700 px-4 py-2 rounded-lg text-xs font-bold flex items-center justify-center gap-2 hover:bg-orange-700 shadow-md transition w-full sm:w-auto animate-pulse"
-                        >
-                        <Upload className="w-4 h-4"/> Upload Ulang (Revisi)
-                        </button>
-                     ) : (
-                        canUpdateStep && (
-                        showProofingActions ? (
-                           <div className="flex gap-2 w-full sm:w-auto">
-                              <button 
-                              onClick={() => setProofingStepId(isEditingRevisi ? null : step.id)} 
-                              className="flex-1 sm:flex-none bg-white dark:bg-slate-800 border border-red-200 dark:border-red-900 text-red-600 dark:text-red-400 px-3 py-2 rounded-lg text-xs font-bold hover:bg-red-50 dark:hover:bg-red-900/20 transition flex items-center justify-center gap-1.5"
-                              >
-                              <ThumbsDown className="w-3.5 h-3.5"/> Revisi
-                              </button>
-                              <button 
-                              onClick={() => handleStatusStep(step.id)} 
-                              className="flex-1 sm:flex-none bg-blue-600 text-white px-3 py-2 rounded-lg text-xs font-bold hover:bg-blue-700 shadow-sm transition flex items-center justify-center gap-1.5"
-                              >
-                              <ThumbsUp className="w-3.5 h-3.5"/> Siap Produksi
-                              </button>
-                           </div>
-                        ) : (
-                           step.type === 'status_update' 
-                           ? (
-                              <button 
-                              onClick={() => handleStatusStep(step.id)} 
-                              className="bg-blue-600 text-white text-xs px-4 py-2 rounded-lg font-bold hover:bg-blue-700 shadow-sm transition w-full sm:w-auto"
-                              >
-                              Tandai Selesai
-                              </button>
-                           ) : (
-                              <button 
-                              onClick={() => onTriggerUpload('step', step.id)} 
-                              className="bg-white dark:bg-slate-800 border-2 border-slate-200 dark:border-slate-700 px-4 py-2 rounded-lg text-xs font-bold text-slate-600 dark:text-slate-300 flex items-center justify-center gap-2 hover:bg-slate-50 dark:hover:bg-slate-700 transition w-full sm:w-auto"
-                              >
-                              <Camera className="w-4 h-4"/> {step.fileUrl ? 'Ganti Foto' : 'Upload Foto'}
-                              </button>
-                           )
-                        )
-                        )
-                     )}
-                  </>
-                  )}
-               </div>
-
-               {isEditingRevisi && (
-                  <div className="mt-2 p-3 bg-slate-50 dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700 animate-in fade-in slide-in-from-top-1">
-                  <label className="text-[10px] font-bold text-slate-500 uppercase mb-1 block">
-                     Catatan Revisi untuk Tim Produksi:
-                  </label>
-                  <div className="flex gap-2">
-                     <input 
-                        type="text" 
-                        autoFocus
-                        placeholder="Misal: Warna kurang terang, sablon miring..." 
-                        className="flex-1 text-sm px-3 py-2 text-slate-800 dark:text-slate-100 border border-slate-300 dark:border-slate-600 rounded-lg outline-none focus:border-red-500 dark:bg-slate-900"
-                        value={proofingRevisiNote}
-                        onChange={(e) => setProofingRevisiNote(e.target.value)}
-                     />
-                     <button 
-                        onClick={handleSaveProofingRevisi}
-                        disabled={!proofingRevisiNote.trim()}
-                        className="bg-red-600 text-white px-4 py-2 rounded-lg font-bold text-xs hover:bg-red-700 disabled:opacity-50"
-                     >
-                        Kirim
-                     </button>
-                  </div>
-                  </div>
-               )}
-            </div>
-            );
-         })}
-      </div>
-      </div>
-
-       {/* --- STEP 3: QC & PACKING --- */}
-       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-           {/* KIRI: AREA QC */}
-           <div className="bg-white dark:bg-slate-900 p-4 md:p-6 rounded-2xl border dark:border-slate-800 shadow-sm flex flex-col h-full">
-             <div className="flex items-center gap-2 mb-4 border-b border-slate-100 dark:border-slate-800 pb-2">
-                <div className="bg-slate-100 dark:bg-slate-800 w-6 h-6 rounded-full flex items-center justify-center text-xs text-slate-600 dark:text-slate-400 font-bold">3a</div>
-                <h3 className="font-bold text-slate-800 dark:text-white text-sm md:text-base">Quality Control</h3>
-             </div>
-
-             {isRevisi && order.finishing_qc.notes && (
-                <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 p-4 rounded-xl mb-4">
-                  <p className="text-[10px] font-bold text-red-700 dark:text-red-400 uppercase mb-1 flex items-center gap-1"> <AlertTriangle className="w-3 h-3"/> Alasan Revisi:</p>
-                  <p className="text-xs text-red-900 dark:text-red-200 font-medium italic">"{order.finishing_qc.notes}"</p>
-                </div>
-             )}
-             
-             {isRevisi && canUpdateStep && (
-                 <button onClick={handleRevisiSelesai} className="w-full bg-white dark:bg-slate-800 border-2 border-red-100 dark:border-red-900/40 text-red-600 dark:text-red-400 py-3 rounded-xl font-bold text-xs uppercase hover:bg-red-50 transition mb-4">
-                    ✓ Konfirmasi Revisi Selesai
-                 </button>
-             )}
-
-             {order.finishing_qc.isPassed ? (
-                <div className="flex-1 flex flex-col items-center justify-center p-6 bg-green-50 dark:bg-green-900/10 rounded-2xl border-2 border-dashed border-green-200 dark:border-green-800 text-center min-h-[160px]">
-                    <div className="bg-green-100 dark:bg-green-900/30 p-3 rounded-full mb-2"><CheckCircle className="w-8 h-8 text-green-600 dark:text-green-400"/></div>
-                    <h4 className="font-bold text-green-800 dark:text-green-400">Lolos QC</h4>
-                    <p className="text-[10px] text-green-600 dark:text-green-500 mt-1">Oleh: {order.finishing_qc.checkedBy}</p>
-                    {canResetQC && <button onClick={handleDeleteQC} className="text-red-500 dark:text-red-400 text-[10px] mt-4 hover:underline">Reset</button>}
-                </div>
-             ) : (
-                canCheckQC ? (
-                  <div className="flex-1 flex flex-col">
-                     <textarea placeholder="Catatan QC (Wajib jika revisi)..." className="w-full text-sm p-3 text-slate-800 dark:text-slate-100 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl outline-none transition mb-3 resize-none h-32" value={qcNote} onChange={e=>setQcNote(e.target.value)}/>
-                     <div className="grid grid-cols-2 gap-3 mt-auto">
-                        <button onClick={()=>handleQC(false)} disabled={!qcNote.trim()} className="bg-white dark:bg-slate-800 border-2 border-red-100 dark:border-red-900 text-red-600 dark:text-red-400 py-2.5 rounded-xl font-bold text-xs hover:bg-red-50 disabled:opacity-50 transition">
-                           REVISI
-                        </button>
-                        <button onClick={()=>handleQC(true)} className="bg-blue-600 text-white py-2.5 rounded-xl font-bold text-xs hover:bg-blue-700 shadow-md transition">
-                           LOLOS QC
-                        </button>
-                     </div>
-                  </div>
-                ) : (
-                   <div className="flex-1 flex items-center justify-center text-center p-6 border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-2xl bg-slate-50 dark:bg-slate-800/50 min-h-[160px]">
-                      <span className="text-xs text-slate-400 dark:text-slate-600 font-medium italic">{!isRevisi ? 'Menunggu produksi selesai...' : 'Sedang Revisi'}</span>
-                   </div>
-                )
-             )}
-           </div>
-
-           {/* KANAN: AREA PACKING */}
-           <div className="bg-white dark:bg-slate-900 p-4 md:p-6 rounded-2xl border dark:border-slate-800 shadow-sm flex flex-col h-full">
-             <div className="flex items-center gap-2 mb-4 border-b border-slate-100 dark:border-slate-800 pb-2">
-                <div className="bg-slate-100 dark:bg-slate-800 w-6 h-6 rounded-full flex items-center justify-center text-xs text-slate-600 dark:text-slate-400 font-bold">3b</div>
-                <h3 className="font-bold text-slate-800 dark:text-white text-sm md:text-base">Packing</h3>
-             </div>
-
-             {order.finishing_packing.isPacked ? (
-                 <div className="flex-1 flex flex-col items-center justify-center p-6 bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 text-center shadow-sm relative overflow-hidden group min-h-[160px]">
-                     {order.finishing_packing.fileUrl ? (
-                        <div className="relative w-full h-32 mb-3 rounded-lg overflow-hidden border border-slate-100 dark:border-slate-700">
-                           <img src={order.finishing_packing.fileUrl} alt="Packing" className="w-full h-full object-cover"/>
-                           <a href={order.finishing_packing.fileUrl} target="_blank" className="absolute inset-0 bg-black/40 flex items-center justify-center text-white opacity-0 group-hover:opacity-100 transition duration-300 font-bold text-xs">
-                              <Eye className="w-4 h-4 mr-1"/> Lihat
-                           </a>
-                        </div>
-                     ) : <Package className="w-10 h-10 text-slate-300 dark:text-slate-600 mb-2"/>}
-                     
-                     <div className="flex items-center gap-2 text-green-700 dark:text-green-400 font-bold text-sm bg-green-50 dark:bg-green-900/20 px-3 py-1 rounded-full border border-green-100 dark:border-green-800">
-                        <CheckCircle className="w-4 h-4"/> Selesai
-                     </div>
-                     
-                     {canDeleteFinishingFile && <button onClick={() => handleFileDelete('packing')} className="absolute top-2 right-2 text-slate-300 dark:text-slate-600 hover:text-red-500 p-1"><Trash2 className="w-4 h-4"/></button>}
-                 </div>
-             ) : (
-                <div className="flex-1 flex items-center justify-center">
-                   {canUpdatePacking ? (
-                      <button onClick={()=>onTriggerUpload('packing')} className="bg-purple-600 text-white w-full py-4 rounded-xl font-bold text-sm flex flex-col items-center justify-center gap-2 shadow-md hover:bg-purple-700 transition duration-200">
-                          <Camera className="w-6 h-6"/>
-                          <span>UPLOAD FOTO</span>
-                      </button>
-                   ) : (
-                      <div className="text-center p-8 border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-2xl w-full min-h-[160px] flex flex-col justify-center items-center">
-                         <Package className="w-8 h-8 text-slate-300 dark:text-slate-600 mb-2"/>
-                         <p className="text-xs text-slate-400 dark:text-slate-600 italic">Menunggu QC Lolos</p>
-                      </div>
-                   )}
-                </div>
-             )}
-           </div>
-       </div>
-
-       {/* --- STEP 4: PENGIRIMAN --- */}
-       <div className="bg-white dark:bg-slate-900 p-4 md:p-6 rounded-2xl border dark:border-slate-800 shadow-sm">
-         <h3 className="font-bold text-slate-800 dark:text-white mb-4 flex items-center gap-2 text-sm md:text-lg"> <div className="bg-slate-100 dark:bg-slate-800 w-8 h-8 rounded-full flex items-center justify-center text-sm">4</div> Pengiriman</h3>
-         <div className="p-4 border border-slate-200 dark:border-slate-700 rounded-xl bg-slate-50/50 dark:bg-slate-800/50 space-y-4">
-            <div className="flex justify-between items-center">
-              <span className="text-xs md:text-sm font-bold text-slate-700 dark:text-slate-300">Bukti Kirim (Resi)</span>
-              {order.shipping.bukti_kirim ? (
-                <div className="flex gap-2 items-center">
-                   <a href={order.shipping.bukti_kirim} target="_blank" className="text-green-600 dark:text-green-400 font-bold underline text-xs">LIHAT RESI</a>
-                   {canDeleteFinishingFile && <button onClick={() => handleFileDelete('shipping_kirim')} className="text-red-500 dark:text-red-400"><Trash2 className="w-4 h-4"/></button>}
-                </div>
-              ) : (canUpdateShipping ? <button onClick={()=>onTriggerUpload('shipping_kirim')} className="text-[10px] md:text-xs bg-blue-600 text-white px-3 py-2 rounded-lg font-bold shadow-md">UPLOAD RESI</button> : <span className="text-[10px] text-slate-300 dark:text-slate-600 italic">Menunggu pengerjaan & packing selesai...</span>)}
-            </div>
-            
-            <div className="flex justify-between items-center border-t border-slate-200 dark:border-slate-700 pt-4">
-              <span className="text-xs md:text-sm font-bold text-slate-700 dark:text-slate-300">Bukti Terima (User)</span>
-              {order.shipping.bukti_terima ? (
-                <div className="flex gap-2 items-center">
-                   <a href={order.shipping.bukti_terima} target="_blank" className="text-orange-600 dark:text-orange-400 font-bold underline text-xs">LIHAT BUKTI</a>
-                   {canDeleteFinishingFile && <button onClick={() => handleFileDelete('shipping_terima')} className="text-red-500 dark:text-red-400"><Trash2 className="w-4 h-4"/></button>}
-                </div>
-              ) : (canUpdateShipping && order.shipping.bukti_kirim ? <button onClick={()=>onTriggerUpload('shipping_terima')} className="text-[10px] md:text-xs bg-orange-600 text-white px-3 py-2 rounded-lg font-bold shadow-md">UPLOAD TERIMA</button> : <span className="text-[10px] text-slate-300 dark:text-slate-600 italic">-</span>)}
-            </div>
-         </div>
-       </div>
     </div>
   );
 }
