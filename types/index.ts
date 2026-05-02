@@ -7,11 +7,9 @@ export interface UserPermissions {
   pages: {
     dashboard: boolean;
     orders: boolean;
-    // 👇 TAMBAHAN BARU
     completed_orders: boolean; 
     activity_logs: boolean;
-    salary: boolean; // 🟢 UPDATE: Izin akses menu Gaji
-    // 👆
+    salary: boolean; 
     kalkulator: boolean;
     settings: boolean;
     trash: boolean;
@@ -54,49 +52,14 @@ export interface UserPermissions {
   };
 }
 
-export interface Order {
-  id: string;
-  created_at: string;
-  kode_produksi: string;
-  nama_pemesan: string;
-  no_hp: string;
-  jumlah: number;
-  tanggal_masuk: string;
-  deadline: string;
-  jenis_produksi: string;
-  status: OrderStatus; 
-  
-  assigned_to?: string | null; 
-  assigned_user?: { name: string } | null; 
-
-  // 👇 TAMBAHAN BARU (HELPER)
-  helper_id?: string | null;
-  helper_user?: { name: string } | null;
-  // 👆
-
-  link_approval: { link: string | null; by: string | null; timestamp: string | null } | null;
-  steps_manual: ProductionStep[];
-  steps_dtf: ProductionStep[];
-  finishing_qc: { isPassed: boolean; notes: string; checkedBy?: string; timestamp?: string };
-  finishing_packing: { isPacked: boolean; fileUrl?: string | null; packedBy?: string | null; timestamp?: string | null };
-  shipping: { 
-    bukti_kirim?: string | null; uploaded_by_kirim?: string | null; timestamp_kirim?: string | null;
-    bukti_terima?: string | null; uploaded_by_terima?: string | null; timestamp_terima?: string | null;
-  };
-  kendala: KendalaNote[];
-  deleted_at?: string | null;
-}
-
 // Default Permissions
 export const DEFAULT_PERMISSIONS: UserPermissions = {
   pages: { 
     dashboard: true, 
     orders: true, 
-    // 👇 TAMBAHAN BARU (DEFAULT FALSE)
     completed_orders: false, 
     activity_logs: false,
-    salary: false, // 🟢 UPDATE: Default matikan akses gaji
-    // 👆
+    salary: false, 
     kalkulator: true, 
     settings: false, 
     trash: false, 
@@ -117,7 +80,6 @@ export interface UserData {
   name: string;
   role: UserRole;
   permissions: UserPermissions;
-  // Tambahan untuk profil baru (Persiapan update UI nanti)
   address?: string;
   dob?: string;
   avatar_url?: string;
@@ -139,17 +101,18 @@ export interface Order {
   kode_produksi: string;
   nama_pemesan: string;
   no_hp: string;
+  alamat_pemesan?: string; // 🟢 UPDATE: Tambahan kolom alamat pemesan
   jumlah: number;
   tanggal_masuk: string;
   deadline: string;
   jenis_produksi: string;
   status: OrderStatus; 
   
-  // --- INI YANG MENYEBABKAN ERROR VERCEL ---
-  // Kamu lupa menambahkan ini di types, padahal dipakai di codingan EditOrder
   assigned_to?: string | null; 
   assigned_user?: { name: string } | null; 
-  // ----------------------------------------
+
+  helper_id?: string | null;
+  helper_user?: { name: string } | null;
 
   link_approval: { link: string | null; by: string | null; timestamp: string | null } | null;
   steps_manual: ProductionStep[];

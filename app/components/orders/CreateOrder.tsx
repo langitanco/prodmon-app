@@ -14,11 +14,12 @@ export default function CreateOrder({ productionTypes, users, onCancel, onSubmit
   const [form, setForm] = useState({ 
     nama: '', 
     hp: '', 
+    alamat_pemesan: '', // 🟢 UPDATE: State alamat
     jumlah: '', 
     deadline: new Date().toISOString().split('T')[0], 
     type: productionTypes[0]?.value || 'manual',
     assigned_to: '',
-    helper_id: '' // 🟢 UPDATE: State untuk Helper
+    helper_id: '' 
   });
 
   useEffect(() => { 
@@ -27,7 +28,6 @@ export default function CreateOrder({ productionTypes, users, onCancel, onSubmit
     setForm(f => ({ ...f, deadline: d.toISOString().split('T')[0] })); 
   }, []);
 
-  // Helper opsional, jadi tidak masuk validasi isDisabled
   const isDisabled = !form.nama || !form.hp || !form.deadline || !form.jumlah || !form.assigned_to;
 
   return (
@@ -64,6 +64,17 @@ export default function CreateOrder({ productionTypes, users, onCancel, onSubmit
             />
           </div>
         </div>
+
+        {/* 🟢 UPDATE: Input Alamat Pemesan */}
+        <div>
+            <label className="block text-[10px] md:text-xs font-bold text-slate-700 dark:text-slate-400 uppercase mb-1 md:mb-2">Alamat Pemesan (Opsional, untuk Label Kirim)</label>
+            <textarea 
+              className="w-full border-2 border-slate-200 dark:border-slate-700 p-2 md:p-3 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none font-medium bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 text-sm placeholder-slate-400 dark:placeholder-slate-500 resize-none h-20" 
+              placeholder="Masukkan alamat lengkap pengiriman..." 
+              value={form.alamat_pemesan} 
+              onChange={e=>setForm({...form, alamat_pemesan: e.target.value})} 
+            />
+        </div>
         
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 md:gap-5">
           <div>
@@ -93,7 +104,6 @@ export default function CreateOrder({ productionTypes, users, onCancel, onSubmit
           </div>
         </div>
 
-        {/* 🟢 UPDATE: Input Helper (Opsional) */}
         <div>
           <label className="block text-[10px] md:text-xs font-bold text-orange-600 dark:text-orange-400 uppercase mb-1 md:mb-2">Helper / Pembantu (Opsional)</label>
           <select 

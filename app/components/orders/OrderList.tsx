@@ -3,7 +3,7 @@
 import React, { useState } from 'react';
 import { formatDate, getDeadlineStatus, getStatusColor, MONTHS } from '@/lib/utils';
 import { Order, ProductionTypeData, UserData } from '@/types';
-import { BarChart3, Calendar, ClipboardList, Clock, FileText, Trash2, User, Users } from 'lucide-react'; 
+import { AlertTriangle, BarChart3, Calendar, ClipboardList, Clock, FileText, Trash2, User, Users } from 'lucide-react';
 
 interface OrderListProps {
   role: string;
@@ -15,6 +15,417 @@ interface OrderListProps {
   currentUser: UserData;
 }
 
+// ─── Konstanta Alur Status ───────────────────────────────────────────────────
+
+const STATUS_FLOW = [
+  'Pesanan Masuk',
+  'On Process',
+  'Finishing',
+  'Kirim',
+  'Selesai',
+] as const;
+
+// Mapping status ke index step (0-based)
+function getStepIndex(status: string): number {
+  const map: Record<string, number> = {
+    'Pesanan Masuk': 0,
+    'On Process': 1,
+    'Finishing': 2,
+    'Kirim': 3,
+    'Selesai': 4,
+    // Status khusus: anggap tetap di step terakhir yang relevan
+    'Revisi': 1,
+    'Ada Kendala': 1,
+    'Telat': 1,
+  };
+  return map[status] ?? 0;
+}
+
+const isSpecialStatus = (status: string) =>
+  ['Revisi', 'Ada Kendala', 'Telat'].includes(status);
+
+// ─── Helper: warna badge status ─────────────────────────────────────────────
+
+function statusBadgeClass(status: string): string {
+  switch (status) {
+    case 'Pesanan Masuk': return 'bg-slate-100 text-slate-700 border-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700';
+    case 'On Process':   return 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-900/30 dark:text-blue-300 dark:border-blue-800';
+    case 'Finishing':    return 'bg-violet-50 text-violet-700 border-violet-200 dark:bg-violet-900/30 dark:text-violet-300 dark:border-violet-800';
+    case 'Kirim':        return 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-900/30 dark:text-amber-300 dark:border-amber-800';
+    case 'Selesai':      return 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-300 dark:border-emerald-800';
+    case 'Revisi':       return 'bg-orange-50 text-orange-700 border-orange-200 dark:bg-orange-900/30 dark:text-orange-300 dark:border-orange-800';
+    case 'Ada Kendala':  return 'bg-red-50 text-red-700 border-red-200 dark:bg-red-900/30 dark:text-red-300 dark:border-red-800';
+    case 'Telat':        return 'bg-red-50 text-red-700 border-red-200 dark:bg-red-900/30 dark:text-red-300 dark:border-red-800';
+    default:             return 'bg-slate-100 text-slate-600 border-slate-200 dark:bg-slate-800 dark:text-slate-400 dark:border-slate-700';
+  }
+}
+
+// ─── Komponen: Progress Bar (untuk Mobile Card) ──────────────────────────────
+
+function ProgressBar({ status }: { status: string }) {
+  const currentStep = getStepIndex(status);
+  const isOverdue = status === 'Telat';
+  const isKendala = status === 'Ada Kendala';
+  const isRevisi = status === 'Revisi';
+
+  return (
+    <div className="mt-2 mb-1">
+      {/* Bar */}
+      <div className="flex gap-1 mb-1">
+        {STATUS_FLOW.map((_, i) => {
+          let barClass = 'h-1 flex-1 rounded-full ';
+          if (i < currentStep) {
+            barClass += 'bg-emerald-400 dark:bg-emerald-600'; // done
+          } else if (i === currentStep) {
+            if (isOverdue || isKendala) barClass += 'bg-red-400 dark:bg-red-600';
+            else if (isRevisi) barClass += 'bg-orange-400 dark:bg-orange-500';
+            else barClass += 'bg-blue-400 dark:bg-blue-500'; // active
+          } else {
+            barClass += 'bg-slate-200 dark:bg-slate-700'; // pending
+          }
+          return <div key={i} className={barClass} />;
+        })}
+      </div>
+      {/* Labels */}
+      <div className="flex justify-between">
+        {STATUS_FLOW.map((step, i) => {
+          let labelClass = 'text-[8px] flex-1 text-center ';
+          if (i < currentStep) {
+            labelClass += 'text-emerald-600 dark:text-emerald-400 font-medium';
+          } else if (i === currentStep) {
+            if (isOverdue || isKendala) labelClass += 'text-red-600 dark:text-red-400 font-semibold';
+            else if (isRevisi) labelClass += 'text-orange-600 dark:text-orange-400 font-semibold';
+            else labelClass += 'text-blue-600 dark:text-blue-400 font-semibold';
+          } else {
+            labelClass += 'text-slate-400 dark:text-slate-600';
+          }
+          // Nama label lebih pendek
+          const shortNames = ['Masuk', 'Proses', 'Finishing', 'Kirim', 'Selesai'];
+          return (
+            <span key={i} className={labelClass}>
+              {shortNames[i]}
+            </span>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// ─── Komponen: Mobile Card ───────────────────────────────────────────────────
+
+interface MobileCardProps {
+  order: Order;
+  isManagement: boolean;
+  canDeleteOrder: boolean;
+  onSelectOrder: (id: string) => void;
+  onDeleteOrder: (id: string) => void;
+}
+
+function MobileCard({ order, isManagement, canDeleteOrder, onSelectOrder, onDeleteOrder }: MobileCardProps) {
+  const isOverdue = order.status === 'Telat' || getDeadlineStatus(order.deadline, order.status) === 'overdue';
+  const isKendala = order.status === 'Ada Kendala';
+  const isDone = order.status === 'Selesai' || order.status === 'Kirim';
+
+  let borderAccent = 'border-slate-200 dark:border-slate-800';
+  if (isOverdue) borderAccent = 'border-t-2 border-t-red-400 border-x-slate-200 border-b-slate-200 dark:border-t-red-600 dark:border-x-slate-800 dark:border-b-slate-800';
+  else if (isKendala) borderAccent = 'border-t-2 border-t-orange-400 border-x-slate-200 border-b-slate-200 dark:border-t-orange-500 dark:border-x-slate-800 dark:border-b-slate-800';
+  else if (isDone) borderAccent = 'border-t-2 border-t-emerald-400 border-x-slate-200 border-b-slate-200 dark:border-t-emerald-600 dark:border-x-slate-800 dark:border-b-slate-800';
+
+  return (
+    <div
+      onClick={() => onSelectOrder(order.id)}
+      className={`bg-white dark:bg-slate-900 rounded-xl border ${borderAccent} p-3 cursor-pointer active:scale-[0.98] transition-transform`}
+    >
+      {/* Row 1: kode + badge status */}
+      <div className="flex items-center justify-between mb-1.5">
+        <span className="text-[10px] font-mono font-bold text-slate-400 dark:text-slate-500">
+          #{order.kode_produksi}
+        </span>
+        <div className="flex items-center gap-1">
+          {isSpecialStatus(order.status) && (
+            <AlertTriangle className="w-3 h-3 text-red-500 dark:text-red-400" />
+          )}
+          <span className={`text-[9px] font-bold px-2 py-0.5 rounded-full border uppercase tracking-wide ${statusBadgeClass(order.status)}`}>
+            {order.status}
+          </span>
+        </div>
+      </div>
+
+      {/* Row 2: Nama pemesan */}
+      <p className="font-semibold text-sm text-slate-800 dark:text-white line-clamp-1 mb-1 leading-tight">
+        {order.nama_pemesan}
+      </p>
+
+      {/* Progress Bar */}
+      <ProgressBar status={order.status} />
+
+      {/* Row 3: Detail ringkas */}
+      <div className="flex items-center justify-between mt-2 pt-2 border-t border-slate-100 dark:border-slate-800">
+        <div className="flex items-center gap-2">
+          <span className="text-[10px] text-slate-500 dark:text-slate-400 font-medium">{order.jumlah} pcs</span>
+          <span className="text-[10px] text-slate-400 dark:text-slate-600">·</span>
+          <span className="text-[10px] text-slate-500 dark:text-slate-400 uppercase font-semibold">{order.jenis_produksi}</span>
+        </div>
+        <span className={`text-[10px] font-semibold ${isOverdue ? 'text-red-500 dark:text-red-400' : 'text-slate-500 dark:text-slate-400'}`}>
+          {formatDate(order.deadline)}
+        </span>
+      </div>
+
+      {/* PIC & Helper */}
+      {isManagement && (
+        <div className="flex flex-wrap gap-1 mt-2">
+          {order.assigned_user && (
+            <div className="flex items-center gap-1 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400 px-1.5 py-0.5 rounded text-[9px] font-semibold border border-blue-100 dark:border-blue-900/30">
+              <User className="w-2.5 h-2.5" /> {order.assigned_user.name}
+            </div>
+          )}
+          {order.helper_user && (
+            <div className="flex items-center gap-1 bg-orange-50 dark:bg-orange-900/20 text-orange-700 dark:text-orange-400 px-1.5 py-0.5 rounded text-[9px] font-semibold border border-orange-100 dark:border-orange-900/30">
+              <Users className="w-2.5 h-2.5" /> {order.helper_user.name}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Tombol hapus */}
+      {canDeleteOrder && (
+        <button
+          onClick={(e) => { e.stopPropagation(); onDeleteOrder(order.id); }}
+          className="mt-2 w-full bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 px-3 py-1.5 rounded-lg text-[10px] font-bold hover:bg-red-100 dark:hover:bg-red-900/40 transition border border-red-200 dark:border-red-900/50 flex items-center justify-center gap-1.5"
+        >
+          <Trash2 className="w-3 h-3" /> Hapus
+        </button>
+      )}
+    </div>
+  );
+}
+
+// ─── Komponen: Desktop Kanban ────────────────────────────────────────────────
+
+const KANBAN_COLUMNS: { status: string; label: string; borderClass: string; bgClass: string; textClass: string; countClass: string }[] = [
+  {
+    status: 'Pesanan Masuk',
+    label: 'Pesanan Masuk',
+    borderClass: 'border-t-slate-400 dark:border-t-slate-500',
+    bgClass: 'bg-slate-100 dark:bg-slate-800/60',
+    textClass: 'text-slate-700 dark:text-slate-200',
+    countClass: 'bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300',
+  },
+  {
+    status: 'On Process',
+    label: 'On Process',
+    borderClass: 'border-t-blue-500 dark:border-t-blue-400',
+    bgClass: 'bg-blue-50 dark:bg-blue-900/30',
+    textClass: 'text-blue-700 dark:text-blue-300',
+    countClass: 'bg-blue-100 dark:bg-blue-800/60 text-blue-600 dark:text-blue-300',
+  },
+  {
+    status: 'Finishing',
+    label: 'Finishing',
+    borderClass: 'border-t-violet-500 dark:border-t-violet-400',
+    bgClass: 'bg-violet-50 dark:bg-violet-900/30',
+    textClass: 'text-violet-700 dark:text-violet-300',
+    countClass: 'bg-violet-100 dark:bg-violet-800/60 text-violet-600 dark:text-violet-300',
+  },
+  {
+    status: 'Kirim',
+    label: 'Siap Kirim',
+    borderClass: 'border-t-amber-500 dark:border-t-amber-400',
+    bgClass: 'bg-amber-50 dark:bg-amber-900/30',
+    textClass: 'text-amber-700 dark:text-amber-300',
+    countClass: 'bg-amber-100 dark:bg-amber-800/60 text-amber-600 dark:text-amber-300',
+  },
+];
+
+// Status khusus: Revisi & Ada Kendala dimasukkan ke kolom On Process
+// Telat juga dimasukkan ke kolom berdasarkan urutan sebelumnya (On Process)
+function getKanbanColumn(order: Order): string {
+  if (order.status === 'Revisi' || order.status === 'Ada Kendala' || order.status === 'Telat') {
+    return 'On Process';
+  }
+  return order.status;
+}
+
+interface KanbanCardProps {
+  order: Order;
+  isManagement: boolean;
+  canDeleteOrder: boolean;
+  onSelectOrder: (id: string) => void;
+  onDeleteOrder: (id: string) => void;
+}
+
+function KanbanCard({ order, isManagement, canDeleteOrder, onSelectOrder, onDeleteOrder }: KanbanCardProps) {
+  const isOverdue = order.status === 'Telat' || getDeadlineStatus(order.deadline, order.status) === 'overdue';
+  const isKendala = order.status === 'Ada Kendala';
+  const isRevisi = order.status === 'Revisi';
+
+  let leftBorder = '';
+  if (isOverdue) leftBorder = 'border-l-2 border-l-red-400 dark:border-l-red-600';
+  else if (isKendala) leftBorder = 'border-l-2 border-l-orange-400 dark:border-l-orange-500';
+  else if (isRevisi) leftBorder = 'border-l-2 border-l-amber-400 dark:border-l-amber-500';
+
+  return (
+    <div
+      onClick={() => onSelectOrder(order.id)}
+      className={`bg-white dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-800 ${leftBorder} p-3 cursor-pointer hover:shadow-sm hover:border-slate-300 dark:hover:border-slate-700 transition group`}
+    >
+      {/* Kode + Badge */}
+      <div className="flex items-start justify-between gap-1 mb-1.5">
+        <span className="text-[9px] font-mono text-slate-400 dark:text-slate-500 font-bold mt-0.5">
+          #{order.kode_produksi}
+        </span>
+        <div className="flex flex-col items-end gap-0.5">
+          {isSpecialStatus(order.status) && (
+            <span className={`text-[8px] font-bold px-1.5 py-0.5 rounded-full border uppercase tracking-wide flex items-center gap-0.5 ${statusBadgeClass(order.status)}`}>
+              <AlertTriangle className="w-2 h-2" />
+              {order.status}
+            </span>
+          )}
+        </div>
+      </div>
+
+      {/* Nama */}
+      <p className="font-semibold text-xs text-slate-800 dark:text-white line-clamp-2 leading-tight mb-2">
+        {order.nama_pemesan}
+      </p>
+
+      {/* Detail */}
+      <div className="space-y-1 text-[10px] text-slate-500 dark:text-slate-400">
+        <div className="flex items-center gap-1">
+          <FileText className="w-3 h-3 shrink-0" />
+          <span className="font-medium">{order.jumlah} pcs</span>
+          <span className="text-slate-300 dark:text-slate-600">·</span>
+          <span className="uppercase font-semibold">{order.jenis_produksi}</span>
+        </div>
+        <div className="flex items-center gap-1">
+          <Clock className="w-3 h-3 shrink-0" />
+          <span className={isOverdue ? 'text-red-500 dark:text-red-400 font-semibold' : ''}>
+            {formatDate(order.deadline)}
+            {isOverdue && ' · Telat!'}
+          </span>
+        </div>
+        <div className="flex items-center gap-1">
+          <Calendar className="w-3 h-3 shrink-0" />
+          <span>{formatDate(order.tanggal_masuk)}</span>
+        </div>
+      </div>
+
+      {/* PIC & Helper */}
+      {isManagement && (
+        <div className="flex flex-wrap gap-1 mt-2 pt-2 border-t border-slate-100 dark:border-slate-800">
+          {order.assigned_user && (
+            <div className="flex items-center gap-1 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400 px-1.5 py-0.5 rounded text-[9px] font-semibold border border-blue-100 dark:border-blue-900/30">
+              <User className="w-2.5 h-2.5" /> {order.assigned_user.name}
+            </div>
+          )}
+          {order.helper_user && (
+            <div className="flex items-center gap-1 bg-orange-50 dark:bg-orange-900/20 text-orange-700 dark:text-orange-400 px-1.5 py-0.5 rounded text-[9px] font-semibold border border-orange-100 dark:border-orange-900/30">
+              <Users className="w-2.5 h-2.5" /> {order.helper_user.name}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Hapus */}
+      {canDeleteOrder && (
+        <button
+          onClick={(e) => { e.stopPropagation(); onDeleteOrder(order.id); }}
+          className="mt-2 w-full bg-red-50 dark:bg-red-900/20 text-red-500 dark:text-red-400 px-2 py-1 rounded text-[9px] font-bold hover:bg-red-100 dark:hover:bg-red-900/40 transition border border-red-100 dark:border-red-900/30 flex items-center justify-center gap-1 opacity-0 group-hover:opacity-100"
+        >
+          <Trash2 className="w-2.5 h-2.5" /> Hapus
+        </button>
+      )}
+    </div>
+  );
+}
+
+// ─── Helper: Sorting Opsi C (Telat → deadline terdekat → sisanya) ───────────
+
+function sortByUrgency(orders: Order[]): Order[] {
+  const now = new Date();
+  now.setHours(0, 0, 0, 0);
+  const H3 = 3 * 24 * 60 * 60 * 1000;
+
+  const getTier = (order: Order): number => {
+    const isOverdue = order.status === 'Telat' || getDeadlineStatus(order.deadline, order.status) === 'overdue';
+    if (isOverdue) return 0;
+
+    const deadline = new Date(order.deadline);
+    deadline.setHours(0, 0, 0, 0);
+    const diffMs = deadline.getTime() - now.getTime();
+    if (diffMs <= H3) return 1;
+
+    return 2;
+  };
+
+  return [...orders].sort((a, b) => {
+    const tierA = getTier(a);
+    const tierB = getTier(b);
+
+    if (tierA !== tierB) return tierA - tierB;
+
+    if (tierA === 0 || tierA === 1) {
+      return new Date(a.deadline).getTime() - new Date(b.deadline).getTime();
+    }
+
+    return new Date(a.tanggal_masuk).getTime() - new Date(b.tanggal_masuk).getTime();
+  });
+}
+
+// ─── Komponen: Desktop Kanban Board ─────────────────────────────────────────
+
+interface KanbanBoardProps {
+  orders: Order[];
+  isManagement: boolean;
+  canDeleteOrder: boolean;
+  onSelectOrder: (id: string) => void;
+  onDeleteOrder: (id: string) => void;
+}
+
+function KanbanBoard({ orders, isManagement, canDeleteOrder, onSelectOrder, onDeleteOrder }: KanbanBoardProps) {
+  const sortedOrders = sortByUrgency(orders);
+  return (
+    <div className="flex gap-3 overflow-x-auto pb-3 -mx-1 px-1">
+      {KANBAN_COLUMNS.map((col) => {
+        const colOrders = sortedOrders.filter((o) => getKanbanColumn(o) === col.status);
+        return (
+          <div key={col.status} className="flex-1 min-w-44">
+            {/* Header kolom */}
+            <div className={`rounded-xl border-t-2 border border-slate-200 dark:border-slate-800 ${col.borderClass} ${col.bgClass} mb-2 px-3 py-2 flex items-center justify-between`}>
+              <span className={`text-xs font-bold ${col.textClass}`}>{col.label}</span>
+              <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${col.countClass}`}>
+                {colOrders.length}
+              </span>
+            </div>
+
+            {/* Cards */}
+            <div className="space-y-2">
+              {colOrders.map((order) => (
+                <KanbanCard
+                  key={order.id}
+                  order={order}
+                  isManagement={isManagement}
+                  canDeleteOrder={canDeleteOrder}
+                  onSelectOrder={onSelectOrder}
+                  onDeleteOrder={onDeleteOrder}
+                />
+              ))}
+              {colOrders.length === 0 && (
+                <div className="text-center text-[10px] text-slate-300 dark:text-slate-700 py-6 border border-dashed border-slate-200 dark:border-slate-800 rounded-lg">
+                  Kosong
+                </div>
+              )}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+// ─── Komponen Utama: OrderList ───────────────────────────────────────────────
+
 export default function OrderList({ role, orders, productionTypes, onSelectOrder, onNewOrder, onDeleteOrder, currentUser }: OrderListProps) {
   const [statusFilter, setStatusFilter] = useState<string | null>(null);
   const [monthFilter, setMonthFilter] = useState<string>('all');
@@ -25,23 +436,23 @@ export default function OrderList({ role, orders, productionTypes, onSelectOrder
   const isManagement = ['admin', 'manager', 'supervisor'].includes(role);
 
   const filteredOrders = orders.filter((o) => {
-    if (statusFilter !== 'completed' && o.status === 'Selesai') {
-        return false;
-    }
+    // Default: sembunyikan 'Selesai' kecuali filter completed
+    if (statusFilter !== 'completed' && o.status === 'Selesai') return false;
 
     let statusMatch = true;
     if (statusFilter === 'process') {
-        statusMatch = o.status === 'On Process' || o.status === 'Finishing' || o.status === 'Pesanan Masuk';
+      statusMatch = ['On Process', 'Finishing', 'Pesanan Masuk'].includes(o.status);
     } else if (statusFilter === 'overdue') {
-        statusMatch = o.status === 'Telat' || getDeadlineStatus(o.deadline, o.status) === 'overdue';
+      statusMatch = o.status === 'Telat' || getDeadlineStatus(o.deadline, o.status) === 'overdue';
     } else if (statusFilter === 'completed') {
-        statusMatch = o.status === 'Selesai' || o.status === 'Kirim';
+      statusMatch = o.status === 'Selesai' || o.status === 'Kirim';
+    } else if (statusFilter === 'kendala') {
+      statusMatch = o.status === 'Ada Kendala' || o.status === 'Revisi';
     }
 
     let monthMatch = true;
     if (monthFilter !== 'all') {
-      const orderDate = new Date(o.tanggal_masuk);
-      const orderMonth = orderDate.getMonth(); 
+      const orderMonth = new Date(o.tanggal_masuk).getMonth();
       monthMatch = orderMonth.toString() === monthFilter;
     }
 
@@ -53,176 +464,132 @@ export default function OrderList({ role, orders, productionTypes, onSelectOrder
     return statusMatch && monthMatch && typeMatch;
   });
 
+  // Hitung jumlah per filter untuk badge
+  const countOverdue = orders.filter(
+    (o) => o.status !== 'Selesai' && (o.status === 'Telat' || getDeadlineStatus(o.deadline, o.status) === 'overdue')
+  ).length;
+  const countKendala = orders.filter((o) => ['Ada Kendala', 'Revisi'].includes(o.status)).length;
+
+  const filterButtons = [
+    { id: null,        label: 'Semua',    count: null },
+    { id: 'process',   label: 'Proses',   count: null },
+    { id: 'overdue',   label: 'Telat',    count: countOverdue },
+    { id: 'kendala',   label: 'Kendala',  count: countKendala },
+    { id: 'completed', label: 'Siap Kirim', count: null },
+  ];
+
   return (
-    <div className="space-y-4 md:space-y-6">
-       
-       {/* HEADER & FILTER */}
-       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-3 md:gap-4">
-        
-        {/* JUDUL */}
+    <div className="space-y-4 md:space-y-5">
+
+      {/* ── HEADER ── */}
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-3">
+
+        {/* Judul (desktop only) */}
         <div className="hidden md:block">
-          <h2 className="text-xl md:text-2xl font-bold text-slate-800 dark:text-white">Daftar Pesanan</h2>
-          <p className="text-xs md:text-sm text-slate-500 dark:text-slate-400 mt-0.5 md:mt-1 font-medium">Kelola {filteredOrders.length} pesanan aktif</p>
+          <h2 className="text-xl font-bold text-slate-800 dark:text-white">Daftar Pesanan</h2>
+          <p className="text-sm text-slate-500 dark:text-slate-400 mt-0.5">
+            {filteredOrders.length} pesanan ditampilkan
+          </p>
         </div>
 
-        {/* BAGIAN KANAN: Filter & Tombol Tambah */}
-        <div className="flex flex-col md:flex-row w-full md:w-auto items-center gap-2 md:gap-3">
-             {/* Filter Status (Mobile) */}
-             <div className="flex md:hidden gap-2 overflow-x-auto pb-2 scrollbar-hide w-full">
-                {[
-                { id: null, label: 'Semua' },
-                { id: 'process', label: 'Proses' },
-                { id: 'overdue', label: 'Telat' },
-                { id: 'completed', label: 'Siap Kirim' } 
-                ].map((f) => (
-                <button 
-                    key={f.id || 'all'}
-                    onClick={() => setStatusFilter(f.id)}
-                    className={`px-3 py-1.5 rounded-full text-[10px] font-bold whitespace-nowrap transition border ${
-                      statusFilter === f.id 
-                        ? 'bg-slate-800 text-white border-slate-800 dark:bg-blue-600 dark:border-blue-600 shadow-md' 
-                        : 'bg-white text-slate-600 border-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700'
-                    }`}
-                >
-                    {f.label}
-                </button>
-                ))}
-             </div>
+        {/* Controls kanan */}
+        <div className="flex flex-wrap items-center gap-2 w-full md:w-auto">
+          <select
+            className="bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-200 text-xs rounded-lg px-2 py-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+            value={monthFilter}
+            onChange={(e) => setMonthFilter(e.target.value)}
+          >
+            <option value="all">Semua Bulan</option>
+            {MONTHS.map((m, i) => (
+              <option key={i} value={i.toString()}>{m}</option>
+            ))}
+          </select>
 
-             <div className="flex flex-row w-full md:w-auto items-center gap-2 md:gap-3 overflow-x-auto pb-1 justify-end">
-                <select 
-                    className="bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-200 text-[10px] md:text-sm rounded-lg p-2 focus:ring-blue-500 focus:border-blue-500 font-medium outline-none"
-                    value={monthFilter}
-                    onChange={(e) => setMonthFilter(e.target.value)}
-                >
-                    <option value="all">Semua Bulan</option>
-                    {MONTHS.map((m, i) => (
-                    <option key={i} value={i.toString()}>{m}</option>
-                    ))}
-                </select>
+          <select
+            className="bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-200 text-xs rounded-lg px-2 py-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+            value={typeFilter}
+            onChange={(e) => setTypeFilter(e.target.value)}
+          >
+            <option value="all">Semua Jenis</option>
+            {productionTypes.map((pt) => (
+              <option key={pt.id} value={pt.value}>{pt.name}</option>
+            ))}
+          </select>
 
-                <select 
-                    className="bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-200 text-[10px] md:text-sm rounded-lg p-2 focus:ring-blue-500 focus:border-blue-500 font-medium outline-none"
-                    value={typeFilter}
-                    onChange={(e) => setTypeFilter(e.target.value)}
-                >
-                    <option value="all">Semua Jenis</option>
-                    {productionTypes.map((pt) => (
-                    <option key={pt.id} value={pt.value}>{pt.name}</option>
-                    ))}
-                </select>
-
-                {canCreateOrder && (
-                    <button onClick={onNewOrder} className="bg-blue-600 text-white px-3 py-2 md:px-4 md:py-2.5 rounded-lg text-[10px] md:text-sm font-bold flex items-center justify-center gap-2 hover:bg-blue-700 transition shadow-sm active:scale-95 whitespace-nowrap ml-auto md:ml-0">
-                    <ClipboardList className="w-3 h-3 md:w-4 md:h-4"/> Tambah
-                    </button>
-                )}
-            </div>
+          {canCreateOrder && (
+            <button
+              onClick={onNewOrder}
+              className="ml-auto md:ml-0 bg-blue-600 text-white px-3 py-2 rounded-lg text-xs font-bold flex items-center gap-2 hover:bg-blue-700 transition shadow-sm active:scale-95 whitespace-nowrap"
+            >
+              <ClipboardList className="w-3.5 h-3.5" /> Tambah Pesanan
+            </button>
+          )}
         </div>
       </div>
 
-      {/* FILTER BUTTONS (Desktop) */}
-      <div className="hidden md:flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
-        {[
-          { id: null, label: 'Semua (Aktif)' },
-          { id: 'process', label: 'Proses' },
-          { id: 'overdue', label: 'Telat' },
-          { id: 'completed', label: 'Siap Kirim' } 
-        ].map((f) => (
-          <button 
-            key={f.id || 'all'}
+      {/* ── FILTER PILLS ── */}
+      <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide">
+        {filterButtons.map((f) => (
+          <button
+            key={f.id ?? 'all'}
             onClick={() => setStatusFilter(f.id)}
-            className={`px-3 py-1.5 md:px-5 md:py-2 rounded-full text-[10px] md:text-sm font-bold whitespace-nowrap transition border ${
-              statusFilter === f.id 
-                ? 'bg-slate-800 text-white border-slate-800 dark:bg-blue-600 dark:border-blue-600 shadow-md' 
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold whitespace-nowrap transition border ${
+              statusFilter === f.id
+                ? 'bg-slate-800 text-white border-slate-800 dark:bg-blue-600 dark:border-blue-600'
                 : 'bg-white text-slate-600 border-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700'
             }`}
           >
             {f.label}
+            {f.count !== null && f.count > 0 && (
+              <span className={`text-[9px] font-extrabold px-1.5 py-0.5 rounded-full ${
+                statusFilter === f.id
+                  ? 'bg-white/20 text-white'
+                  : 'bg-red-100 text-red-600 dark:bg-red-900/40 dark:text-red-400'
+              }`}>
+                {f.count}
+              </span>
+            )}
           </button>
         ))}
       </div>
 
-      {/* ORDER CARDS */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 md:gap-4 items-stretch">
-          {filteredOrders.map((order) => {
-             const calculatedStatus = getDeadlineStatus(order.deadline, order.status);
-             const showOverdueBadge = calculatedStatus === 'overdue' || order.status === 'Telat';
-
-             return (
-              <div 
-                key={order.id} 
-                onClick={() => onSelectOrder(order.id)} 
-                className={`bg-white dark:bg-slate-900 rounded-2xl shadow-sm border p-3 md:p-5 cursor-pointer hover:shadow-md dark:hover:shadow-blue-900/10 transition relative overflow-hidden active:scale-[0.98] h-full flex flex-col justify-between ${
-                  showOverdueBadge ? 'border-red-300 dark:border-red-900 ring-1 ring-red-100 dark:ring-red-900/20' : 'border-slate-200 dark:border-slate-800'
-                }`}
-              >
-                <div className="flex-1">
-                    <div className="flex justify-between items-start mb-1 md:mb-4 mt-1">
-                      <div className="flex flex-col gap-1">
-                          <span className="text-[10px] md:text-xs font-mono font-bold text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 md:px-2 md:py-1 rounded-md h-fit w-fit">#{order.kode_produksi}</span>
-                          
-                          {isManagement && (
-                             <div className="flex flex-col gap-1 mt-1">
-                                {/* PJ BADGE */}
-                                <div className="flex items-center gap-1 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400 px-1.5 py-0.5 rounded border border-blue-100 dark:border-blue-900/30 w-fit">
-                                    <User className="w-3 h-3"/>
-                                    <span className="text-[10px] font-bold truncate max-w-[100px]">{order.assigned_user?.name || 'No PIC'}</span>
-                                </div>
-                                {/* 🟢 UPDATE: HELPER BADGE */}
-                                {order.helper_user && (
-                                    <div className="flex items-center gap-1 bg-orange-50 dark:bg-orange-900/20 text-orange-700 dark:text-orange-400 px-1.5 py-0.5 rounded border border-orange-100 dark:border-orange-900/30 w-fit">
-                                        <Users className="w-3 h-3"/>
-                                        <span className="text-[10px] font-bold truncate max-w-[100px]">{order.helper_user.name}</span>
-                                    </div>
-                                )}
-                             </div>
-                          )}
-                      </div>
-                      <div className="flex flex-col gap-1 items-end">
-                          <span className={`text-[9px] md:text-[10px] font-extrabold px-2 py-0.5 md:px-2.5 md:py-1 rounded-full border uppercase tracking-wide whitespace-nowrap ${getStatusColor(order.status)}`}>
-                            {order.status}
-                          </span>
-                          {showOverdueBadge && (
-                            <span className="text-[8px] md:text-[9px] font-extrabold px-2 py-0.5 rounded-full border border-red-200 bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-100 dark:border-red-800 uppercase tracking-wide whitespace-nowrap">Telat Deadline</span>
-                          )}
-                      </div>
-                    </div>
-                    
-                    <h3 className="font-bold text-sm md:text-lg text-slate-800 dark:text-white line-clamp-1 mb-0.5 md:mb-1 leading-tight">{order.nama_pemesan}</h3>
-                    <div className="text-[10px] md:text-xs text-slate-500 dark:text-slate-400 mb-2 md:mb-4 font-medium flex items-center gap-1">
-                      <Calendar className="w-3 h-3"/> {formatDate(order.tanggal_masuk)}
-                    </div>
-                    
-                    <div className="pt-2 border-t border-slate-100 dark:border-slate-800 grid grid-cols-3 md:grid-cols-1 gap-1 md:gap-2 mb-3">
-                      <div className="flex flex-col md:flex-row md:items-center md:justify-between text-[10px] md:text-sm">
-                        <span className="text-slate-500 dark:text-slate-400 flex items-center gap-1.5 font-medium hidden md:flex"><FileText className="w-4 h-4"/> Jumlah</span>
-                        <span className="text-slate-500 text-[8px] md:hidden uppercase font-bold">Jml</span>
-                        <span className="font-bold text-slate-800 dark:text-slate-200">{order.jumlah} Pcs</span>
-                      </div>
-                      <div className="flex flex-col md:flex-row md:items-center md:justify-between text-[10px] md:text-sm border-l md:border-l-0 border-slate-100 dark:border-slate-800 pl-2 md:pl-0">
-                        <span className="text-slate-500 dark:text-slate-400 flex items-center gap-1.5 font-medium hidden md:flex"><BarChart3 className="w-4 h-4"/> Tipe</span>
-                        <span className="text-slate-500 text-[8px] md:hidden uppercase font-bold">Tipe</span>
-                        <span className="font-bold text-slate-800 dark:text-slate-200 uppercase bg-slate-50 dark:bg-slate-800 md:px-2 rounded">{order.jenis_produksi}</span>
-                      </div>
-                      <div className="flex flex-col md:flex-row md:items-center md:justify-between text-[10px] md:text-sm border-l md:border-l-0 border-slate-100 dark:border-slate-800 pl-2 md:pl-0">
-                        <span className="text-slate-500 dark:text-slate-400 flex items-center gap-1.5 font-medium hidden md:flex"><Clock className="w-4 h-4"/> Deadline</span>
-                        <span className="text-slate-500 text-[8px] md:hidden uppercase font-bold">Deadline</span>
-                        <span className={`font-bold ${showOverdueBadge ? 'text-red-600 dark:text-red-400' : 'text-slate-800 dark:text-slate-200'}`}>{formatDate(order.deadline)}</span>
-                      </div>
-                    </div>
-                </div>
-
-                {canDeleteOrder && (
-                  <button onClick={(e) => { e.stopPropagation(); onDeleteOrder(order.id); }} className="mt-auto w-full bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 px-3 py-1.5 md:py-2 rounded-lg text-[10px] md:text-xs font-bold hover:bg-red-100 dark:hover:bg-red-900/40 transition border border-red-200 dark:border-red-900/50 flex items-center justify-center gap-2">
-                    <Trash2 className="w-3 h-3 md:w-3.5 md:h-3.5"/> Hapus Pesanan
-                  </button>
-                )}
-              </div>
-             );
-          })}
-          {filteredOrders.length === 0 && <div className="col-span-full text-center text-slate-400 dark:text-slate-500 py-12 border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-xl bg-slate-50 dark:bg-slate-900/50 text-xs">Tidak ada pesanan aktif sesuai filter</div>}
+      {/* ── KANBAN (Desktop/Tablet: md ke atas) ── */}
+      <div className="hidden md:block">
+        {filteredOrders.length > 0 ? (
+          <KanbanBoard
+            orders={filteredOrders}
+            isManagement={isManagement}
+            canDeleteOrder={canDeleteOrder}
+            onSelectOrder={onSelectOrder}
+            onDeleteOrder={onDeleteOrder}
+          />
+        ) : (
+          <div className="text-center text-slate-400 dark:text-slate-500 py-16 border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-xl bg-slate-50 dark:bg-slate-900/50 text-sm">
+            Tidak ada pesanan sesuai filter
+          </div>
+        )}
       </div>
+
+      {/* ── MOBILE CARDS (Mobile: di bawah md) ── */}
+      <div className="md:hidden space-y-2.5">
+        {filteredOrders.length > 0 ? (
+          sortByUrgency(filteredOrders).map((order) => (
+            <MobileCard
+              key={order.id}
+              order={order}
+              isManagement={isManagement}
+              canDeleteOrder={canDeleteOrder}
+              onSelectOrder={onSelectOrder}
+              onDeleteOrder={onDeleteOrder}
+            />
+          ))
+        ) : (
+          <div className="text-center text-slate-400 dark:text-slate-500 py-12 border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-xl bg-slate-50 dark:bg-slate-900/50 text-xs">
+            Tidak ada pesanan sesuai filter
+          </div>
+        )}
+      </div>
+
     </div>
   );
 }

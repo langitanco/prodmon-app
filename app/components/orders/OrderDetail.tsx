@@ -1,11 +1,13 @@
 // app/components/orders/OrderDetail.tsx
 
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { formatDate, getStatusColor, openWA, getDeadlineStatus } from '@/lib/utils';
 import { Order, UserData, KendalaNote } from '@/types';
+import { toJpeg } from 'html-to-image'; 
+import jsPDF from 'jspdf'; 
 import { 
   AlertTriangle, Camera, CheckCircle, ChevronRight, Eye, MessageSquare, 
-  Package, Pencil, Phone, Trash2, Upload, X, Clock, User, Send, ThumbsUp, ThumbsDown, Users
+  Package, Pencil, Phone, Trash2, Upload, X, Clock, User, Send, ThumbsUp, ThumbsDown, Users, Printer
 } from 'lucide-react';
 
 interface OrderDetailProps {
@@ -27,6 +29,10 @@ export default function OrderDetail({ currentUser, order, onBack, onEdit, onTrig
   // -- STATE UNTUK FITUR PROOFING --
   const [proofingRevisiNote, setProofingRevisiNote] = useState('');
   const [proofingStepId, setProofingStepId] = useState<string | null>(null);
+
+  // -- STATE & REF UNTUK LABEL PENGIRIMAN --
+  const labelRef = useRef<HTMLDivElement>(null);
+  const [isPrintingLabel, setIsPrintingLabel] = useState(false);
 
   // --- LOGIKA HAK AKSES ---
   const isSupervisor = currentUser.role === 'supervisor';
@@ -61,7 +67,42 @@ export default function OrderDetail({ currentUser, order, onBack, onEdit, onTrig
   const canResetQC = isSupervisor || perms?.finishing?.qc_reset;
   const canDeleteFinishingFile = isSupervisor || perms?.finishing?.delete_files;
 
-  // --- HANDLERS (Tidak berubah) ---
+  // --- FUNGSI CETAK LABEL (MENAMPILKAN PREVIEW DI TAB BARU) ---
+  const handlePrintLabel = async () => {
+    if (!labelRef.current) return;
+    setIsPrintingLabel(true);
+    try {
+      await new Promise(resolve => setTimeout(resolve, 150)); 
+      
+      const dataUrl = await toJpeg(labelRef.current, { 
+          pixelRatio: 2, 
+          quality: 0.9,
+          cacheBust: true,
+          backgroundColor: '#ffffff'
+      });
+      
+      const pdf = new jsPDF({
+        orientation: 'landscape', 
+        unit: 'mm',
+        format: [165, 107.5] 
+      });
+
+      pdf.addImage(dataUrl, 'JPEG', 0, 0, 165, 107.5);
+      
+      // Blob url untuk preview di tab baru
+      const pdfBlob = pdf.output('blob');
+      const pdfUrl = URL.createObjectURL(pdfBlob);
+      window.open(pdfUrl, '_blank');
+      
+    } catch (error) {
+      console.error('Gagal membuat Label PDF:', error);
+      alert('Terjadi kesalahan saat mengekspor Label PDF.');
+    } finally {
+      setIsPrintingLabel(false);
+    }
+  };
+
+  // --- HANDLERS ---
   const handleStatusStep = (stepId: string) => {
     const updated = JSON.parse(JSON.stringify(order));
     const steps = (isManual ? updated.steps_manual : updated.steps_dtf) as any[];
@@ -179,13 +220,102 @@ export default function OrderDetail({ currentUser, order, onBack, onEdit, onTrig
   }
 
   return (
-    <div className="space-y-4 md:space-y-6 pb-24">
+    <div className="space-y-4 md:space-y-6 pb-24 relative">
+      
+      {/* 🟢 UPDATE: TEMPLATE RAHASIA LABEL PENGIRIMAN */}
+      <div className="fixed left-[-9999px] top-[-9999px] z-[-1]">
+          <div 
+             ref={labelRef} 
+             className="bg-white text-black border border-black flex flex-col relative"
+             style={{ 
+               width: '165mm', 
+               height: '107.5mm', 
+               boxSizing: 'border-box',
+               fontFamily: "'Inter', sans-serif" 
+             }}
+          >
+              {/* Main Content Area */}
+              <div className="flex-1 flex flex-col p-6 pb-2">
+                  {/* Header: Menggunakan Gambar dari folder Public (Diperbarui dengan p-[4mm] untuk celah pinggir) */}
+                  <div className="h-[22mm] w-full mb-2 p-[4mm]">
+                      <img 
+                          src="/header-pengiriman.png" 
+                          alt="Header Pengiriman" 
+                          className="h-full w-auto object-contain object-left" 
+                          crossOrigin="anonymous"
+                          onError={(e) => {
+                              (e.target as HTMLImageElement).src = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+ip1sAAAAASUVORK5CYII=';
+                          }}
+                      />
+                  </div>
+
+                  {/* Spacer (Mendorong pengirim & penerima ke bawah) */}
+                  <div className="flex-1"></div>
+
+                  {/* Sender & Receiver Info (Posisi Fixed dengan ukuran Tinggi Tetap h-[35mm] dan items-start) */}
+                  <div className="flex justify-between items-start w-full h-[35mm]">
+                      {/* Kiri: Pengirim */}
+                      <div className="w-[45%] text-left flex flex-col h-full">
+                          <p className="text-[10px] font-bold text-gray-700 mb-1 uppercase tracking-widest">Pengirim :</p>
+                          <h1 className="text-2xl font-semibold text-gray-900 mb-1">Langitan.co</h1>
+                          <div className="mt-1">
+                              <p className="text-[10px] leading-tight text-gray-700">
+                                  Jl. Raya Widang - Babat PO BOX 02 Babat<br/>
+                                  Mandungan, Widang, Tuban, Jawa Timur
+                              </p>
+                              <p className="text-[10px] font-bold text-black mt-1">+62 851-8466-6545</p>
+                          </div>
+                      </div>
+
+                      {/* Garis Tengah Vertikal */}
+                      <div className="w-[2px] bg-black h-full"></div>
+
+                      {/* Kanan: Penerima */}
+                      <div className="w-[45%] text-right flex flex-col items-end h-full">
+                          <p className="text-[10px] font-bold text-gray-700 mb-1 uppercase tracking-widest">Penerima :</p>
+                          <h1 className="text-2xl font-semibold text-gray-900 mb-1 leading-tight">{order.nama_pemesan}</h1>
+                          <div className="mt-1 w-full flex flex-col items-end">
+                              <p className="text-[10px] leading-tight text-gray-700 text-right w-full">
+                                  {order.alamat_pemesan ? (
+                                      order.alamat_pemesan.split('\n').map((line, i) => (
+                                          <React.Fragment key={i}>
+                                              {line}<br/>
+                                          </React.Fragment>
+                                      ))
+                                  ) : (
+                                      'Alamat lengkap belum dicantumkan'
+                                  )}
+                              </p>
+                              <p className="text-[10px] font-bold text-black mt-1">{order.no_hp}</p>
+                          </div>
+                      </div>
+                  </div>
+              </div>
+
+              {/* Footer: Kotak Peringatan (Rata Tengah Tanpa Garis Putus) */}
+              <div className="border-t border-black p-2 flex justify-center items-center h-[12mm]">
+                  <p className="text-[10px] font-bold text-gray-900 leading-tight m-0 text-center uppercase tracking-wider">
+                      Mohon untuk melakukan video unboxing ya, Tanpa bukti video unboxing komplain tidak diterima
+                  </p>
+              </div>
+          </div>
+      </div>
+
       {/* HEADER ACTIONS */}
       <div className="flex items-center justify-between flex-wrap gap-3">
         <button onClick={onBack} className="text-xs md:text-sm text-slate-500 dark:text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 flex items-center gap-2 font-bold p-2 -ml-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition">
           <ChevronRight className="w-4 h-4 md:w-5 md:h-5 rotate-180"/> Kembali
         </button>
         <div className="flex gap-2">
+          {/* TOMBOL CETAK LABEL KIRIM DI HEADER */}
+          <button 
+             onClick={handlePrintLabel} 
+             disabled={isPrintingLabel}
+             className="bg-emerald-600 text-white px-3 py-1.5 rounded-lg text-xs md:text-sm font-bold flex items-center gap-2 hover:bg-emerald-700 shadow-sm transition disabled:opacity-50"
+          > 
+             <Printer className="w-3 h-3"/> {isPrintingLabel ? 'Memproses...' : 'Label Kirim'} 
+          </button>
+          
           {canEditOrderInfo && <button onClick={onEdit} className="bg-blue-600 text-white px-3 py-1.5 rounded-lg text-xs md:text-sm font-bold flex items-center gap-2 hover:bg-blue-700 shadow-sm transition"> <Pencil className="w-3 h-3"/> Edit </button>}
           {canDeleteOrder && <button onClick={() => onDelete(order.id)} className="bg-red-600 text-white px-3 py-1.5 rounded-lg text-xs md:text-sm font-bold flex items-center gap-2 hover:bg-red-700 shadow-sm transition"> <Trash2 className="w-3 h-3"/> Hapus </button>}
         </div>
@@ -202,7 +332,6 @@ export default function OrderDetail({ currentUser, order, onBack, onEdit, onTrig
               <button onClick={() => openWA(order.no_hp)} className="bg-green-600 text-white px-2 py-1 rounded-lg text-[10px] font-bold flex items-center gap-1"> <Phone className="w-3 h-3"/> WA </button>
             </div>
             
-            {/* 🟢 UPDATE: MENAMPILKAN PJ & HELPER DI DETAIL */}
             {isManagement && (
                <div className="mt-3 flex items-center gap-3">
                  <div className="flex items-center gap-1.5 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400 px-2 py-1 rounded-lg border border-blue-100 dark:border-blue-900/40 w-fit">
