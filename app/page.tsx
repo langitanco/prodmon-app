@@ -1,105 +1,81 @@
-// app/page.tsx - V.10.1 (Fix Prop CompletedOrders)
+// app/page.tsx
 'use client';
 
-import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { createBrowserClient } from '@supabase/ssr';
-import imageCompression from 'browser-image-compression'; 
 
-// Layout & UI
+// ─── Hooks ───────────────────────────────────────────────────────────────────
+import { useAuth } from '@/hooks/useAuth';
+import { useNotifications } from '@/hooks/useNotifications';
+import { useOrders } from '@/hooks/useOrders';
+import { useUpload } from '@/hooks/useUpload';
+import { useUsers } from '@/hooks/useUsers';
+
+// ─── Layout & UI ─────────────────────────────────────────────────────────────
 import Sidebar from '@/app/components/layout/Sidebar';
-import Header from '@/app/components/layout/Header'; 
+import Header from '@/app/components/layout/Header';
 import CustomAlert from '@/app/components/ui/CustomAlert';
 import LoginScreen from '@/app/components/auth/LoginScreen';
 import ProfileModal from '@/app/components/ui/ProfileModal';
 
-// Dashboard - Lazy load
+// ─── Lazy Load: Dashboard ────────────────────────────────────────────────────
 import dynamic from 'next/dynamic';
 const Dashboard = dynamic(() => import('@/app/components/dashboard/Dashboard'), {
-  loading: () => <div className="flex items-center justify-center h-64"><div className="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"></div></div>,
-  ssr: false
+  loading: () => (
+    <div className="flex items-center justify-center h-64">
+      <div className="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin" />
+    </div>
+  ),
+  ssr: false,
 });
 
-// Apps & Config - Lazy load
-const CalculatorView = dynamic(() => import('@/app/components/apps/CalculatorView'));
+// ─── Lazy Load: Apps & Config ────────────────────────────────────────────────
+const CalculatorView  = dynamic(() => import('@/app/components/apps/CalculatorView'));
 const ConfigPriceView = dynamic(() => import('@/app/components/apps/ConfigPriceView'));
-const ActivityLogView = dynamic(() => import('@/app/components/apps/ActivityLogView')); 
-const AboutView = dynamic(() => import('@/app/components/misc/AboutView'));
-const CalendarView = dynamic(() => import('@/app/components/apps/CalendarView'));
-const SalaryView = dynamic(() => import('@/app/components/apps/SalaryView'));
+const ActivityLogView = dynamic(() => import('@/app/components/apps/ActivityLogView'));
+const AboutView       = dynamic(() => import('@/app/components/misc/AboutView'));
+const CalendarView    = dynamic(() => import('@/app/components/apps/CalendarView'));
+const SalaryView      = dynamic(() => import('@/app/components/apps/SalaryView'));
+const NotaView        = dynamic(() => import('@/app/components/apps/NotaView'));
 
-// 🟢 UPDATE: Import NotaView
-const NotaView = dynamic(() => import('@/app/components/apps/NotaView'));
+// ─── Lazy Load: Orders ───────────────────────────────────────────────────────
+const OrderList       = dynamic(() => import('@/app/components/orders/OrderList'));
+const CreateOrder     = dynamic(() => import('@/app/components/orders/CreateOrder'));
+const EditOrder       = dynamic(() => import('@/app/components/orders/EditOrder'));
+const OrderDetail     = dynamic(() => import('@/app/components/orders/OrderDetail'));
+const CompletedOrders = dynamic(() => import('@/app/components/orders/CompletedOrders'));
+const TrashView       = dynamic(() => import('@/app/components/orders/TrashView'));
 
-// ORDERS - Lazy load
-const OrderList = dynamic(() => import('@/app/components/orders/OrderList'));
-const CreateOrder = dynamic(() => import('@/app/components/orders/CreateOrder'));
-const EditOrder = dynamic(() => import('@/app/components/orders/EditOrder'));
-const OrderDetail = dynamic(() => import('@/app/components/orders/OrderDetail'));
-const CompletedOrders = dynamic(() => import('@/app/components/orders/CompletedOrders')); 
-const TrashView = dynamic(() => import('@/app/components/orders/TrashView'));
-
-// Settings - Lazy load
+// ─── Lazy Load: Settings ─────────────────────────────────────────────────────
 const SettingsPage = dynamic(() => import('@/app/components/settings/SettingsPage'));
 
-// Types & Helpers
-import { UserData, Order, ProductionTypeData, DEFAULT_PERMISSIONS, OrderStatus } from '@/types';
-import { DEFAULT_PRODUCTION_TYPES } from '@/lib/utils';
-import { triggerOrderNotifications } from '@/lib/orderLogic';
-
-// Icon Import untuk Loading Overlay
+// ─── Types ───────────────────────────────────────────────────────────────────
+import { Order } from '@/types';
 import { Loader2 } from 'lucide-react';
 
-interface CurrentUser extends UserData {
-  id: string; 
-}
+type ActiveTab =
+  | 'dashboard' | 'orders' | 'calendar' | 'logs'
+  | 'completed_orders' | 'settings' | 'trash'
+  | 'kalkulator' | 'config_harga' | 'about'
+  | 'salary' | 'nota';
 
-interface Notification {
-  id: string;
-  title: string;
-  message: string;
-  time: string;
-  isRead: boolean;
-  orderId?: string;
-}
+type ViewMode = 'list' | 'detail' | 'create' | 'edit';
 
-// Interface Context Upload
-interface UploadContextState {
-  type: string;
-  stepId?: string;
-  kendalaId?: string;
-}
+// ─── Komponen Utama ───────────────────────────────────────────────────────────
 
 export default function ProductionApp() {
-  const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null);
-  const [loadingUser, setLoadingUser] = useState(true);
-  
-  // 🟢 UPDATE: Tambahkan 'nota' di tipe activeTab
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'orders' | 'calendar' | 'logs' | 'completed_orders' | 'settings' | 'trash' | 'kalkulator' | 'config_harga' | 'about' | 'salary' | 'nota'>('dashboard');
-  
-  const [orders, setOrders] = useState<Order[]>([]);
-  const [usersList, setUsersList] = useState<UserData[]>([]);
-  const [productionTypes, setProductionTypes] = useState<ProductionTypeData[]>([]);
-  const [view, setView] = useState<'list' | 'detail' | 'create' | 'edit'>('list');
+  // UI State
+  const [activeTab, setActiveTab]         = useState<ActiveTab>('dashboard');
+  const [view, setView]                   = useState<ViewMode>('list');
   const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
-  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [sidebarOpen, setSidebarOpen]     = useState(false);
   const [showProfileModal, setShowProfileModal] = useState(false);
-  const [notifications, setNotifications] = useState<Notification[]>([]);
-
-  // --- STATE BARU: UPLOAD VIA REF ---
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const [uploadContext, setUploadContext] = useState<UploadContextState | null>(null);
-  const [isUploading, setIsUploading] = useState(false);
-
   const [alertState, setAlertState] = useState<{
-    isOpen: boolean; title: string; message: string; type: 'success' | 'error' | 'confirm'; onConfirm?: () => void;
+    isOpen: boolean; title: string; message: string;
+    type: 'success' | 'error' | 'confirm'; onConfirm?: () => void;
   }>({ isOpen: false, title: '', message: '', type: 'success' });
 
-  // OPTIMASI: Singleton Supabase
-  const supabase = useMemo(() => createBrowserClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-  ), []);
-
+  // Alert helpers
   const showAlert = useCallback((title: string, message: string, type: 'success' | 'error' = 'success') => {
     setAlertState({ isOpen: true, title, message, type, onConfirm: undefined });
   }, []);
@@ -110,120 +86,68 @@ export default function ProductionApp() {
 
   const closeAlert = useCallback(() => setAlertState(prev => ({ ...prev, isOpen: false })), []);
 
-  // FETCH NOTIFIKASI
-  const fetchNotifications = useCallback(async () => {
-    if (!currentUser) return;
-    try {
-      const { data, error } = await supabase
-        .from('notifications')
-        .select('*')
-        .eq('user_id', currentUser.id)
-        .order('created_at', { ascending: false })
-        .limit(20);
-      
-      if (data) {
-        const mappedNotifications = data.map((n: any) => ({
-            id: n.id,
-            title: n.title,
-            message: n.message,
-            time: new Date(n.created_at).toLocaleString('id-ID', { 
-              day: '2-digit', month: 'short', year: 'numeric',
-              hour: '2-digit', minute: '2-digit' 
-            }),
-            isRead: n.is_read,
-            orderId: n.order_id 
-          }));
-        setNotifications(mappedNotifications);
-      }
-    } catch (error) {
-      console.error('Err notification', error);
-    }
-  }, [currentUser, supabase]);
+  // Supabase singleton
+  const supabase = useMemo(() => createBrowserClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  ), []);
+
+  // ─── Hooks ─────────────────────────────────────────────────────────────────
+
+  const { currentUser, loadingUser, handleLogout, handleUpdateProfile } = useAuth({
+    supabase, showAlert, showConfirm,
+  });
+
+  const { notifications, fetchNotifications, markAsRead, markAllAsRead } = useNotifications({
+    currentUserId: currentUser?.id ?? null, supabase,
+  });
+
+  const {
+    orders, activeOrders, fetchOrders, writeLog,
+    checkAutoStatus, handleCreateOrder, handleEditOrder,
+    handleDeleteOrder, handleRestoreOrder, handlePermanentDelete,
+  } = useOrders({
+    supabase, currentUser, fetchNotifications, showAlert, showConfirm, setView,
+  });
+
+  const { fileInputRef, isUploading, triggerUpload, handleFileChange } = useUpload({
+    supabase, currentUser, orders, selectedOrderId, checkAutoStatus, writeLog, showAlert,
+  });
+
+  const {
+    usersList, productionTypes,
+    fetchUsers, fetchProductionTypes,
+    handleSaveUser, handleDeleteUser,
+    handleSaveType, handleDeleteType,
+  } = useUsers({ supabase, showAlert, showConfirm });
+
+  // ─── Handlers ──────────────────────────────────────────────────────────────
 
   const handleNotificationClick = useCallback(async (notificationId: string, orderId: string) => {
-    try {
-      await supabase.from('notifications').update({ is_read: true }).eq('id', notificationId);
-      setNotifications(prev => prev.map(n => n.id === notificationId ? { ...n, isRead: true } : n));
-    } catch (e) {}
-
+    await markAsRead(notificationId);
     setActiveTab('orders');
     setView('detail');
     setSelectedOrderId(orderId);
     setSidebarOpen(false);
-  }, [supabase]);
+  }, [markAsRead]);
 
-  const handleMarkAllRead = useCallback(async () => {
-  if (!currentUser) return;
-  try {
-    await supabase
-      .from('notifications')
-      .update({ is_read: true })
-      .eq('user_id', currentUser.id)
-      .eq('is_read', false); // hanya yang belum dibaca
+  const handleSelectOrder = useCallback((id: string, tab: ActiveTab = 'orders') => {
+    setSelectedOrderId(id);
+    setView('detail');
+    setActiveTab(tab);
+  }, []);
 
-    setNotifications(prev => prev.map(n => ({ ...n, isRead: true })));
-  } catch (e) {
-    console.error('Gagal tandai semua dibaca', e);
-  }
-}, [currentUser, supabase]);
+  // ─── Effects ───────────────────────────────────────────────────────────────
 
-  useEffect(() => {
-    const initSession = async () => {
-      setLoadingUser(true);
-      const { data: { session } } = await supabase.auth.getSession();
-      if (session) {
-        const { data: userData } = await supabase.from('users').select('*').eq('id', session.user.id).single();
-        if (userData) {
-          setCurrentUser({
-            id: session.user.id,
-            username: userData.username || '',
-            name: userData.name || 'User',
-            role: userData.role || 'produksi',
-            password: '',
-            permissions: userData.permissions || DEFAULT_PERMISSIONS,
-            address: userData.address,
-            dob: userData.dob,
-            avatar_url: userData.avatar_url
-          });
-        }
-      }
-      setLoadingUser(false);
-    };
-    initSession();
-  }, [supabase]);
-
-  const fetchOrders = useCallback(async () => {
-    // 🟢 UPDATE QUERY: Tambahkan helper_user:users!helper_id ( name )
-    const { data } = await supabase
-      .from('orders')
-      .select(`*, assigned_user:users!assigned_to ( name ), helper_user:users!helper_id ( name )`) 
-      .order('created_at', { ascending: false });
-      
-    if (data) setOrders(data.map((o: any) => ({ ...o, kendala: Array.isArray(o.kendala) ? o.kendala : [] })));
-  }, [supabase]);
-
-  const fetchUsers = useCallback(async () => {
-    const { data } = await supabase.from('users').select('*').order('name');
-    if (data) setUsersList(data);
-  }, [supabase]);
-
-  const fetchProductionTypes = useCallback(async () => {
-    const { data } = await supabase.from('production_types').select('*').order('name');
-    if (data) setProductionTypes(data);
-    else if (productionTypes.length === 0) setProductionTypes(DEFAULT_PRODUCTION_TYPES);
-  }, [supabase, productionTypes.length]);
-
+  // Load data setelah user tersedia
   useEffect(() => {
     if (!currentUser) return;
-    const loadAppData = async () => {
-      await Promise.all([fetchOrders(), fetchUsers(), fetchProductionTypes(), fetchNotifications()]);
-    };
-    loadAppData();
+    Promise.all([fetchOrders(), fetchUsers(), fetchProductionTypes(), fetchNotifications()]);
     const interval = setInterval(fetchNotifications, 60000);
     return () => clearInterval(interval);
   }, [currentUser, fetchOrders, fetchUsers, fetchProductionTypes, fetchNotifications]);
 
-  // NAVIGATION HANDLER
+  // Handle browser back button
   useEffect(() => {
     const handlePopState = () => {
       if (activeTab !== 'dashboard') {
@@ -235,531 +159,191 @@ export default function ProductionApp() {
     return () => window.removeEventListener('popstate', handlePopState);
   }, [activeTab]);
 
-  const handleLogout = useCallback(async () => {
-    showConfirm('Logout', 'Keluar aplikasi?', async () => {
-        await supabase.auth.signOut();
-        window.location.reload(); 
-    });
-  }, [showConfirm, supabase]);
+  // ─── Render Guards ─────────────────────────────────────────────────────────
 
-  const handleUpdateProfile = useCallback(async (newData: any) => {
-    if (!currentUser) return;
-    const { error } = await supabase.from('users').update({
-      name: newData.name, address: newData.address, dob: newData.dob, avatar_url: newData.avatar_url
-    }).eq('id', currentUser.id);
-
-    if (!error) {
-      setCurrentUser({ ...currentUser, ...newData });
-      setShowProfileModal(false);
-      showAlert('Sukses', 'Profil diperbarui');
-    } else {
-      showAlert('Gagal', error.message, 'error');
-    }
-  }, [currentUser, supabase, showAlert]);
-
-  const generateProductionCode = useCallback(() => {
-    const now = new Date();
-    const prefix = `LCO-${String(now.getMonth() + 1).padStart(2, '0')}/${String(now.getFullYear()).slice(-2)}-`;
-    const existingCodes = orders.filter(o => o.kode_produksi?.startsWith(prefix)).map(o => parseInt(o.kode_produksi.split('-').pop()!) || 0);
-    const max = existingCodes.length > 0 ? Math.max(...existingCodes) : 0;
-    return `${prefix}${String(max + 1).padStart(4, '0')}`;
-  }, [orders]);
-
-  // ===============================================
-  // 🟢 FUNGSI PENCATATAN LOG (R&D)
-  // ===============================================
-  const writeLog = useCallback(async ({
-    order,
-    category,
-    event,
-    ket = '-',
-    newVal = '',
-    isSystem = false,
-    meta = {}
-  }: {
-    order: Order,
-    category: 'STATUS' | 'FILE' | 'KENDALA' | 'QC' | 'REVISI' | 'SISTEM',
-    event: string,
-    ket?: string,
-    newVal?: string,
-    isSystem?: boolean,
-    meta?: any
-  }) => {
-    if (!currentUser && !isSystem) return;
-
-    const { error } = await supabase.from('order_logs').insert([{
-      order_id: order.id,
-      kode_produksi: order.kode_produksi,
-      category: category,
-      event_name: event,
-      description: ket,
-      old_value: order.status,
-      new_value: newVal || order.status,
-      oleh: isSystem ? 'Sistem' : (currentUser?.name || 'Unknown'),
-      metadata: meta
-    }]);
-
-    if (error) console.error("Gagal mencatat log R&D:", error);
-  }, [currentUser, supabase]);
-
-
-  // ===============================================
-  // 🟢 LOGIKA UPDATE STATUS + LOG R&D
-  // ===============================================
-  const checkAutoStatus = useCallback(async (orderData: Order) => {
-    const oldStatus = orderData.status as OrderStatus;
-    const hasUnresolvedKendala = orderData.kendala?.some((k: any) => !k.isResolved);
-    
-    const type = orderData.jenis_produksi?.toLowerCase() || '';
-    const isManual = type.includes('manual') || type.includes('sablon');
-    
-    const steps = (isManual ? orderData.steps_manual : orderData.steps_dtf) as any[];
-    
-    const productionDone = Array.isArray(steps) && steps.length > 0 && steps.every((s: any) => s.isCompleted);
-
-    let normalStatus = 'Pesanan Masuk';
-
-    if (!orderData.link_approval?.link) {
-      normalStatus = 'Pesanan Masuk';
-    } 
-    else if (!productionDone) {
-      normalStatus = 'On Process';
-    } 
-    else if (
-        !orderData.finishing_qc?.isPassed || 
-        !orderData.finishing_packing?.isPacked
-    ) {
-      if (orderData.finishing_qc?.isPassed === false && orderData.finishing_qc?.notes) {
-        normalStatus = 'Revisi';
-      } else {
-        normalStatus = 'Finishing';
-      }
-    } 
-    else if (!orderData.shipping?.bukti_terima) {
-      normalStatus = 'Kirim';
-    } 
-    else {
-      normalStatus = 'Selesai';
-    }
-    
-    const finalStatus = (hasUnresolvedKendala ? 'Ada Kendala' : normalStatus) as OrderStatus;
-    
-    const payload: any = { ...orderData, status: finalStatus };
-    delete payload.assigned_user; 
-    
-    // 🟢 UPDATE: Hapus data join helper_user sebelum update
-    delete payload.helper_user; 
-    
-    delete payload.id;            
-    delete payload.created_at; 
-
-    const { error } = await supabase.from('orders').update(payload).eq('id', orderData.id);
-    
-    if (!error) { 
-      if (oldStatus !== finalStatus) {
-        await writeLog({
-          order: orderData,
-          category: 'STATUS',
-          event: 'Perubahan Status Otomatis',
-          ket: `Status berubah dari ${oldStatus} menjadi ${finalStatus}`,
-          newVal: finalStatus,
-          isSystem: true
-        });
-      }
-
-      fetchOrders(); 
-      await triggerOrderNotifications({ ...orderData, status: finalStatus }, oldStatus);
-      await fetchNotifications();
-    } else {
-      console.error('DB Error Details:', JSON.stringify(error, null, 2)); 
-      showAlert('Error Database', error.message || error.details || 'Gagal menyimpan data', 'error');
-    }
-  }, [supabase, fetchOrders, fetchNotifications, showAlert, writeLog]);
-
-  // ===============================================
-  // 🟢 LOGIKA UPLOAD BARU + LOG R&D
-  // ===============================================
-  const triggerUpload = useCallback((targetType: string, stepId?: string, kendalaId?: string) => {
-    setUploadContext({ type: targetType, stepId, kendalaId });
-    setTimeout(() => {
-        if (fileInputRef.current) {
-            fileInputRef.current.value = ''; 
-            fileInputRef.current.click();
-        }
-    }, 50);
-  }, []);
-
-  const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
-      const file = event.target.files?.[0];
-      if (!file || !selectedOrderId || !uploadContext) return;
-      
-      setIsUploading(true);
-      let processedFile = file;
-
-      if (file.type.startsWith('image/')) {
-        try { 
-          processedFile = await imageCompression(file, { maxSizeMB: 1, maxWidthOrHeight: 1920, useWebWorker: true }); 
-        } catch (error) { console.error("Kompresi gagal, pakai asli", error); }
-      } 
-      else if (file.type === 'application/pdf') {
-         const MAX_MB = 15;
-         if (file.size > MAX_MB * 1024 * 1024) {
-            alert(`File PDF terlalu besar (> ${MAX_MB}MB). Harap kecilkan ukuran file.`);
-            setIsUploading(false);
-            return;
-         }
-      }
-
-      const fileName = `${selectedOrderId}/${Date.now()}.${processedFile.name.split('.').pop()}`;
-      const { error: uploadError } = await supabase.storage.from('production-proofs').upload(fileName, processedFile, { upsert: false });
-      
-      if (uploadError) { 
-        showAlert('Gagal Upload', uploadError.message, 'error'); 
-        setIsUploading(false);
-        return; 
-      }
-
-      const { data: urlData } = supabase.storage.from('production-proofs').getPublicUrl(fileName);
-      
-      const order = orders.find(o => o.id === selectedOrderId); 
-      if (!order) { setIsUploading(false); return; }
-
-      await writeLog({
-        order: order,
-        category: 'FILE',
-        event: `Upload File ${uploadContext.type}`,
-        ket: `Nama File: ${processedFile.name}`,
-        meta: { url: urlData.publicUrl, context: uploadContext }
-      });
-      
-      let updatedOrder = JSON.parse(JSON.stringify(order));
-      const common = { fileUrl: urlData.publicUrl, timestamp: new Date().toLocaleString(), uploadedBy: currentUser?.name };
-      
-      if (uploadContext.type === 'approval') updatedOrder.link_approval = { link: urlData.publicUrl, by: currentUser?.name, timestamp: common.timestamp };
-        else if (uploadContext.type === 'step' && uploadContext.stepId) {
-          const steps = updatedOrder.jenis_produksi === 'manual' ? updatedOrder.steps_manual : updatedOrder.steps_dtf;
-          const idx = steps.findIndex((s: any) => s.id === uploadContext.stepId); 
-          
-          if (idx >= 0) {
-            const stepName = steps[idx].name.toLowerCase();
-            const isProofing = stepName.includes('proofing');
-
-            steps[idx] = { 
-              ...steps[idx], 
-              fileUrl: urlData.publicUrl, 
-              timestamp: common.timestamp,
-              uploadedBy: currentUser?.name,
-              isCompleted: !isProofing,
-              proofing_note: isProofing ? undefined : steps[idx].proofing_note
-            };
-          }
-        } 
-      
-      else if (uploadContext.type === 'packing') updatedOrder.finishing_packing = { isPacked: true, ...common };
-      else if (uploadContext.type === 'shipping_kirim') updatedOrder.shipping.bukti_kirim = urlData.publicUrl;
-      else if (uploadContext.type === 'shipping_terima') updatedOrder.shipping.bukti_terima = urlData.publicUrl;
-      else if (uploadContext.type === 'kendala_bukti' && uploadContext.kendalaId) { 
-        const idx = updatedOrder.kendala.findIndex((k: any) => k.id === uploadContext.kendalaId); 
-        if(idx >= 0) updatedOrder.kendala[idx].buktiFile = urlData.publicUrl; 
-      }
-      
-      await checkAutoStatus(updatedOrder);
-      
-      setIsUploading(false);
-      setUploadContext(null);
-      if (fileInputRef.current) fileInputRef.current.value = '';
-      showAlert('Sukses', 'File terupload');
-  };
-
-  // CRUD HANDLERS
-  const handleCreateOrder = useCallback(async (formData: any) => {
-    const payload: any = {
-      kode_produksi: generateProductionCode(),
-      nama_pemesan: formData.nama,
-      no_hp: formData.hp,
-      jumlah: parseInt(formData.jumlah) || 0,
-      tanggal_masuk: new Date().toISOString().split('T')[0],
-      deadline: formData.deadline,
-      jenis_produksi: formData.type,
-      assigned_to: formData.assigned_to || null,
-      
-      // 🟢 UPDATE: Tambahkan helper_id 
-      helper_id: formData.helper_id || null, 
-      
-      status: 'Pesanan Masuk',
-      steps_manual: [
-        { id: 'm1', name: 'Pecah Gambar (PDF)', type: 'upload_pdf', isCompleted: false },
-        { id: 'm2', name: 'Print Film', type: 'upload_image', isCompleted: false },
-        { id: 'm3', name: 'Proofing', type: 'upload_image', isCompleted: false }, 
-        { id: 'm4', name: 'Produksi Massal', type: 'upload_image', isCompleted: false }
-      ],
-      steps_dtf: [
-        { id: 'd1', name: 'Cetak DTF', type: 'status_update', isCompleted: false },
-        { id: 'd2', name: 'Press Kaos', type: 'upload_image', isCompleted: false }
-      ],
-      finishing_qc: { isPassed: false, notes: '' },
-      finishing_packing: { isPacked: false },
-      shipping: {},
-      kendala: []
-    };
-    const { data, error } = await supabase.from('orders').insert([payload]).select().single();
-    if (!error) { 
-        await writeLog({
-            order: data, 
-            category: 'STATUS', 
-            event: 'Pesanan Masuk', 
-            ket: 'Pesanan baru dibuat',
-            isSystem: true 
-        });
-        
-        await fetchOrders(); setView('list'); showAlert('Sukses', 'Pesanan dibuat'); triggerOrderNotifications(data); 
-    }
-    else showAlert('Error', error.message, 'error');
-  }, [generateProductionCode, supabase, fetchOrders, showAlert, writeLog]);
-
-  const handleEditOrder = useCallback(async (d: any) => {
-    if (!selectedOrderId) return;
-    const updates = { 
-        nama_pemesan: d.nama, 
-        no_hp: d.hp, 
-        jumlah: parseInt(d.jumlah), 
-        deadline: d.deadline, 
-        jenis_produksi: d.type, 
-        assigned_to: d.assigned_to || null,
-        // 🟢 UPDATE: Tambahkan helper_id
-        helper_id: d.helper_id || null
-    };
-    const { error } = await supabase.from('orders').update(updates).eq('id', selectedOrderId);
-    if (!error) {
-       const old = orders.find(o => o.id === selectedOrderId);
-       if(old) await checkAutoStatus({ ...old, ...updates });
-      await fetchOrders(); setView('detail'); showAlert('Sukses', 'Diupdate');
-    }
-  }, [selectedOrderId, supabase, orders, fetchOrders, showAlert, checkAutoStatus]);
-
-  const handleDeleteOrder = useCallback(async (id: string) => {
-    const orderToDelete = orders.find(o => o.id === id); 
-    
-    showConfirm('Hapus?', 'Pindah ke sampah.', async () => {
-      const { error } = await supabase.from('orders').update({ deleted_at: new Date().toISOString() }).eq('id', id);
-      if (!error) { 
-        if (orderToDelete) {
-          await writeLog({
-            order: orderToDelete,
-            category: 'STATUS',
-            event: 'Pesanan Dihapus',
-            ket: 'Pesanan dipindahkan ke sampah',
-            newVal: 'Sampah'
-          });
-        }
-        await fetchOrders(); setView('list'); showAlert('Sukses', 'Dihapus'); 
-      }
-    });
-  }, [showConfirm, supabase, fetchOrders, showAlert, orders, writeLog]);
-
-  const handleRestoreOrder = useCallback(async (id: string) => {
-    const orderToRestore = orders.find(o => o.id === id); 
-
-    const { error } = await supabase.from('orders').update({ deleted_at: null }).eq('id', id); 
-    if(!error) {
-       if (orderToRestore) {
-          await writeLog({
-            order: orderToRestore,
-            category: 'STATUS',
-            event: 'Pesanan Dipulihkan',
-            ket: 'Pesanan dikembalikan dari sampah',
-            newVal: orderToRestore.status
-          });
-       }
-       fetchOrders(); showAlert('Sukses', 'Dipulihkan');
-    }
-  }, [supabase, fetchOrders, showAlert, orders, writeLog]);
-
-  const handlePermanentDelete = useCallback(async (id: string) => {
-    showConfirm('Hapus Permanen?', 'Data dan semua file lampiran akan hilang selamanya.', async () => {
-      setIsUploading(true); 
-      
-      try {
-        const { data: orderData } = await supabase
-          .from('orders')
-          .select('link_approval, steps_manual, steps_dtf, finishing_packing, shipping, kendala')
-          .eq('id', id)
-          .single();
-
-        if (orderData) {
-          const BUCKET_NAME = 'production-proofs';
-          const filesToDelete: string[] = [];
-
-          const extractPath = (rawPath: string) => {
-            if (typeof rawPath !== 'string' || !rawPath.includes(`/${BUCKET_NAME}/`)) return;
-            const path = decodeURIComponent(rawPath).split(`/${BUCKET_NAME}/`)[1]?.split('?')[0];
-            if (path) filesToDelete.push(path);
-          };
-
-          const processData = (obj: any) => {
-            if (!obj) return;
-            if (typeof obj === 'string') extractPath(obj);
-            else if (Array.isArray(obj)) obj.forEach(processData);
-            else if (typeof obj === 'object') Object.values(obj).forEach(processData);
-          };
-
-          processData(orderData);
-
-          if (filesToDelete.length > 0) {
-            await supabase.storage.from(BUCKET_NAME).remove(filesToDelete);
-          }
-        }
-
-        const { error: logError } = await supabase.from('order_logs').delete().eq('order_id', id);
-        if (logError) console.error("Gagal menghapus log:", logError);
-
-        const { error: dbError } = await supabase.from('orders').delete().eq('id', id);
-        
-        if (!dbError) {
-          await fetchOrders();
-          showAlert('Sukses', 'Order dan file terkait telah dihapus selamanya');
-        } else {
-          throw dbError;
-        }
-      } catch (err: any) {
-        showAlert('Gagal Hapus', err.message, 'error');
-      } finally {
-        setIsUploading(false);
-      }
-    });
-  }, [showConfirm, supabase, fetchOrders, showAlert]);
-
-  const handleSaveUser = useCallback(async (u: any) => {
-    const p: any = { name: u.name, role: u.role, username: u.username }; 
-    if (u.permissions) p.permissions = u.permissions; 
-    if (u.password?.trim()) p.password = u.password;
-    const { error } = u.id ? await supabase.from('users').update(p).eq('id', u.id) : await supabase.from('users').insert([p]);
-    if(!error) { fetchUsers(); showAlert('Sukses', 'User tersimpan'); }
-  }, [supabase, fetchUsers, showAlert]);
-
-  const handleDeleteUser = useCallback(async (id: string) => { 
-    showConfirm('Hapus User?', 'User akan dihapus.', async () => { await supabase.from('users').delete().eq('id', id); fetchUsers(); showAlert('Sukses', 'Dihapus'); }); 
-  }, [showConfirm, supabase, fetchUsers, showAlert]);
-
-  const handleSaveType = useCallback(async (t: any) => { 
-    const p = { name: t.name, value: t.value }; 
-    const { error } = t.id ? await supabase.from('production_types').update(p).eq('id', t.id) : await supabase.from('production_types').insert([p]);
-    if(!error) { fetchProductionTypes(); showAlert('Sukses', 'Tipe tersimpan'); } 
-  }, [supabase, fetchProductionTypes, showAlert]);
-
-  const handleDeleteType = useCallback(async (id: string) => { 
-    showConfirm('Hapus Tipe?', 'Yakin hapus?', async () => { await supabase.from('production_types').delete().eq('id', id); fetchProductionTypes(); showAlert('Sukses', 'Dihapus'); }); 
-  }, [showConfirm, supabase, fetchProductionTypes, showAlert]);
-
-  const activeOrders = useMemo(() => orders.filter(o => !o.deleted_at), [orders]);
-
-  if (loadingUser) return <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-slate-950"><div className="w-10 h-10 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"></div></div>;
+  if (loadingUser) return (
+    <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-slate-950">
+      <div className="w-10 h-10 border-4 border-blue-600 border-t-transparent rounded-full animate-spin" />
+    </div>
+  );
 
   if (!currentUser) return <LoginScreen />;
 
+  // ─── Render ────────────────────────────────────────────────────────────────
+
   return (
     <div className="h-screen overflow-hidden bg-gray-100 dark:bg-slate-950 flex flex-col md:flex-row font-sans text-slate-800 dark:text-slate-100 relative">
-       
-       <input type="file" ref={fileInputRef} className="hidden" accept="image/*,application/pdf" onChange={handleFileChange} />
-       
-       {isUploading && (
-         <div className="absolute inset-0 z-[9999] bg-black/60 flex flex-col items-center justify-center text-white backdrop-blur-sm">
-            <Loader2 className="w-12 h-12 animate-spin mb-3 text-blue-400" />
-            <p className="font-bold">Mengupload File...</p>
-            <p className="text-xs text-gray-300 mt-1">Mohon tunggu, jangan tutup aplikasi</p>
-         </div>
-       )}
 
-       <CustomAlert alertState={alertState} closeAlert={closeAlert} />
-       {currentUser && <ProfileModal user={currentUser} isOpen={showProfileModal} onClose={() => setShowProfileModal(false)} onSave={handleUpdateProfile} />}
-    
-       <Sidebar 
-          sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} currentUser={currentUser} activeTab={activeTab} 
-          handleNav={(tab: any) => { setActiveTab(tab); setView('list'); setSidebarOpen(false); }}
-          onLogout={handleLogout} onOpenProfile={() => setShowProfileModal(true)} 
-       />
+      {/* File input tersembunyi untuk upload */}
+      <input
+        type="file"
+        ref={fileInputRef}
+        className="hidden"
+        accept="image/*,application/pdf"
+        onChange={handleFileChange}
+      />
 
-       <div className="flex-1 flex flex-col min-w-0 h-full overflow-hidden">
-          <Header 
-            currentUser={currentUser} 
-            onToggleSidebar={() => setSidebarOpen(true)} 
-            onLogout={handleLogout}
-            sidebarOpen={sidebarOpen}
-            currentPage={activeTab}
-            notifications={notifications}
-            onNotificationClick={handleNotificationClick}
-            onMarkAllRead={handleMarkAllRead}
-          />
-          
-          <main className="flex-1 overflow-y-auto px-4 md:px-6 py-2 md:py-3 pb-32 relative bg-gray-100 dark:bg-slate-950 no-scrollbar">
-             <div className="max-w-7xl mx-auto h-full">
-                {activeTab === 'dashboard' && currentUser.permissions?.pages?.dashboard && (
-                  <Dashboard role={currentUser.role} orders={activeOrders} onSelectOrder={(id) => { setSelectedOrderId(id); setView('detail'); setActiveTab('orders'); }} />
-                )}
-                {activeTab === 'orders' && currentUser.permissions?.pages?.orders && (
-                  <>
-                    {view === 'list' && <OrderList role={currentUser.role} orders={activeOrders} productionTypes={productionTypes} onSelectOrder={(id) => { setSelectedOrderId(id); setView('detail'); }} onNewOrder={() => setView('create')} onDeleteOrder={handleDeleteOrder} currentUser={currentUser} />}
-                    {view === 'create' && <CreateOrder users={usersList} productionTypes={productionTypes} onCancel={() => setView('list')} onSubmit={handleCreateOrder} />}
-                    {view === 'edit' && selectedOrderId && <EditOrder users={usersList} order={orders.find(o => o.id === selectedOrderId)!} productionTypes={productionTypes} onCancel={() => setView('detail')} onSubmit={handleEditOrder} />}
-                    {view === 'detail' && selectedOrderId && <OrderDetail 
-                        currentUser={currentUser} 
-                        order={orders.find(o => o.id === selectedOrderId)!} 
-                        onBack={() => { setSelectedOrderId(null); setView('list'); }} 
-                        onEdit={() => setView('edit')} 
-                        onTriggerUpload={triggerUpload} 
-                        onUpdateOrder={checkAutoStatus} 
-                        onDelete={handleDeleteOrder} 
-                        onConfirm={showConfirm}
-                        // @ts-ignore
-                        onLogActivity={writeLog} 
-                    />}
-                  </>
-                )}
-                
-                {/* 🟢 UPDATE: TAMBAHKAN PROP onSelectOrder */}
-                {activeTab === 'completed_orders' && currentUser.permissions?.pages?.completed_orders && (
-                   <CompletedOrders 
-                      orders={activeOrders} 
-                      onSelectOrder={(id) => {
-                         setSelectedOrderId(id);
-                         setView('detail');
-                         setActiveTab('orders'); // Pindah ke tab order aktif untuk melihat detail
-                      }}
-                   />
-                )}
+      {/* Upload overlay */}
+      {isUploading && (
+        <div className="absolute inset-0 z-[9999] bg-black/60 flex flex-col items-center justify-center text-white backdrop-blur-sm">
+          <Loader2 className="w-12 h-12 animate-spin mb-3 text-blue-400" />
+          <p className="font-bold">Mengupload File...</p>
+          <p className="text-xs text-gray-300 mt-1">Mohon tunggu, jangan tutup aplikasi</p>
+        </div>
+      )}
 
-                {activeTab === 'calendar' && (
-                    <CalendarView 
-                        orders={activeOrders} 
-                        onSelectOrder={(id) => { 
-                            setSelectedOrderId(id); 
-                            setView('detail'); 
-                            setActiveTab('orders'); 
-                        }} 
-                    />
-                )}
+      <CustomAlert alertState={alertState} closeAlert={closeAlert} />
 
-                {activeTab === 'salary' && currentUser.permissions?.pages?.salary && (
-                    <SalaryView users={usersList} orders={orders} />
-                )}
+      <ProfileModal
+        user={currentUser}
+        isOpen={showProfileModal}
+        onClose={() => setShowProfileModal(false)}
+        onSave={(data) => handleUpdateProfile(data, () => setShowProfileModal(false))}
+      />
 
-                {/* 🟢 BARU: RENDER HALAMAN NOTA (Dengan type assertion sbg backup jika types.ts blm diupdate) */}
-                {activeTab === 'nota' && (currentUser.permissions?.pages as any)?.nota && (
-                    <NotaView />
-                )}
-                
-                {activeTab === 'logs' && currentUser.permissions?.pages?.activity_logs && (
-                    <ActivityLogView />
-                )}
+      {/* Sidebar */}
+      <Sidebar
+        sidebarOpen={sidebarOpen}
+        setSidebarOpen={setSidebarOpen}
+        currentUser={currentUser}
+        activeTab={activeTab}
+        handleNav={(tab: any) => { setActiveTab(tab); setView('list'); setSidebarOpen(false); }}
+        onLogout={handleLogout}
+        onOpenProfile={() => setShowProfileModal(true)}
+      />
 
-                {activeTab === 'trash' && <TrashView orders={orders.filter(o => o.deleted_at)} onRestore={handleRestoreOrder} onPermanentDelete={handlePermanentDelete} />}
-                {activeTab === 'settings' && <SettingsPage users={usersList} productionTypes={productionTypes} onSaveUser={handleSaveUser} onDeleteUser={handleDeleteUser} onSaveProductionType={handleSaveType} onDeleteProductionType={handleDeleteType} />}
-                {activeTab === 'kalkulator' && <CalculatorView />}
-                {activeTab === 'config_harga' && <ConfigPriceView />}
-                {activeTab === 'about' && <AboutView />}
-             </div>
-          </main>
-       </div>
+      {/* Main area */}
+      <div className="flex-1 flex flex-col min-w-0 h-full overflow-hidden">
+        <Header
+          currentUser={currentUser}
+          onToggleSidebar={() => setSidebarOpen(true)}
+          onLogout={handleLogout}
+          sidebarOpen={sidebarOpen}
+          currentPage={activeTab}
+          notifications={notifications}
+          onNotificationClick={handleNotificationClick}
+          onMarkAllRead={markAllAsRead}
+        />
+
+        <main className="flex-1 overflow-y-auto px-4 md:px-6 py-2 md:py-3 pb-32 relative bg-gray-100 dark:bg-slate-950 no-scrollbar">
+          <div className="max-w-7xl mx-auto h-full">
+
+            {/* Dashboard */}
+            {activeTab === 'dashboard' && currentUser.permissions?.pages?.dashboard && (
+              <Dashboard
+                role={currentUser.role}
+                orders={activeOrders}
+                onSelectOrder={(id) => handleSelectOrder(id)}
+              />
+            )}
+
+            {/* Orders */}
+            {activeTab === 'orders' && currentUser.permissions?.pages?.orders && (
+              <>
+                {view === 'list' && (
+                  <OrderList
+                    role={currentUser.role}
+                    orders={activeOrders}
+                    productionTypes={productionTypes}
+                    onSelectOrder={(id) => { setSelectedOrderId(id); setView('detail'); }}
+                    onNewOrder={() => setView('create')}
+                    onDeleteOrder={handleDeleteOrder}
+                    currentUser={currentUser}
+                  />
+                )}
+                {view === 'create' && (
+                  <CreateOrder
+                    users={usersList}
+                    productionTypes={productionTypes}
+                    onCancel={() => setView('list')}
+                    onSubmit={handleCreateOrder}
+                  />
+                )}
+                {view === 'edit' && selectedOrderId && (
+                  <EditOrder
+                    users={usersList}
+                    order={orders.find((o: Order) => o.id === selectedOrderId)!}
+                    productionTypes={productionTypes}
+                    onCancel={() => setView('detail')}
+                    onSubmit={(d) => handleEditOrder(d, selectedOrderId)}
+                  />
+                )}
+                {view === 'detail' && selectedOrderId && (
+                  <OrderDetail
+                    currentUser={currentUser}
+                    order={orders.find((o: Order) => o.id === selectedOrderId)!}
+                    onBack={() => { setSelectedOrderId(null); setView('list'); }}
+                    onEdit={() => setView('edit')}
+                    onTriggerUpload={triggerUpload}
+                    onUpdateOrder={checkAutoStatus}
+                    onDelete={handleDeleteOrder}
+                    onConfirm={showConfirm}
+                    // @ts-ignore
+                    onLogActivity={writeLog}
+                  />
+                )}
+              </>
+            )}
+
+            {/* Completed Orders */}
+            {activeTab === 'completed_orders' && currentUser.permissions?.pages?.completed_orders && (
+              <CompletedOrders
+                orders={activeOrders}
+                onSelectOrder={(id) => handleSelectOrder(id)}
+              />
+            )}
+
+            {/* Calendar */}
+            {activeTab === 'calendar' && (
+              <CalendarView
+                orders={activeOrders}
+                onSelectOrder={(id) => handleSelectOrder(id)}
+              />
+            )}
+
+            {/* Salary */}
+            {activeTab === 'salary' && currentUser.permissions?.pages?.salary && (
+              <SalaryView users={usersList} orders={orders} />
+            )}
+
+            {/* Nota */}
+            {activeTab === 'nota' && (currentUser.permissions?.pages as any)?.nota && (
+              <NotaView />
+            )}
+
+            {/* Activity Log */}
+            {activeTab === 'logs' && currentUser.permissions?.pages?.activity_logs && (
+              <ActivityLogView />
+            )}
+
+            {/* Trash */}
+            {activeTab === 'trash' && (
+              <TrashView
+                orders={orders.filter((o: Order) => o.deleted_at)}
+                onRestore={handleRestoreOrder}
+                onPermanentDelete={handlePermanentDelete}
+              />
+            )}
+
+            {/* Settings */}
+            {activeTab === 'settings' && (
+              <SettingsPage
+                users={usersList}
+                productionTypes={productionTypes}
+                onSaveUser={handleSaveUser}
+                onDeleteUser={handleDeleteUser}
+                onSaveProductionType={handleSaveType}
+                onDeleteProductionType={handleDeleteType}
+              />
+            )}
+
+            {activeTab === 'kalkulator'   && <CalculatorView />}
+            {activeTab === 'config_harga' && <ConfigPriceView />}
+            {activeTab === 'about'        && <AboutView />}
+
+          </div>
+        </main>
+      </div>
     </div>
   );
 }

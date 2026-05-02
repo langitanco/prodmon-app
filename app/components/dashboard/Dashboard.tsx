@@ -3,7 +3,7 @@
 
 'use client';
 
-import React, { useMemo, useState, useCallback, memo } from 'react';
+import React, { useMemo, useState, useCallback, memo, useEffect } from 'react';
 import { Order } from '@/types';
 import { 
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, 
@@ -309,6 +309,12 @@ function formatDateDiff(dateStr: string) {
 // MEMOIZED: BAR CHART
 // ==========================================
 const ChartBarMemo = memo(({ monthlyData }: { monthlyData: any[] }) => {
+  const [mounted, setMounted] = useState(false);
+  
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
   return (
     <div className="lg:col-span-2 bg-white dark:bg-slate-900 p-4 md:p-6 rounded-2xl border border-slate-200 dark:border-slate-700 transition-colors duration-200">
         <div className="flex items-center justify-between mb-4 md:mb-6">
@@ -320,28 +326,27 @@ const ChartBarMemo = memo(({ monthlyData }: { monthlyData: any[] }) => {
             </div>
         </div>
         <div className="h-[200px] md:h-[300px] w-full">
-            <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={monthlyData} margin={{ top: 10, right: 0, left: -10, bottom: 0 }}>
-                    {/* Menggunakan strokeOpacity agar grid terlihat oke di light/dark mode tanpa logic ribet */}
-                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#94a3b8" strokeOpacity={0.2} />
-                    {/* Tick fill menggunakan warna Slate-400 (#94a3b8) agar terlihat di background gelap & terang */}
-                    <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fill: '#94a3b8', fontSize: 10}} dy={10} />
-                    <YAxis axisLine={false} tickLine={false} tick={{fill: '#94a3b8', fontSize: 10}} />
-                    <RechartsTooltip 
-                        cursor={{fill: 'currentColor', opacity: 0.1}} // Adaptif
-                        contentStyle={{
-                            borderRadius: '12px', 
-                            border: 'none', 
-                            boxShadow: '0 10px 15px -3px rgba(0,0,0,0.1)', 
-                            fontSize: '10px',
-                            backgroundColor: 'rgb(30, 41, 59)', // slate-800 for dark mode feel
-                            color: '#fff'
-                        }}
-                        formatter={(value: number) => [`${value} Pcs`, 'Total']}
-                    />
-                    <Bar dataKey="pcs" fill="#3b82f6" radius={[4, 4, 0, 0]} barSize={30} name="Total PCS" />
-                </BarChart>
-            </ResponsiveContainer>
+            {mounted && (  // ← hanya render setelah mount
+                <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={monthlyData} margin={{ top: 10, right: 0, left: -10, bottom: 0 }}>
+                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#94a3b8" strokeOpacity={0.2} />
+                        <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fill: '#94a3b8', fontSize: 10}} dy={10} />
+                        <YAxis axisLine={false} tickLine={false} tick={{fill: '#94a3b8', fontSize: 10}} />
+                        <RechartsTooltip 
+                            cursor={{fill: 'currentColor', opacity: 0.1}}
+                            contentStyle={{
+                                borderRadius: '12px', border: 'none', 
+                                boxShadow: '0 10px 15px -3px rgba(0,0,0,0.1)', 
+                                fontSize: '10px',
+                                backgroundColor: 'rgb(30, 41, 59)',
+                                color: '#fff'
+                            }}
+                            formatter={(value: number) => [`${value} Pcs`, 'Total']}
+                        />
+                        <Bar dataKey="pcs" fill="#3b82f6" radius={[4, 4, 0, 0]} barSize={30} name="Total PCS" />
+                    </BarChart>
+                </ResponsiveContainer>
+            )}
         </div>
     </div>
   );
@@ -352,13 +357,14 @@ ChartBarMemo.displayName = 'ChartBarMemo';
 // MEMOIZED: PIE CHART
 // ==========================================
 const ChartPieMemo = memo(({ 
-  productionTypeData, 
-  activeIndex, 
-  setActiveIndex, 
-  centerValue, 
-  centerLabel, 
-  centerColor 
+  productionTypeData, activeIndex, setActiveIndex, centerValue, centerLabel, centerColor 
 }: any) => {
+  const [mounted, setMounted] = useState(false);
+  
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
   return (
     <div className="bg-white dark:bg-slate-900 p-4 md:p-6 rounded-2xl border border-slate-200 dark:border-slate-700 flex flex-col transition-colors duration-200">
         <div className="mb-2 md:mb-4">
@@ -368,27 +374,26 @@ const ChartPieMemo = memo(({
             <p className="text-[10px] md:text-xs text-slate-500 dark:text-slate-400">Distribusi tipe order keseluruhan</p>
         </div>
         <div className="flex-1 min-h-[200px] md:min-h-[250px] relative">
-            <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                    <Pie
-                        data={productionTypeData}
-                        cx="50%"
-                        cy="50%"
-                        innerRadius={50}
-                        outerRadius={70}
-                        paddingAngle={5}
-                        dataKey="value"
-                        onMouseEnter={(_, index) => setActiveIndex(index)} 
-                        onMouseLeave={() => setActiveIndex(null)}
-                        stroke="none"
-                    >
-                        {productionTypeData.map((entry: any, index: number) => (
-                            <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} stroke="none" />
-                        ))}
-                    </Pie>
-                    <Legend verticalAlign="bottom" height={36} iconType="circle" wrapperStyle={{fontSize: '10px', color: '#94a3b8'}} />
-                </PieChart>
-            </ResponsiveContainer>
+            {mounted && (  // ← hanya render setelah mount
+                <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                        <Pie
+                            data={productionTypeData}
+                            cx="50%" cy="50%"
+                            innerRadius={50} outerRadius={70}
+                            paddingAngle={5} dataKey="value"
+                            onMouseEnter={(_, index) => setActiveIndex(index)} 
+                            onMouseLeave={() => setActiveIndex(null)}
+                            stroke="none"
+                        >
+                            {productionTypeData.map((entry: any, index: number) => (
+                                <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} stroke="none" />
+                            ))}
+                        </Pie>
+                        <Legend verticalAlign="bottom" height={36} iconType="circle" wrapperStyle={{fontSize: '10px', color: '#94a3b8'}} />
+                    </PieChart>
+                </ResponsiveContainer>
+            )}
             
             <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-center pointer-events-none pb-6">
                 <span 
