@@ -28,31 +28,35 @@ export default function OrderDetail({
   const labelRef = useRef<HTMLDivElement>(null);
   const [isPrintingLabel, setIsPrintingLabel] = useState(false);
 
-  // ─── Hak Akses ───────────────────────────────────────────────────────────
+  // ─── Hak Akses (struktur baru) ────────────────────────────────────────────
   const isSupervisor = currentUser.role === 'supervisor';
   const isManagement = ['admin', 'manager', 'supervisor'].includes(currentUser.role);
   const perms = currentUser.permissions;
-  const jenisProd = order.jenis_produksi?.toLowerCase() || '';
-  const isManual = jenisProd === 'manual' || jenisProd === 'sablon';
-  const isDTF = jenisProd === 'dtf' || jenisProd === 'digital';
-  const prodPerms = isManual ? perms?.prod_manual : (isDTF ? perms?.prod_dtf : null);
 
   const currentStatus = order.status;
+  const jenisProd = order.jenis_produksi?.toLowerCase() || '';
+  const isManual = jenisProd === 'manual' || jenisProd === 'sablon';
   const currentSteps = isManual ? order.steps_manual : order.steps_dtf;
   const isProductionFinished = currentSteps && currentSteps.length > 0 && currentSteps.every(s => s.isCompleted);
   const isRevisi = currentStatus === 'Revisi';
 
-  const canUpdateStep = isSupervisor || (prodPerms?.step_process && (currentStatus === 'On Process' || currentStatus === 'Revisi' || currentStatus === 'Ada Kendala'));
-  const canCheckQC = isSupervisor || (perms?.finishing?.qc_check && (currentStatus === 'Finishing' || isProductionFinished));
-  const canUpdatePacking = isSupervisor || (perms?.finishing?.packing_update && order.finishing_qc.isPassed);
-  const canUpdateShipping = isSupervisor || (perms?.finishing?.shipping_update && (currentStatus === 'Kirim' || currentStatus === 'Selesai'));
-  const canEditOrderInfo = isSupervisor || perms?.orders?.edit;
-  const canDeleteOrder = isSupervisor || perms?.orders?.delete;
-  const canUploadApproval = isSupervisor || perms?.orders?.edit;
-  const canDeleteApprovalFile = isSupervisor || prodPerms?.delete_files;
-  const canDeleteStepFile = isSupervisor || prodPerms?.delete_files;
-  const canResetQC = isSupervisor || perms?.finishing?.qc_reset;
-  const canDeleteFinishingFile = isSupervisor || perms?.finishing?.delete_files;
+  // produksi.edit  → update step & lapor kendala
+  // produksi.create → upload approval
+  // produksi.delete → hapus file step/approval
+  // finishing.edit  → cek QC, update packing, update pengiriman
+  // finishing.create → reset QC (aksi "undo")
+  // finishing.delete → hapus file finishing
+
+  const canUpdateStep      = isSupervisor || (perms?.produksi?.edit   && (currentStatus === 'On Process' || currentStatus === 'Revisi' || currentStatus === 'Ada Kendala'));
+  const canCheckQC         = isSupervisor || (perms?.finishing?.edit   && (currentStatus === 'Finishing' || isProductionFinished));
+  const canUpdatePacking   = isSupervisor || (perms?.finishing?.edit   && order.finishing_qc.isPassed);
+  const canUpdateShipping  = isSupervisor || (perms?.finishing?.edit   && (currentStatus === 'Kirim' || currentStatus === 'Selesai'));
+  const canEditOrderInfo   = isSupervisor || perms?.orders?.edit;
+  const canDeleteOrder     = isSupervisor || perms?.orders?.delete;
+  const canUploadApproval  = isSupervisor || perms?.produksi?.create;
+  const canDeleteApprovalFile = isSupervisor || perms?.produksi?.delete;
+  const canResetQC         = isSupervisor || perms?.finishing?.create;
+  const canDeleteFinishingFile = isSupervisor || perms?.finishing?.delete;
 
   // ─── Hook ─────────────────────────────────────────────────────────────────
   const {

@@ -2,81 +2,51 @@
 
 export type UserRole = 'admin' | 'produksi' | 'qc' | 'manager' | 'supervisor';
 
-// --- DEFINISI HAK AKSES ---
+// ─── Tipe dasar per modul ────────────────────────────────────────────────────
+
+interface ModuleFull   { view: boolean; create: boolean; edit: boolean; delete: boolean }
+interface ModuleView   { view: boolean }
+interface ModuleViewEdit { view: boolean; edit: boolean }
+interface ModuleTrash  { view: boolean; delete: boolean }
+
+// ─── Definisi Hak Akses ──────────────────────────────────────────────────────
+
 export interface UserPermissions {
-  pages: {
-    dashboard: boolean;
-    orders: boolean;
-    completed_orders: boolean; 
-    activity_logs: boolean;
-    salary: boolean; 
-    kalkulator: boolean;
-    settings: boolean;
-    trash: boolean;
-    config_harga: boolean; 
-    about: boolean;
-  };
-  
-  orders: {
-    create: boolean;  
-    edit: boolean;    
-    delete: boolean;  
-    restore: boolean; 
-    permanent_delete: boolean; 
-  };
-
-  prod_manual: {
-    step_process: boolean; 
-    upload_approval: boolean;
-    access_files: boolean; 
-    delete_files: boolean; 
-  };
-
-  prod_dtf: {
-    step_process: boolean; 
-    upload_approval: boolean;
-    access_files: boolean;
-    delete_files: boolean;
-  };
-
-  finishing: {
-    qc_check: boolean; 
-    qc_reset: boolean; 
-    packing_update: boolean; 
-    shipping_update: boolean; 
-    delete_files: boolean; 
-  };
-
-  price_config: {
-    edit: boolean; 
-  };
+  dashboard:    ModuleView;
+  orders:       ModuleFull;
+  produksi:     ModuleFull;
+  finishing:    ModuleFull;
+  salary:       ModuleView;
+  logs:         ModuleView;
+  settings:     ModuleFull;
+  kalkulator:   ModuleView;
+  config_harga: ModuleViewEdit;
+  trash:        ModuleTrash;
+  nota:         ModuleView;
 }
 
-// Default Permissions
+// ─── Default Permissions ─────────────────────────────────────────────────────
+
 export const DEFAULT_PERMISSIONS: UserPermissions = {
-  pages: { 
-    dashboard: true, 
-    orders: true, 
-    completed_orders: false, 
-    activity_logs: false,
-    salary: false, 
-    kalkulator: true, 
-    settings: false, 
-    trash: false, 
-    config_harga: false, 
-    about: true 
-  },
-  orders: { create: false, edit: false, delete: false, restore: false, permanent_delete: false },
-  prod_manual: { step_process: false, upload_approval: false, access_files: true, delete_files: false },
-  prod_dtf: { step_process: false, upload_approval: false, access_files: true, delete_files: false },
-  finishing: { qc_check: false, qc_reset: false, packing_update: false, shipping_update: false, delete_files: false },
-  price_config: { edit: false } 
+  dashboard:    { view: true },
+  orders:       { view: true,  create: false, edit: false, delete: false },
+  produksi:     { view: true,  create: false, edit: false, delete: false },
+  finishing:    { view: true,  create: false, edit: false, delete: false },
+  salary:       { view: false },
+  logs:         { view: false },
+  settings:     { view: false, create: false, edit: false, delete: false },
+  kalkulator:   { view: true  },
+  config_harga: { view: false, edit: false },
+  trash:        { view: false, delete: false },
+  nota:         { view: false },
 };
+
+// ─── User ────────────────────────────────────────────────────────────────────
 
 export interface UserData {
   id: string;
   username: string;
-  password?: string; 
+  password?: string;
   name: string;
   role: UserRole;
   permissions: UserPermissions;
@@ -84,6 +54,8 @@ export interface UserData {
   dob?: string;
   avatar_url?: string;
 }
+
+// ─── Order ───────────────────────────────────────────────────────────────────
 
 export type OrderStatus =
   | 'Pesanan Masuk'
@@ -93,7 +65,7 @@ export type OrderStatus =
   | 'Selesai'
   | 'Revisi'
   | 'Ada Kendala'
-  | 'Telat'; 
+  | 'Telat';
 
 export interface Order {
   id: string;
@@ -101,15 +73,15 @@ export interface Order {
   kode_produksi: string;
   nama_pemesan: string;
   no_hp: string;
-  alamat_pemesan?: string; // 🟢 UPDATE: Tambahan kolom alamat pemesan
+  alamat_pemesan?: string;
   jumlah: number;
   tanggal_masuk: string;
   deadline: string;
   jenis_produksi: string;
-  status: OrderStatus; 
-  
-  assigned_to?: string | null; 
-  assigned_user?: { name: string } | null; 
+  status: OrderStatus;
+
+  assigned_to?: string | null;
+  assigned_user?: { name: string } | null;
 
   helper_id?: string | null;
   helper_user?: { name: string } | null;
@@ -119,7 +91,7 @@ export interface Order {
   steps_dtf: ProductionStep[];
   finishing_qc: { isPassed: boolean; notes: string; checkedBy?: string; timestamp?: string };
   finishing_packing: { isPacked: boolean; fileUrl?: string | null; packedBy?: string | null; timestamp?: string | null };
-  shipping: { 
+  shipping: {
     bukti_kirim?: string | null; uploaded_by_kirim?: string | null; timestamp_kirim?: string | null;
     bukti_terima?: string | null; uploaded_by_terima?: string | null; timestamp_terima?: string | null;
   };

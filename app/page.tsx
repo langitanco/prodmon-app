@@ -5,7 +5,6 @@ import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { createBrowserClient } from '@supabase/ssr';
 
 // ─── Hooks ───────────────────────────────────────────────────────────────────
-import { useAuth } from '@/hooks/useAuth';
 import { useNotifications } from '@/hooks/useNotifications';
 import { useOrders } from '@/hooks/useOrders';
 import { useUpload } from '@/hooks/useUpload';
@@ -18,18 +17,13 @@ import CustomAlert from '@/app/components/ui/CustomAlert';
 import LoginScreen from '@/app/components/auth/LoginScreen';
 import ProfileModal from '@/app/components/ui/ProfileModal';
 
-// ─── Lazy Load: Dashboard ────────────────────────────────────────────────────
+// ─── Lazy Load ───────────────────────────────────────────────────────────────
 import dynamic from 'next/dynamic';
+
 const Dashboard = dynamic(() => import('@/app/components/dashboard/Dashboard'), {
-  loading: () => (
-    <div className="flex items-center justify-center h-64">
-      <div className="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin" />
-    </div>
-  ),
+  loading: () => <div className="flex items-center justify-center h-64"><div className="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin" /></div>,
   ssr: false,
 });
-
-// ─── Lazy Load: Apps & Config ────────────────────────────────────────────────
 const CalculatorView  = dynamic(() => import('@/app/components/apps/CalculatorView'));
 const ConfigPriceView = dynamic(() => import('@/app/components/apps/ConfigPriceView'));
 const ActivityLogView = dynamic(() => import('@/app/components/apps/ActivityLogView'));
@@ -37,20 +31,17 @@ const AboutView       = dynamic(() => import('@/app/components/misc/AboutView'))
 const CalendarView    = dynamic(() => import('@/app/components/apps/CalendarView'));
 const SalaryView      = dynamic(() => import('@/app/components/apps/SalaryView'));
 const NotaView        = dynamic(() => import('@/app/components/apps/NotaView'));
-
-// ─── Lazy Load: Orders ───────────────────────────────────────────────────────
 const OrderList       = dynamic(() => import('@/app/components/orders/OrderList'));
 const CreateOrder     = dynamic(() => import('@/app/components/orders/CreateOrder'));
 const EditOrder       = dynamic(() => import('@/app/components/orders/EditOrder'));
 const OrderDetail     = dynamic(() => import('@/app/components/orders/OrderDetail'));
 const CompletedOrders = dynamic(() => import('@/app/components/orders/CompletedOrders'));
 const TrashView       = dynamic(() => import('@/app/components/orders/TrashView'));
-
-// ─── Lazy Load: Settings ─────────────────────────────────────────────────────
-const SettingsPage = dynamic(() => import('@/app/components/settings/SettingsPage'));
+const SettingsPage    = dynamic(() => import('@/app/components/settings/SettingsPage'));
 
 // ─── Types ───────────────────────────────────────────────────────────────────
-import { Order } from '@/types';
+import { UserData, Order, ProductionTypeData, DEFAULT_PERMISSIONS, OrderStatus } from '@/types';
+import { DEFAULT_PRODUCTION_TYPES } from '@/lib/utils';
 import { Loader2 } from 'lucide-react';
 
 type ActiveTab =
@@ -59,14 +50,13 @@ type ActiveTab =
   | 'kalkulator' | 'config_harga' | 'about'
   | 'salary' | 'nota';
 
-type ViewMode = 'list' | 'detail' | 'create' | 'edit';
-
-// ─── Komponen Utama ───────────────────────────────────────────────────────────
+interface CurrentUser extends UserData { id: string }
 
 export default function ProductionApp() {
-  // UI State
+  const [currentUser, setCurrentUser]     = useState<CurrentUser | null>(null);
+  const [loadingUser, setLoadingUser]     = useState(true);
   const [activeTab, setActiveTab]         = useState<ActiveTab>('dashboard');
-  const [view, setView]                   = useState<ViewMode>('list');
+  const [view, setView]                   = useState<'list' | 'detail' | 'create' | 'edit'>('list');
   const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
   const [sidebarOpen, setSidebarOpen]     = useState(false);
   const [showProfileModal, setShowProfileModal] = useState(false);
@@ -75,28 +65,20 @@ export default function ProductionApp() {
     type: 'success' | 'error' | 'confirm'; onConfirm?: () => void;
   }>({ isOpen: false, title: '', message: '', type: 'success' });
 
-  // Alert helpers
   const showAlert = useCallback((title: string, message: string, type: 'success' | 'error' = 'success') => {
     setAlertState({ isOpen: true, title, message, type, onConfirm: undefined });
   }, []);
-
   const showConfirm = useCallback((title: string, message: string, onConfirm: () => void) => {
     setAlertState({ isOpen: true, title, message, type: 'confirm', onConfirm });
   }, []);
-
   const closeAlert = useCallback(() => setAlertState(prev => ({ ...prev, isOpen: false })), []);
 
-  // Supabase singleton
   const supabase = useMemo(() => createBrowserClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
   ), []);
 
   // ─── Hooks ─────────────────────────────────────────────────────────────────
-
-  const { currentUser, loadingUser, handleLogout, handleUpdateProfile } = useAuth({
-    supabase, showAlert, showConfirm,
-  });
 
   const { notifications, fetchNotifications, markAsRead, markAllAsRead } = useNotifications({
     currentUserId: currentUser?.id ?? null, supabase,
@@ -106,9 +88,7 @@ export default function ProductionApp() {
     orders, activeOrders, fetchOrders, writeLog,
     checkAutoStatus, handleCreateOrder, handleEditOrder,
     handleDeleteOrder, handleRestoreOrder, handlePermanentDelete,
-  } = useOrders({
-    supabase, currentUser, fetchNotifications, showAlert, showConfirm, setView,
-  });
+  } = useOrders({ supabase, currentUser, fetchNotifications, showAlert, showConfirm, setView });
 
   const { fileInputRef, isUploading, triggerUpload, handleFileChange } = useUpload({
     supabase, currentUser, orders, selectedOrderId, checkAutoStatus, writeLog, showAlert,
@@ -121,7 +101,77 @@ export default function ProductionApp() {
     handleSaveType, handleDeleteType,
   } = useUsers({ supabase, showAlert, showConfirm });
 
+  // ─── Auth ──────────────────────────────────────────────────────────────────
+
+  useEffect(() => {
+    const initSession = async () => {
+      setLoadingUser(true);
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session) {
+        const { data: userData } = await supabase.from('users').select('*').eq('id', session.user.id).single();
+        if (userData) {
+          setCurrentUser({
+            id: session.user.id,
+            username: userData.username || '',
+            name: userData.name || 'User',
+            role: userData.role || 'produksi',
+            password: '',
+            permissions: userData.permissions || DEFAULT_PERMISSIONS,
+            address: userData.address,
+            dob: userData.dob,
+            avatar_url: userData.avatar_url,
+          });
+        }
+      }
+      setLoadingUser(false);
+    };
+    initSession();
+  }, [supabase]);
+
+  // ─── Load Data ─────────────────────────────────────────────────────────────
+
+  useEffect(() => {
+    if (!currentUser) return;
+    Promise.all([fetchOrders(), fetchUsers(), fetchProductionTypes(), fetchNotifications()]);
+    const interval = setInterval(fetchNotifications, 60000);
+    return () => clearInterval(interval);
+  }, [currentUser, fetchOrders, fetchUsers, fetchProductionTypes, fetchNotifications]);
+
+  // ─── Navigation ────────────────────────────────────────────────────────────
+
+  useEffect(() => {
+    const handlePopState = () => {
+      if (activeTab !== 'dashboard') { setActiveTab('dashboard'); setView('list'); setSelectedOrderId(null); }
+    };
+    window.addEventListener('popstate', handlePopState);
+    if (activeTab !== 'dashboard') window.history.pushState({ tab: activeTab }, '', `?tab=${activeTab}`);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, [activeTab]);
+
   // ─── Handlers ──────────────────────────────────────────────────────────────
+
+  const handleLogout = useCallback(async () => {
+    showConfirm('Logout', 'Keluar aplikasi?', async () => {
+      await supabase.auth.signOut();
+      // Bersihkan URL sebelum reload
+      window.history.replaceState({}, '', '/'); // ← tambah ini
+      window.location.reload();
+    });
+  }, [showConfirm, supabase]);
+
+  const handleUpdateProfile = useCallback(async (newData: any) => {
+    if (!currentUser) return;
+    const { error } = await supabase.from('users').update({
+      name: newData.name, address: newData.address, dob: newData.dob, avatar_url: newData.avatar_url,
+    }).eq('id', currentUser.id);
+    if (!error) {
+      setCurrentUser({ ...currentUser, ...newData });
+      setShowProfileModal(false);
+      showAlert('Sukses', 'Profil diperbarui');
+    } else {
+      showAlert('Gagal', error.message, 'error');
+    }
+  }, [currentUser, supabase, showAlert]);
 
   const handleNotificationClick = useCallback(async (notificationId: string, orderId: string) => {
     await markAsRead(notificationId);
@@ -131,35 +181,7 @@ export default function ProductionApp() {
     setSidebarOpen(false);
   }, [markAsRead]);
 
-  const handleSelectOrder = useCallback((id: string, tab: ActiveTab = 'orders') => {
-    setSelectedOrderId(id);
-    setView('detail');
-    setActiveTab(tab);
-  }, []);
-
-  // ─── Effects ───────────────────────────────────────────────────────────────
-
-  // Load data setelah user tersedia
-  useEffect(() => {
-    if (!currentUser) return;
-    Promise.all([fetchOrders(), fetchUsers(), fetchProductionTypes(), fetchNotifications()]);
-    const interval = setInterval(fetchNotifications, 60000);
-    return () => clearInterval(interval);
-  }, [currentUser, fetchOrders, fetchUsers, fetchProductionTypes, fetchNotifications]);
-
-  // Handle browser back button
-  useEffect(() => {
-    const handlePopState = () => {
-      if (activeTab !== 'dashboard') {
-        setActiveTab('dashboard'); setView('list'); setSelectedOrderId(null);
-      }
-    };
-    window.addEventListener('popstate', handlePopState);
-    if (activeTab !== 'dashboard') window.history.pushState({ tab: activeTab }, '', `?tab=${activeTab}`);
-    return () => window.removeEventListener('popstate', handlePopState);
-  }, [activeTab]);
-
-  // ─── Render Guards ─────────────────────────────────────────────────────────
+  // ─── Guards ────────────────────────────────────────────────────────────────
 
   if (loadingUser) return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-slate-950">
@@ -169,21 +191,15 @@ export default function ProductionApp() {
 
   if (!currentUser) return <LoginScreen />;
 
+  const p = currentUser.permissions;
+
   // ─── Render ────────────────────────────────────────────────────────────────
 
   return (
     <div className="h-screen overflow-hidden bg-gray-100 dark:bg-slate-950 flex flex-col md:flex-row font-sans text-slate-800 dark:text-slate-100 relative">
 
-      {/* File input tersembunyi untuk upload */}
-      <input
-        type="file"
-        ref={fileInputRef}
-        className="hidden"
-        accept="image/*,application/pdf"
-        onChange={handleFileChange}
-      />
+      <input type="file" ref={fileInputRef} className="hidden" accept="image/*,application/pdf" onChange={handleFileChange} />
 
-      {/* Upload overlay */}
       {isUploading && (
         <div className="absolute inset-0 z-[9999] bg-black/60 flex flex-col items-center justify-center text-white backdrop-blur-sm">
           <Loader2 className="w-12 h-12 animate-spin mb-3 text-blue-400" />
@@ -194,14 +210,15 @@ export default function ProductionApp() {
 
       <CustomAlert alertState={alertState} closeAlert={closeAlert} />
 
-      <ProfileModal
-        user={currentUser}
-        isOpen={showProfileModal}
-        onClose={() => setShowProfileModal(false)}
-        onSave={(data) => handleUpdateProfile(data, () => setShowProfileModal(false))}
-      />
+      {currentUser && (
+        <ProfileModal
+          user={currentUser}
+          isOpen={showProfileModal}
+          onClose={() => setShowProfileModal(false)}
+          onSave={handleUpdateProfile}
+        />
+      )}
 
-      {/* Sidebar */}
       <Sidebar
         sidebarOpen={sidebarOpen}
         setSidebarOpen={setSidebarOpen}
@@ -212,7 +229,6 @@ export default function ProductionApp() {
         onOpenProfile={() => setShowProfileModal(true)}
       />
 
-      {/* Main area */}
       <div className="flex-1 flex flex-col min-w-0 h-full overflow-hidden">
         <Header
           currentUser={currentUser}
@@ -228,43 +244,26 @@ export default function ProductionApp() {
         <main className="flex-1 overflow-y-auto px-4 md:px-6 py-2 md:py-3 pb-32 relative bg-gray-100 dark:bg-slate-950 no-scrollbar">
           <div className="max-w-7xl mx-auto h-full">
 
-            {/* Dashboard */}
-            {activeTab === 'dashboard' && currentUser.permissions?.pages?.dashboard && (
-              <Dashboard
-                role={currentUser.role}
-                orders={activeOrders}
-                onSelectOrder={(id) => handleSelectOrder(id)}
-              />
+            {activeTab === 'dashboard' && p?.dashboard?.view && (
+              <Dashboard role={currentUser.role} orders={activeOrders} onSelectOrder={(id) => { setSelectedOrderId(id); setView('detail'); setActiveTab('orders'); }} />
             )}
 
-            {/* Orders */}
-            {activeTab === 'orders' && currentUser.permissions?.pages?.orders && (
+            {activeTab === 'orders' && p?.orders?.view && (
               <>
                 {view === 'list' && (
-                  <OrderList
-                    role={currentUser.role}
-                    orders={activeOrders}
-                    productionTypes={productionTypes}
+                  <OrderList role={currentUser.role} orders={activeOrders} productionTypes={productionTypes}
                     onSelectOrder={(id) => { setSelectedOrderId(id); setView('detail'); }}
-                    onNewOrder={() => setView('create')}
-                    onDeleteOrder={handleDeleteOrder}
-                    currentUser={currentUser}
+                    onNewOrder={() => setView('create')} onDeleteOrder={handleDeleteOrder} currentUser={currentUser}
                   />
                 )}
                 {view === 'create' && (
-                  <CreateOrder
-                    users={usersList}
-                    productionTypes={productionTypes}
-                    onCancel={() => setView('list')}
-                    onSubmit={handleCreateOrder}
+                  <CreateOrder users={usersList} productionTypes={productionTypes}
+                    onCancel={() => setView('list')} onSubmit={handleCreateOrder}
                   />
                 )}
                 {view === 'edit' && selectedOrderId && (
-                  <EditOrder
-                    users={usersList}
-                    order={orders.find((o: Order) => o.id === selectedOrderId)!}
-                    productionTypes={productionTypes}
-                    onCancel={() => setView('detail')}
+                  <EditOrder users={usersList} order={orders.find((o: Order) => o.id === selectedOrderId)!}
+                    productionTypes={productionTypes} onCancel={() => setView('detail')}
                     onSubmit={(d) => handleEditOrder(d, selectedOrderId)}
                   />
                 )}
@@ -285,61 +284,38 @@ export default function ProductionApp() {
               </>
             )}
 
-            {/* Completed Orders */}
-            {activeTab === 'completed_orders' && currentUser.permissions?.pages?.completed_orders && (
-              <CompletedOrders
-                orders={activeOrders}
-                onSelectOrder={(id) => handleSelectOrder(id)}
+            {activeTab === 'completed_orders' && p?.orders?.view && (
+              <CompletedOrders orders={activeOrders}
+                onSelectOrder={(id) => { setSelectedOrderId(id); setView('detail'); setActiveTab('orders'); }}
               />
             )}
 
-            {/* Calendar */}
             {activeTab === 'calendar' && (
-              <CalendarView
-                orders={activeOrders}
-                onSelectOrder={(id) => handleSelectOrder(id)}
+              <CalendarView orders={activeOrders}
+                onSelectOrder={(id) => { setSelectedOrderId(id); setView('detail'); setActiveTab('orders'); }}
               />
             )}
 
-            {/* Salary */}
-            {activeTab === 'salary' && currentUser.permissions?.pages?.salary && (
-              <SalaryView users={usersList} orders={orders} />
-            )}
-
-            {/* Nota */}
-            {activeTab === 'nota' && (currentUser.permissions?.pages as any)?.nota && (
-              <NotaView />
-            )}
-
-            {/* Activity Log */}
-            {activeTab === 'logs' && currentUser.permissions?.pages?.activity_logs && (
-              <ActivityLogView />
-            )}
-
-            {/* Trash */}
-            {activeTab === 'trash' && (
-              <TrashView
-                orders={orders.filter((o: Order) => o.deleted_at)}
-                onRestore={handleRestoreOrder}
-                onPermanentDelete={handlePermanentDelete}
-              />
-            )}
-
-            {/* Settings */}
-            {activeTab === 'settings' && (
-              <SettingsPage
-                users={usersList}
-                productionTypes={productionTypes}
-                onSaveUser={handleSaveUser}
-                onDeleteUser={handleDeleteUser}
-                onSaveProductionType={handleSaveType}
-                onDeleteProductionType={handleDeleteType}
-              />
-            )}
-
-            {activeTab === 'kalkulator'   && <CalculatorView />}
-            {activeTab === 'config_harga' && <ConfigPriceView />}
+            {activeTab === 'salary'       && p?.salary?.view       && <SalaryView users={usersList} orders={orders} />}
+            {activeTab === 'nota'         && p?.nota?.view         && <NotaView />}
+            {activeTab === 'logs'         && p?.logs?.view         && <ActivityLogView />}
+            {activeTab === 'kalkulator'   && p?.kalkulator?.view   && <CalculatorView />}
+            {activeTab === 'config_harga' && p?.config_harga?.view && <ConfigPriceView />}
             {activeTab === 'about'        && <AboutView />}
+
+            {activeTab === 'trash' && p?.trash?.view && (
+              <TrashView orders={orders.filter((o: Order) => o.deleted_at)}
+                onRestore={handleRestoreOrder} onPermanentDelete={handlePermanentDelete}
+              />
+            )}
+
+            {activeTab === 'settings' && p?.settings?.view && (
+              <SettingsPage
+                users={usersList} productionTypes={productionTypes}
+                onSaveUser={handleSaveUser} onDeleteUser={handleDeleteUser}
+                onSaveProductionType={handleSaveType} onDeleteProductionType={handleDeleteType}
+              />
+            )}
 
           </div>
         </main>
