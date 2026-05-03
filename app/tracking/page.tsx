@@ -1,7 +1,7 @@
 // app/tracking/page.tsx
 'use client';
 
-import React, { useState, useMemo, useEffect, useRef } from 'react';
+import React, { useState, useMemo, useEffect, useRef, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { createBrowserClient } from '@supabase/ssr';
 import { Search, Loader2, AlertCircle, Package } from 'lucide-react';
@@ -17,7 +17,9 @@ const smartFormat = (input: string): string => {
   return input.toUpperCase().trim();
 };
 
-export default function TrackingPage() {
+// ─── Komponen inner (pakai useSearchParams di sini) ──────────────────────────
+
+function TrackingPageInner() {
   const [searchCode, setSearchCode]   = useState('');
   const [result, setResult]           = useState<any>(null);
   const [loading, setLoading]         = useState(false);
@@ -25,14 +27,12 @@ export default function TrackingPage() {
   const [error, setError]             = useState(false);
 
   const searchParams = useSearchParams();
-  const didAutoSearch = useRef(false); // cegah double-run di StrictMode
+  const didAutoSearch = useRef(false);
 
   const supabase = useMemo(() => createBrowserClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
   ), []);
-
-  // ─── Fungsi pencarian (bisa dipanggil dari form ATAU dari URL) ───────────
 
   const doSearch = async (code: string) => {
     if (!code.trim()) return;
@@ -56,8 +56,6 @@ export default function TrackingPage() {
     setLoading(false);
   };
 
-  // ─── Auto-search jika ada ?kode= di URL ──────────────────────────────────
-
   useEffect(() => {
     const kodeFromUrl = searchParams.get('kode');
     if (kodeFromUrl && !didAutoSearch.current) {
@@ -67,8 +65,6 @@ export default function TrackingPage() {
     }
   }, [searchParams]);
 
-  // ─── Handler form manual ─────────────────────────────────────────────────
-
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();
     doSearch(searchCode);
@@ -76,8 +72,6 @@ export default function TrackingPage() {
 
   const formatted   = searchCode ? smartFormat(searchCode) : '';
   const showPreview = searchCode.length >= 6 && formatted !== searchCode.toUpperCase().trim();
-
-  // ─── Shared: Search form ─────────────────────────────────────────────────
 
   const SearchForm = (
     <form onSubmit={handleSearch} className="space-y-3">
@@ -112,8 +106,6 @@ export default function TrackingPage() {
     </form>
   );
 
-  // ─── Shared: Result area ──────────────────────────────────────────────────
-
   const ResultArea = (
     <>
       {loading && (
@@ -122,7 +114,6 @@ export default function TrackingPage() {
           <p className="text-sm text-slate-500 dark:text-slate-400">Mencari pesanan...</p>
         </div>
       )}
-
       {!loading && hasSearched && error && (
         <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-10 flex flex-col items-center gap-3 text-center">
           <div className="w-12 h-12 rounded-full bg-red-50 dark:bg-red-900/20 flex items-center justify-center">
@@ -134,7 +125,6 @@ export default function TrackingPage() {
           </div>
         </div>
       )}
-
       {!hasSearched && !loading && (
         <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-10 flex flex-col items-center gap-3 text-center">
           <div className="w-12 h-12 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center">
@@ -146,7 +136,6 @@ export default function TrackingPage() {
           </div>
         </div>
       )}
-
       {!loading && result && (
         <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden">
           <TrackingTimeline result={result} />
@@ -179,8 +168,6 @@ export default function TrackingPage() {
 
       {/* ── DESKTOP layout ── */}
       <div className="hidden md:flex min-h-screen">
-
-        {/* Kiri: sticky search panel */}
         <div className="w-80 lg:w-96 flex-shrink-0 border-r border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 flex flex-col">
           <div className="p-6 border-b border-slate-100 dark:border-slate-800">
             <div className="flex items-center gap-3 mb-6">
@@ -193,7 +180,6 @@ export default function TrackingPage() {
             </div>
             {SearchForm}
           </div>
-
           <div className="p-6 flex-1">
             <p className="text-[11px] font-medium text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-3">Petunjuk</p>
             <ul className="space-y-2.5">
@@ -209,13 +195,11 @@ export default function TrackingPage() {
               ))}
             </ul>
           </div>
-
           <div className="p-6 border-t border-slate-100 dark:border-slate-800">
             <p className="text-[11px] text-slate-300 dark:text-slate-700">Langitan.co · Sistem Produksi</p>
           </div>
         </div>
 
-        {/* Kanan: result area */}
         <div className="flex-1 overflow-y-auto bg-slate-50 dark:bg-slate-950">
           <div className="max-w-2xl mx-auto px-8 py-10">
             {(loading || !result || (hasSearched && error)) && (
@@ -257,5 +241,19 @@ export default function TrackingPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+// ─── Export default dibungkus Suspense ───────────────────────────────────────
+
+export default function TrackingPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex items-center justify-center">
+        <div className="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin" />
+      </div>
+    }>
+      <TrackingPageInner />
+    </Suspense>
   );
 }
