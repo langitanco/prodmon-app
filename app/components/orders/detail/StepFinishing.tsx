@@ -114,7 +114,9 @@ export default function StepFinishing({
           </div>
 
           {order.finishing_packing.isPacked ? (
-            <div className="flex-1 flex flex-col items-center justify-center p-6 bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 text-center shadow-sm relative overflow-hidden group min-h-[160px]">
+            <div className="flex-1 flex flex-col p-4 bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden group min-h-[160px]">
+
+              {/* Foto packing */}
               {order.finishing_packing.fileUrl ? (
                 <div className="relative w-full h-32 mb-3 rounded-lg overflow-hidden border border-slate-100 dark:border-slate-700">
                   <img src={order.finishing_packing.fileUrl} alt="Packing" className="w-full h-full object-cover" />
@@ -127,18 +129,39 @@ export default function StepFinishing({
                   </a>
                 </div>
               ) : (
-                <Package className="w-10 h-10 text-slate-300 dark:text-slate-600 mb-2" />
+                <div className="flex justify-center mb-3">
+                  <Package className="w-10 h-10 text-slate-300 dark:text-slate-600" />
+                </div>
               )}
-              <div className="flex items-center gap-2 text-green-700 dark:text-green-400 font-bold text-sm bg-green-50 dark:bg-green-900/20 px-3 py-1 rounded-full border border-green-100 dark:border-green-800">
-                <CheckCircle className="w-4 h-4" /> Selesai
+
+              {/* Status selesai + tombol hapus bersebelahan */}
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2 text-green-700 dark:text-green-400 font-bold text-sm bg-green-50 dark:bg-green-900/20 px-3 py-1 rounded-full border border-green-100 dark:border-green-800">
+                  <CheckCircle className="w-4 h-4" /> Selesai
+                </div>
+                {canDeleteFinishingFile && (
+                  <button
+                    onClick={() => onFileDelete('packing')}
+                    className="flex items-center gap-1 text-[10px] font-bold text-red-500 dark:text-red-400 bg-red-50 dark:bg-red-900/20 border border-red-100 dark:border-red-900/30 px-2 py-1 rounded-lg hover:bg-red-100 dark:hover:bg-red-900/40 transition"
+                  >
+                    <Trash2 className="w-3 h-3" /> Hapus
+                  </button>
+                )}
               </div>
-              {canDeleteFinishingFile && (
-                <button
-                  onClick={() => onFileDelete('packing')}
-                  className="absolute top-2 right-2 text-slate-300 dark:text-slate-600 hover:text-red-500 p-1"
-                >
-                  <Trash2 className="w-4 h-4" />
-                </button>
+
+              {/* Info uploader */}
+              {order.finishing_packing.packedBy && (
+                <p className="text-[10px] text-slate-400 dark:text-slate-500 mt-2">
+                  Di-pack oleh:{' '}
+                  <span className="font-semibold text-slate-600 dark:text-slate-300">
+                    {order.finishing_packing.packedBy}
+                  </span>
+                  {order.finishing_packing.timestamp && (
+                    <> · {new Date(order.finishing_packing.timestamp).toLocaleDateString('id-ID', {
+                      day: 'numeric', month: 'short', year: 'numeric',
+                    })}</>
+                  )}
+                </p>
               )}
             </div>
           ) : (
@@ -169,6 +192,7 @@ export default function StepFinishing({
           Pengiriman
         </h3>
         <div className="p-4 border border-slate-200 dark:border-slate-700 rounded-xl bg-slate-50/50 dark:bg-slate-800/50 space-y-4">
+
           {/* Bukti Kirim */}
           <div className="flex justify-between items-center">
             <span className="text-xs md:text-sm font-bold text-slate-700 dark:text-slate-300">Bukti Kirim (Resi)</span>

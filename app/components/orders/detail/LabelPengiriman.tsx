@@ -23,19 +23,6 @@ export default function LabelPengiriman({ order, labelRef }: LabelPengirimanProp
       >
         {/* Main Content */}
         <div className="flex-1 flex flex-col p-6 pb-2">
-          {/* Header Logo */}
-          <div className="h-[22mm] w-full mb-2 p-[4mm]">
-            <img
-              src="/header-pengiriman.png"
-              alt="Header Pengiriman"
-              className="h-full w-auto object-contain object-left"
-              crossOrigin="anonymous"
-              onError={(e) => {
-                (e.target as HTMLImageElement).src =
-                  'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+ip1sAAAAASUVORK5CYII=';
-              }}
-            />
-          </div>
 
           <div className="flex-1" />
 

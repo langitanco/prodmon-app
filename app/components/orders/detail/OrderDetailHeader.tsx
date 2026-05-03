@@ -3,7 +3,7 @@
 import React from 'react';
 import { formatDate, getStatusColor, openWA, getDeadlineStatus } from '@/lib/utils';
 import { Order, UserData } from '@/types';
-import { ChevronRight, Pencil, Phone, Printer, Trash2, User, Users } from 'lucide-react';
+import { ChevronRight, MessageCircle, Pencil, Phone, Printer, Trash2, User, Users } from 'lucide-react';
 
 interface OrderDetailHeaderProps {
   order: Order;
@@ -17,6 +17,9 @@ interface OrderDetailHeaderProps {
   onPrintLabel: () => void;
 }
 
+// Ganti dengan domain produksi Anda
+const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://langitanco-superapp.vercel.app';
+
 export default function OrderDetailHeader({
   order, currentUser, isPrintingLabel,
   canEditOrderInfo, canDeleteOrder,
@@ -24,6 +27,43 @@ export default function OrderDetailHeader({
 }: OrderDetailHeaderProps) {
   const isManagement = ['admin', 'manager', 'supervisor'].includes(currentUser.role);
   const isLate = getDeadlineStatus(order.deadline, order.status) === 'overdue';
+
+  // ─── Kirim konfirmasi pesanan via WhatsApp ────────────────────────────────
+
+  const handleKirimKonfirmasi = () => {
+    const trackingUrl = `${APP_URL}/tracking?kode=${order.kode_produksi}`;
+    const pesan = [
+      `Assalamu'alaikum, *${order.nama_pemesan}* 👋`,
+      ``,
+      `Pesanan Anda telah kami terima dan sedang kami proses.`,
+      ``,
+      `📦 *Detail Pesanan*`,
+      `Kode  : *${order.kode_produksi}*`,
+      `Item  : ${order.jumlah} pcs (${order.jenis_produksi})`,
+      `Estimasi selesai: *${formatDate(order.deadline)}*`,
+      ``,
+      `🔍 *Pantau progres produksi Anda di:*`,
+      trackingUrl,
+      ``,
+      `Terima kasih telah mempercayai Langitan.co 🙏`,
+    ].join('\n');
+
+    const nomorWA = order.no_hp?.replace(/\D/g, '');
+    if (!nomorWA) {
+      alert('Nomor HP pelanggan belum diisi.');
+      return;
+    }
+
+    // Pastikan nomor diawali kode negara (62 untuk Indonesia)
+    const nomorFormatted = nomorWA.startsWith('0')
+      ? `62${nomorWA.slice(1)}`
+      : nomorWA;
+
+    window.open(
+      `https://wa.me/${nomorFormatted}?text=${encodeURIComponent(pesan)}`,
+      '_blank'
+    );
+  };
 
   return (
     <>
@@ -35,7 +75,9 @@ export default function OrderDetailHeader({
         >
           <ChevronRight className="w-4 h-4 md:w-5 md:h-5 rotate-180" /> Kembali
         </button>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
+          {/* Tombol kirim konfirmasi WA — hanya management */}
+          {isManagement && 
           <button
             onClick={onPrintLabel}
             disabled={isPrintingLabel}
@@ -44,6 +86,7 @@ export default function OrderDetailHeader({
             <Printer className="w-3 h-3" />
             {isPrintingLabel ? 'Memproses...' : 'Label Kirim'}
           </button>
+          }
           {canEditOrderInfo && (
             <button
               onClick={onEdit}
@@ -78,10 +121,10 @@ export default function OrderDetailHeader({
               {formatDate(order.deadline)}
             </span>
             <button
-              onClick={() => openWA(order.no_hp)}
-              className="bg-green-600 text-white px-2 py-1 rounded-lg text-[10px] font-bold flex items-center gap-1"
+              onClick={handleKirimKonfirmasi}
+              className="bg-green-600 text-white px-2 py-1 rounded-lg text-[10px] font-bold flex items-center gap-1.5"
             >
-              <Phone className="w-3 h-3" /> WA
+              <MessageCircle className="w-3 h-3" /> Konfirmasi WA
             </button>
           </div>
 

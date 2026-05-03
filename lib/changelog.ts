@@ -20,6 +20,7 @@ export const CHANGELOG: ChangelogEntry[] = [
     date: "2026-05-03",
     changes: [
       "Restruktur SettingsPage dan user premission.",
+      "Menambahkan fitur tracking untuk customer, dan link bisa dibagikan melalui DetailOrder.",
     ],
   },
   {
