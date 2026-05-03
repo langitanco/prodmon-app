@@ -31,7 +31,7 @@ export default function OrderDetailHeader({
   // ─── Kirim konfirmasi pesanan via WhatsApp ────────────────────────────────
 
   const handleKirimKonfirmasi = () => {
-    const trackingUrl = `${APP_URL}/tracking?kode=${order.kode_produksi}`;
+    const trackingUrl = `${APP_URL}/tracking?kode=${encodeURIComponent(order.kode_produksi)}`;
     const pesan = [
       `Assalamu'alaikum, *${order.nama_pemesan}* 👋`,
       ``,

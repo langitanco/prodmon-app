@@ -40,8 +40,13 @@ function TrackingPageInner() {
     setHasSearched(true);
     setResult(null);
     setError(false);
+
     const formatted = smartFormat(code);
-    const { data } = await supabase
+
+    // Coba formatted dulu, kalau tidak ketemu coba raw input
+    let data = null;
+
+    const { data: data1 } = await supabase
       .from('orders')
       .select(`
         kode_produksi, nama_pemesan, jumlah, jenis_produksi,
@@ -49,8 +54,26 @@ function TrackingPageInner() {
         link_approval, steps_manual, steps_dtf,
         finishing_qc, finishing_packing, shipping
       `)
-      .or(`kode_produksi.ilike.${formatted},kode_produksi.ilike.${code.trim()}`)
+      .ilike('kode_produksi', formatted)
       .single();
+
+    if (data1) {
+      data = data1;
+    } else {
+      const { data: data2 } = await supabase
+        .from('orders')
+        .select(`
+          kode_produksi, nama_pemesan, jumlah, jenis_produksi,
+          status, tanggal_masuk, deadline,
+          link_approval, steps_manual, steps_dtf,
+          finishing_qc, finishing_packing, shipping
+        `)
+        .ilike('kode_produksi', code.trim())
+        .single();
+
+      if (data2) data = data2;
+    }
+
     if (data) setResult(data);
     else setError(true);
     setLoading(false);
@@ -60,6 +83,7 @@ function TrackingPageInner() {
     const kodeFromUrl = searchParams.get('kode');
     if (kodeFromUrl && !didAutoSearch.current) {
       didAutoSearch.current = true;
+      // searchParams.get() sudah otomatis decode, jadi langsung pakai saja
       setSearchCode(kodeFromUrl);
       doSearch(kodeFromUrl);
     }
