@@ -41,12 +41,10 @@ function TrackingPageInner() {
     setResult(null);
     setError(false);
 
-    const formatted = smartFormat(code);
+    const formatted = smartFormat(code.trim());
 
-    // Coba formatted dulu, kalau tidak ketemu coba raw input
-    let data = null;
-
-    const { data: data1 } = await supabase
+    // Coba formatted dulu
+    const { data: result1 } = await supabase
       .from('orders')
       .select(`
         kode_produksi, nama_pemesan, jumlah, jenis_produksi,
@@ -55,27 +53,32 @@ function TrackingPageInner() {
         finishing_qc, finishing_packing, shipping
       `)
       .ilike('kode_produksi', formatted)
-      .single();
+      .maybeSingle();
 
-    if (data1) {
-      data = data1;
-    } else {
-      const { data: data2 } = await supabase
-        .from('orders')
-        .select(`
-          kode_produksi, nama_pemesan, jumlah, jenis_produksi,
-          status, tanggal_masuk, deadline,
-          link_approval, steps_manual, steps_dtf,
-          finishing_qc, finishing_packing, shipping
-        `)
-        .ilike('kode_produksi', code.trim())
-        .single();
-
-      if (data2) data = data2;
+    if (result1) {
+      setResult(result1);
+      setLoading(false);
+      return;
     }
 
-    if (data) setResult(data);
-    else setError(true);
+    // Coba raw input
+    const { data: result2 } = await supabase
+      .from('orders')
+      .select(`
+        kode_produksi, nama_pemesan, jumlah, jenis_produksi,
+        status, tanggal_masuk, deadline,
+        link_approval, steps_manual, steps_dtf,
+        finishing_qc, finishing_packing, shipping
+      `)
+      .ilike('kode_produksi', code.trim())
+      .maybeSingle();
+
+    if (result2) {
+      setResult(result2);
+    } else {
+      setError(true);
+    }
+
     setLoading(false);
   };
 
