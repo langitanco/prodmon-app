@@ -40,13 +40,25 @@ export function useUsers({ supabase, showAlert, showConfirm }: UseUsersProps) {
   }, [supabase, fetchUsers, showAlert]);
 
   const handleDeleteUser = useCallback(async (id: string) => {
-    showConfirm('Hapus User?', 'User akan dihapus.', async () => {
-      await supabase.from('users').delete().eq('id', id);
-      fetchUsers();
-      showAlert('Sukses', 'Dihapus');
+    showConfirm('Hapus User?', 'User akan dihapus dari aplikasi dan akun login.', async () => {
+      try {
+        // 1. Hapus dari tabel users
+        await supabase.from('users').delete().eq('id', id);
+
+        // 2. Hapus dari auth via API route
+        await fetch('/api/delete-user', {
+          method: 'DELETE',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ userId: id }),
+        });
+
+        fetchUsers();
+        showAlert('Sukses', 'User berhasil dihapus');
+      } catch (err: any) {
+        showAlert('Gagal', err.message, 'error');
+      }
     });
   }, [showConfirm, supabase, fetchUsers, showAlert]);
-
   // ─── Production Type CRUD ─────────────────────────────────────────────────
 
   const handleSaveType = useCallback(async (t: any) => {
