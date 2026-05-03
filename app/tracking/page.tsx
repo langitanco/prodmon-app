@@ -45,13 +45,8 @@ function TrackingPageInner() {
 
     // Coba formatted dulu
     const { data: result1 } = await supabase
-      .from('orders')
-      .select(`
-        kode_produksi, nama_pemesan, jumlah, jenis_produksi,
-        status, tanggal_masuk, deadline,
-        link_approval, steps_manual, steps_dtf,
-        finishing_qc, finishing_packing, shipping
-      `)
+      .from('orders_tracking')  // ← ganti ini
+      .select(`...`)
       .ilike('kode_produksi', formatted)
       .maybeSingle();
 
