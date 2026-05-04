@@ -4,10 +4,10 @@ export type UserRole = 'admin' | 'produksi' | 'qc' | 'manager' | 'supervisor';
 
 // ─── Tipe dasar per modul ────────────────────────────────────────────────────
 
-interface ModuleFull   { view: boolean; create: boolean; edit: boolean; delete: boolean }
-interface ModuleView   { view: boolean }
+interface ModuleFull     { view: boolean; create: boolean; edit: boolean; delete: boolean }
+interface ModuleView     { view: boolean }
 interface ModuleViewEdit { view: boolean; edit: boolean }
-interface ModuleTrash  { view: boolean; delete: boolean }
+interface ModuleTrash    { view: boolean; delete: boolean }
 
 // ─── Definisi Hak Akses ──────────────────────────────────────────────────────
 
@@ -18,6 +18,7 @@ export interface UserPermissions {
   finishing:    ModuleFull;
   salary:       ModuleView;
   logs:         ModuleView;
+  weekly_notes: ModuleView;
   settings:     ModuleFull;
   kalkulator:   ModuleView;
   config_harga: ModuleViewEdit;
@@ -28,12 +29,13 @@ export interface UserPermissions {
 // ─── Default Permissions ─────────────────────────────────────────────────────
 
 export const DEFAULT_PERMISSIONS: UserPermissions = {
-  dashboard:    { view: true },
+  dashboard:    { view: true  },
   orders:       { view: true,  create: false, edit: false, delete: false },
   produksi:     { view: true,  create: false, edit: false, delete: false },
   finishing:    { view: true,  create: false, edit: false, delete: false },
   salary:       { view: false },
   logs:         { view: false },
+  weekly_notes: { view: false },
   settings:     { view: false, create: false, edit: false, delete: false },
   kalkulator:   { view: true  },
   config_harga: { view: false, edit: false },

@@ -46,6 +46,7 @@ const MODULES: ModuleDef[] = [
     editLabel: 'Edit harga' },
   { key: 'trash',        label: 'Sampah',            hasCreate: false, hasEdit: false, hasDelete: true,
     deleteLabel: 'Hapus permanen' },
+  { key: 'weekly_notes', label: 'Catatan Rapat',     hasCreate: false, hasEdit: false, hasDelete: false },
   { key: 'nota',         label: 'Generator Nota',    hasCreate: false, hasEdit: false, hasDelete: false },
 ];
 
@@ -196,6 +197,7 @@ export default function SettingsPage({
       kalkulator:   { view: false, ...((u.permissions as any)?.kalkulator   || {}) },
       config_harga: { view: false, edit: false, ...((u.permissions as any)?.config_harga || {}) },
       trash:        { view: false, delete: false, ...((u.permissions as any)?.trash      || {}) },
+      weekly_notes: { view: false, ...((u.permissions as any)?.weekly_notes || {}) },
       nota:         { view: false, ...((u.permissions as any)?.nota         || {}) },
     };
     setPermissions(merged);
