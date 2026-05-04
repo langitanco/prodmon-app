@@ -155,14 +155,14 @@ ProfileCardMobileMemo.displayName = 'ProfileCardMobileMemo';
 const MenuItemMemo = memo(({ item, isActive, onClick }: { item: any; isActive: boolean; onClick: () => void }) => (
   <button
     onClick={onClick}
-    className={`w-full flex items-center gap-3 px-4 py-3 text-sm font-bold rounded-xl transition-all duration-200 will-change-transform active:scale-95 ${
+    className={`w-full flex items-center gap-2 px-3 py-2 text-sm font-bold rounded-xl transition-all duration-200 will-change-transform active:scale-95 ${
       isActive
         ? 'bg-blue-600 text-white shadow-lg shadow-blue-200 dark:shadow-none'
         : 'text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-slate-200 active:bg-slate-100 dark:active:bg-slate-700'
     }`}
     style={{ WebkitTapHighlightColor: 'transparent' }}
   >
-    <item.icon className={`w-4 h-4 ${isActive ? 'text-white' : 'text-slate-400 dark:text-slate-500'}`} />
+    <item.icon className={`w-3.5 h-3.5 ${isActive ? 'text-white' : 'text-slate-400 dark:text-slate-500'}`} />
     {item.label}
   </button>
 ), (prev, next) => prev.isActive === next.isActive && prev.item.id === next.item.id);
