@@ -339,7 +339,15 @@ export default function SettingsPage({
                       </div>
                     </div>
                     <button
-                      onClick={(e) => { e.stopPropagation(); onDeleteUser(u.id); }}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onDeleteUser(u.id);
+                        // Reset editor jika user yang dihapus sedang dipilih
+                        if (selectedUser?.id === u.id) {
+                          setSelectedUser(null);
+                          setIsNewUser(false);
+                        }
+                      }}
                       className="p-1.5 text-slate-300 dark:text-slate-600 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition"
                     >
                       <Trash2 className="w-3.5 h-3.5" />

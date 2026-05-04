@@ -6,6 +6,7 @@ import {
   AlertTriangle, Camera, CheckCircle, Eye, MessageSquare,
   Send, ThumbsDown, ThumbsUp, Trash2, Upload, Clock, User,
 } from 'lucide-react';
+import ProductionNotes from './ProductionNotes';
 
 interface StepProduksiProps {
   order: Order;
@@ -14,7 +15,6 @@ interface StepProduksiProps {
   canUpdateStep: boolean;
   isSupervisor: boolean;
   isManagement: boolean;
-  // State
   kendalaNote: string;
   setKendalaNote: (v: string) => void;
   showKendalaForm: boolean;
@@ -23,7 +23,6 @@ interface StepProduksiProps {
   setProofingRevisiNote: (v: string) => void;
   proofingStepId: string | null;
   setProofingStepId: (v: string | null) => void;
-  // Handlers
   onTriggerUpload: (type: string, stepId?: string) => void;
   onStatusStep: (stepId: string) => void;
   onSaveProofingRevisi: () => void;
@@ -255,6 +254,15 @@ export default function StepProduksi({
           );
         })}
       </div>
+
+      {/* ─── Catatan Produksi ─────────────────────────────────────────────── */}
+      <ProductionNotes
+        orderId={order.id}
+        kodeProduksi={order.kode_produksi}
+        namaPemesan={order.nama_pemesan}
+        section="produksi"
+        currentUser={currentUser}
+      />
     </div>
   );
 }

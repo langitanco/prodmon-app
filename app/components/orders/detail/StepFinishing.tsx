@@ -1,10 +1,12 @@
 // app/components/orders/detail/StepFinishing.tsx
 import React from 'react';
-import { Order } from '@/types';
+import { Order, UserData } from '@/types';
 import { AlertTriangle, Camera, CheckCircle, Eye, Package, Trash2 } from 'lucide-react';
+import ProductionNotes from './ProductionNotes';
 
 interface StepFinishingProps {
   order: Order;
+  currentUser: UserData;
   isRevisi: boolean;
   canCheckQC: boolean;
   canUpdatePacking: boolean;
@@ -21,7 +23,7 @@ interface StepFinishingProps {
 }
 
 export default function StepFinishing({
-  order, isRevisi,
+  order, currentUser, isRevisi,
   canCheckQC, canUpdatePacking, canUpdateShipping,
   canResetQC, canDeleteFinishingFile,
   qcNote, setQcNote,
@@ -104,6 +106,15 @@ export default function StepFinishing({
               </div>
             )
           )}
+
+          {/* Catatan QC & Finishing */}
+          <ProductionNotes
+            orderId={order.id}
+            kodeProduksi={order.kode_produksi}
+            namaPemesan={order.nama_pemesan}
+            section="finishing"
+            currentUser={currentUser}
+          />
         </div>
 
         {/* KANAN: PACKING */}
@@ -115,8 +126,6 @@ export default function StepFinishing({
 
           {order.finishing_packing.isPacked ? (
             <div className="flex-1 flex flex-col p-4 bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden group min-h-[160px]">
-
-              {/* Foto packing */}
               {order.finishing_packing.fileUrl ? (
                 <div className="relative w-full h-32 mb-3 rounded-lg overflow-hidden border border-slate-100 dark:border-slate-700">
                   <img src={order.finishing_packing.fileUrl} alt="Packing" className="w-full h-full object-cover" />
@@ -133,8 +142,6 @@ export default function StepFinishing({
                   <Package className="w-10 h-10 text-slate-300 dark:text-slate-600" />
                 </div>
               )}
-
-              {/* Status selesai + tombol hapus bersebelahan */}
               <div className="flex items-center justify-between gap-2">
                 <div className="flex items-center gap-2 text-green-700 dark:text-green-400 font-bold text-sm bg-green-50 dark:bg-green-900/20 px-3 py-1 rounded-full border border-green-100 dark:border-green-800">
                   <CheckCircle className="w-4 h-4" /> Selesai
@@ -148,8 +155,6 @@ export default function StepFinishing({
                   </button>
                 )}
               </div>
-
-              {/* Info uploader */}
               {order.finishing_packing.packedBy && (
                 <p className="text-[10px] text-slate-400 dark:text-slate-500 mt-2">
                   Di-pack oleh:{' '}
@@ -192,7 +197,6 @@ export default function StepFinishing({
           Pengiriman
         </h3>
         <div className="p-4 border border-slate-200 dark:border-slate-700 rounded-xl bg-slate-50/50 dark:bg-slate-800/50 space-y-4">
-
           {/* Bukti Kirim */}
           <div className="flex justify-between items-center">
             <span className="text-xs md:text-sm font-bold text-slate-700 dark:text-slate-300">Bukti Kirim (Resi)</span>
@@ -231,6 +235,15 @@ export default function StepFinishing({
             )}
           </div>
         </div>
+
+        {/* Catatan Pengiriman */}
+        <ProductionNotes
+          orderId={order.id}
+          kodeProduksi={order.kode_produksi}
+          namaPemesan={order.nama_pemesan}
+          section="pengiriman"
+          currentUser={currentUser}
+        />
       </div>
     </>
   );

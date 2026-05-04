@@ -38,6 +38,7 @@ const OrderDetail     = dynamic(() => import('@/app/components/orders/OrderDetai
 const CompletedOrders = dynamic(() => import('@/app/components/orders/CompletedOrders'));
 const TrashView       = dynamic(() => import('@/app/components/orders/TrashView'));
 const SettingsPage    = dynamic(() => import('@/app/components/settings/SettingsPage'));
+const WeeklyNotesView = dynamic(() => import('@/app/components/apps/WeeklyNotesView'));
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 import { UserData, Order, ProductionTypeData, DEFAULT_PERMISSIONS, OrderStatus } from '@/types';
@@ -48,7 +49,7 @@ type ActiveTab =
   | 'dashboard' | 'orders' | 'calendar' | 'logs'
   | 'completed_orders' | 'settings' | 'trash'
   | 'kalkulator' | 'config_harga' | 'about'
-  | 'salary' | 'nota';
+  | 'salary' | 'nota' | 'weekly_notes';
 
 interface CurrentUser extends UserData { id: string }
 
@@ -153,8 +154,7 @@ export default function ProductionApp() {
   const handleLogout = useCallback(async () => {
     showConfirm('Logout', 'Keluar aplikasi?', async () => {
       await supabase.auth.signOut();
-      // Bersihkan URL sebelum reload
-      window.history.replaceState({}, '', '/'); // ← tambah ini
+      window.history.replaceState({}, '', '/');
       window.location.reload();
     });
   }, [showConfirm, supabase]);
@@ -296,12 +296,13 @@ export default function ProductionApp() {
               />
             )}
 
-            {activeTab === 'salary'       && p?.salary?.view       && <SalaryView users={usersList} orders={orders} />}
-            {activeTab === 'nota'         && p?.nota?.view         && <NotaView />}
-            {activeTab === 'logs'         && p?.logs?.view         && <ActivityLogView />}
-            {activeTab === 'kalkulator'   && p?.kalkulator?.view   && <CalculatorView />}
-            {activeTab === 'config_harga' && p?.config_harga?.view && <ConfigPriceView />}
-            {activeTab === 'about'        && <AboutView />}
+            {activeTab === 'salary'        && p?.salary?.view       && <SalaryView users={usersList} orders={orders} />}
+            {activeTab === 'nota'          && p?.nota?.view         && <NotaView />}
+            {activeTab === 'logs'          && p?.logs?.view         && <ActivityLogView />}
+            {activeTab === 'weekly_notes'  && p?.logs?.view         && <WeeklyNotesView />}
+            {activeTab === 'kalkulator'    && p?.kalkulator?.view   && <CalculatorView />}
+            {activeTab === 'config_harga'  && p?.config_harga?.view && <ConfigPriceView />}
+            {activeTab === 'about'         && <AboutView />}
 
             {activeTab === 'trash' && p?.trash?.view && (
               <TrashView orders={orders.filter((o: Order) => o.deleted_at)}

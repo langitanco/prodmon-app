@@ -143,6 +143,7 @@ export default function OrderDetail({
 
       <StepFinishing
         order={order}
+        currentUser={currentUser}
         isRevisi={isRevisi}
         canCheckQC={!!canCheckQC}
         canUpdatePacking={!!canUpdatePacking}

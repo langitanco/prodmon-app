@@ -4,7 +4,7 @@
 import React, { memo } from 'react';
 import {
   Home, ClipboardList, Settings, Calculator, Trash2, Info, X, DollarSign, LogOut,
-  Archive, Activity, CalendarDays, Banknote, Receipt
+  Archive, Activity, CalendarDays, Banknote, Receipt, BookOpen
 } from 'lucide-react';
 import { UserData } from '@/types';
 
@@ -34,11 +34,12 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen, currentUser, acti
     {
       title: 'ALAT PRODUKSI',
       items: [
-        { id: 'logs',         label: 'Log Aktivitas',    icon: Activity,  visible: p?.logs?.view },
-        { id: 'kalkulator',   label: 'Kalkulator',       icon: Calculator, visible: p?.kalkulator?.view },
-        { id: 'config_harga', label: 'Config Harga',     icon: DollarSign, visible: p?.config_harga?.view },
-        { id: 'salary',       label: 'Gaji & Upah',      icon: Banknote,  visible: p?.salary?.view },
-        { id: 'nota',         label: 'Generator Nota',   icon: Receipt,   visible: p?.nota?.view },
+        { id: 'logs',          label: 'Log Aktivitas',    icon: Activity,   visible: p?.logs?.view },
+        { id: 'weekly_notes',  label: 'Catatan Rapat',    icon: BookOpen,   visible: p?.logs?.view },
+        { id: 'kalkulator',    label: 'Kalkulator',       icon: Calculator, visible: p?.kalkulator?.view },
+        { id: 'config_harga',  label: 'Config Harga',     icon: DollarSign, visible: p?.config_harga?.view },
+        { id: 'salary',        label: 'Gaji & Upah',      icon: Banknote,   visible: p?.salary?.view },
+        { id: 'nota',          label: 'Generator Nota',   icon: Receipt,    visible: p?.nota?.view },
       ],
     },
     {
