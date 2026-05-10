@@ -153,7 +153,9 @@ export function useOrders({
       kode_produksi: generateProductionCode(),
       nama_pemesan: formData.nama,
       no_hp: formData.hp,
-      jumlah: parseInt(formData.jumlah) || 0,
+      alamat_pemesan: formData.alamat_pemesan || null,   // ← tambah
+      jumlah: formData.jumlah || 0,                      // ← hapus parseInt, sudah number
+      detail_ukuran: formData.detail_ukuran || null,     // ← tambah
       tanggal_masuk: new Date().toISOString().split('T')[0],
       deadline: formData.deadline,
       jenis_produksi: formData.type,
@@ -198,7 +200,9 @@ export function useOrders({
     const updates = {
       nama_pemesan: d.nama,
       no_hp: d.hp,
-      jumlah: parseInt(d.jumlah),
+      alamat_pemesan: d.alamat_pemesan || null,   // ← tambah
+      jumlah: d.jumlah || 0,                      // ← ubah dari parseInt
+      detail_ukuran: d.detail_ukuran || null,     // ← tambah
       deadline: d.deadline,
       jenis_produksi: d.type,
       assigned_to: d.assigned_to || null,

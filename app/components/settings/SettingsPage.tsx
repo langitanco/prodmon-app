@@ -1,13 +1,15 @@
 // app/components/settings/SettingsPage.tsx
 'use client';
 
-import React, { useState } from 'react';
-import { Trash2, UserPlus, Package, Pencil, X, Eye, EyeOff, Check, Minus, Shield } from 'lucide-react';
-import { UserData, ProductionTypeData, UserPermissions, DEFAULT_PERMISSIONS } from '@/types';
+import React, { useState, useEffect } from 'react';
+import { Trash2, UserPlus, Package, Pencil, X, Eye, EyeOff, Check, Minus, Shield, Megaphone, Bell } from 'lucide-react';
+import { UserData, ProductionTypeData, UserPermissions, DEFAULT_PERMISSIONS, Announcement } from '@/types';
+import { createBrowserClient } from '@supabase/ssr';
 
 interface SettingsPageProps {
   users: UserData[];
   productionTypes: ProductionTypeData[];
+  currentUser: UserData;
   onSaveUser: (u: any) => void;
   onDeleteUser: (id: string) => void;
   onSaveProductionType: (t: any) => void;
@@ -127,27 +129,23 @@ function PermissionTable({ permissions, onChange }: {
               <td className="px-3 py-2.5">
                 <span className="text-xs font-semibold text-slate-700 dark:text-slate-300">{mod.label}</span>
               </td>
-              {/* Lihat */}
               <PermCell
                 active={getPermVal(permissions, mod.key, 'view')}
                 tooltip="Akses halaman ini"
                 onChange={() => toggle(mod.key, 'view')}
               />
-              {/* Buat */}
               <PermCell
                 active={mod.hasCreate ? getPermVal(permissions, mod.key, 'create') : false}
                 disabled={!mod.hasCreate}
                 tooltip={mod.createLabel}
                 onChange={() => mod.hasCreate && toggle(mod.key, 'create')}
               />
-              {/* Edit */}
               <PermCell
                 active={mod.hasEdit ? getPermVal(permissions, mod.key, 'edit') : false}
                 disabled={!mod.hasEdit}
                 tooltip={mod.editLabel}
                 onChange={() => mod.hasEdit && toggle(mod.key, 'edit')}
               />
-              {/* Hapus */}
               <PermCell
                 active={mod.hasDelete ? getPermVal(permissions, mod.key, 'delete') : false}
                 disabled={!mod.hasDelete}
@@ -165,19 +163,50 @@ function PermissionTable({ permissions, onChange }: {
 // ─── Komponen Utama: SettingsPage ────────────────────────────────────────────
 
 export default function SettingsPage({
-  users, productionTypes,
+  users, productionTypes, currentUser,
   onSaveUser, onDeleteUser,
   onSaveProductionType, onDeleteProductionType,
 }: SettingsPageProps) {
 
+  const supabase = createBrowserClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  );
+
+  const isManagement = ['admin', 'manager', 'supervisor'].includes(currentUser.role);
+
+  // ─── State: User ────────────────────────────────────────────────────────────
   const [selectedUser, setSelectedUser] = useState<UserData | null>(null);
   const [formData, setFormData]         = useState<Partial<UserData>>({});
   const [permissions, setPermissions]   = useState<UserPermissions>(DEFAULT_PERMISSIONS);
   const [showPassword, setShowPassword] = useState(false);
   const [isNewUser, setIsNewUser]       = useState(false);
 
+  // ─── State: Production Type ─────────────────────────────────────────────────
   const [isTypeModalOpen, setIsTypeModalOpen] = useState(false);
   const [editingType, setEditingType]         = useState<any>(null);
+
+  // ─── State: Announcement ────────────────────────────────────────────────────
+  const [announcements, setAnnouncements] = useState<Announcement[]>([]);
+  const [annForm, setAnnForm] = useState({
+    title: '',
+    message: '',
+    type: 'info' as Announcement['type'],
+    expires_at: '',
+  });
+  const [annLoading, setAnnLoading] = useState(false);
+
+  // ─── Fetch Announcements ────────────────────────────────────────────────────
+  useEffect(() => {
+    const fetchAnnouncements = async () => {
+      const { data } = await supabase
+        .from('announcements')
+        .select('*')
+        .order('created_at', { ascending: false });
+      if (data) setAnnouncements(data);
+    };
+    fetchAnnouncements();
+  }, []);
 
   // ─── User handlers ──────────────────────────────────────────────────────────
 
@@ -235,6 +264,49 @@ export default function SettingsPage({
     setIsTypeModalOpen(false);
   };
 
+  // ─── Announcement handlers ──────────────────────────────────────────────────
+
+  const refreshAnnouncements = async () => {
+    const { data } = await supabase
+      .from('announcements')
+      .select('*')
+      .order('created_at', { ascending: false });
+    if (data) setAnnouncements(data);
+  };
+
+  const handlePostAnnouncement = async () => {
+  if (!annForm.title.trim() || !annForm.message.trim()) return;
+  setAnnLoading(true);
+
+  // Konversi ke ISO agar Supabase tahu ini waktu lokal, bukan UTC
+  const expiresAt = annForm.expires_at
+    ? new Date(annForm.expires_at).toISOString()
+    : null;
+
+  await supabase.from('announcements').insert({
+    title: annForm.title,
+    message: annForm.message,
+    type: annForm.type,
+    is_active: true,
+    created_by: currentUser.name,
+    expires_at: expiresAt,  // ← pakai yang sudah dikonversi
+  });
+
+  setAnnForm({ title: '', message: '', type: 'info', expires_at: '' });
+  await refreshAnnouncements();
+  setAnnLoading(false);
+};
+
+  const handleToggleAnnouncement = async (id: string, current: boolean) => {
+    await supabase.from('announcements').update({ is_active: !current }).eq('id', id);
+    setAnnouncements(prev => prev.map(a => a.id === id ? { ...a, is_active: !current } : a));
+  };
+
+  const handleDeleteAnnouncement = async (id: string) => {
+    await supabase.from('announcements').delete().eq('id', id);
+    setAnnouncements(prev => prev.filter(a => a.id !== id));
+  };
+
   // ─── Shared styles ──────────────────────────────────────────────────────────
 
   const inputCls = "w-full border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-800 dark:text-slate-100 bg-white dark:bg-slate-800 outline-none focus:ring-2 focus:ring-blue-500 transition placeholder-slate-400 dark:placeholder-slate-500";
@@ -242,12 +314,26 @@ export default function SettingsPage({
 
   const showEditor = selectedUser !== null || isNewUser;
 
+  const typeColors: Record<Announcement['type'], string> = {
+    info:    'bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400 border-blue-100 dark:border-blue-900/40',
+    warning: 'bg-yellow-50 dark:bg-yellow-900/20 text-yellow-700 dark:text-yellow-400 border-yellow-100 dark:border-yellow-900/40',
+    success: 'bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-400 border-green-100 dark:border-green-900/40',
+    update:  'bg-purple-50 dark:bg-purple-900/20 text-purple-700 dark:text-purple-400 border-purple-100 dark:border-purple-900/40',
+  };
+
+  const typeLabels: Record<Announcement['type'], string> = {
+    info: 'ℹ️ Info',
+    warning: '⚠️ Peringatan',
+    success: '✅ Sukses',
+    update: '📣 Update',
+  };
+
   return (
     <div className="space-y-8 pb-24">
 
       {/* ── BAGIAN 1: JENIS PRODUKSI ── */}
       <div className="space-y-4">
-        <div className="flex justify-between items-center bg-white dark:bg-slate-900 p-4 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm">
+        <div className="flex justify-between items-center bg-white dark:bg-slate-900 p-4 rounded-xl border border-slate-100 dark:border-slate-800 shadow-sm">
           <div>
             <h2 className="text-base font-bold text-slate-800 dark:text-white flex items-center gap-2">
               <Package className="w-4 h-4 text-green-600 dark:text-green-500" /> Jenis Produksi
@@ -264,7 +350,7 @@ export default function SettingsPage({
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
           {productionTypes.map((pt) => (
-            <div key={pt.id} className="bg-white dark:bg-slate-900 p-3 rounded-xl border border-slate-200 dark:border-slate-800 flex justify-between items-center shadow-sm">
+            <div key={pt.id} className="bg-white dark:bg-slate-900 p-3 rounded-xl border border-slate-100 dark:border-slate-800 flex justify-between items-center shadow-sm">
               <div>
                 <div className="font-bold text-slate-700 dark:text-slate-200 text-sm">{pt.name}</div>
                 <div className="font-mono text-[10px] text-slate-400 dark:text-slate-500 bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded mt-0.5 w-fit">{pt.value}</div>
@@ -286,7 +372,7 @@ export default function SettingsPage({
 
       {/* ── BAGIAN 2: DATA PENGGUNA ── */}
       <div className="space-y-4">
-        <div className="flex justify-between items-center bg-white dark:bg-slate-900 p-4 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm">
+        <div className="flex justify-between items-center bg-white dark:bg-slate-900 p-4 rounded-xl border border-slate-100 dark:border-slate-800 shadow-sm">
           <div>
             <h2 className="text-base font-bold text-slate-800 dark:text-white flex items-center gap-2">
               <UserPlus className="w-4 h-4 text-blue-600 dark:text-blue-500" /> Data Pengguna
@@ -301,11 +387,10 @@ export default function SettingsPage({
           </button>
         </div>
 
-        {/* Split layout: daftar user kiri, editor kanan */}
         <div className={`grid gap-4 ${showEditor ? 'grid-cols-1 lg:grid-cols-5' : 'grid-cols-1'}`}>
 
           {/* Daftar User */}
-          <div className={`${showEditor ? 'lg:col-span-2' : ''} bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 overflow-hidden shadow-sm`}>
+          <div className={`${showEditor ? 'lg:col-span-2' : ''} bg-white dark:bg-slate-900 rounded-xl border border-slate-100 dark:border-slate-800 overflow-hidden shadow-sm`}>
             <div className="px-4 py-3 border-b border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50">
               <p className="text-xs font-bold text-slate-600 dark:text-slate-400 uppercase tracking-wide">Daftar User</p>
             </div>
@@ -344,7 +429,6 @@ export default function SettingsPage({
                       onClick={(e) => {
                         e.stopPropagation();
                         onDeleteUser(u.id);
-                        // Reset editor jika user yang dihapus sedang dipilih
                         if (selectedUser?.id === u.id) {
                           setSelectedUser(null);
                           setIsNewUser(false);
@@ -363,9 +447,7 @@ export default function SettingsPage({
           {/* Editor: Info + Permission Table */}
           {showEditor && (
             <div className="lg:col-span-3 space-y-4">
-
-              {/* Info Akun */}
-              <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
+              <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-100 dark:border-slate-800 shadow-sm overflow-hidden">
                 <div className="px-4 py-3 border-b border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50 flex items-center justify-between">
                   <p className="text-xs font-bold text-slate-600 dark:text-slate-400 uppercase tracking-wide flex items-center gap-2">
                     <UserPlus className="w-3.5 h-3.5" />
@@ -412,8 +494,7 @@ export default function SettingsPage({
                 </div>
               </div>
 
-              {/* Tabel Permission */}
-              <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
+              <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-100 dark:border-slate-800 shadow-sm overflow-hidden">
                 <div className="px-4 py-3 border-b border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50">
                   <p className="text-xs font-bold text-slate-600 dark:text-slate-400 uppercase tracking-wide flex items-center gap-2">
                     <Shield className="w-3.5 h-3.5" /> Hak Akses
@@ -423,7 +504,6 @@ export default function SettingsPage({
                 <PermissionTable permissions={permissions} onChange={setPermissions} />
               </div>
 
-              {/* Tombol Simpan */}
               <div className="flex gap-3 justify-end">
                 <button onClick={handleCancel} className="px-4 py-2 rounded-lg border border-slate-200 dark:border-slate-700 text-sm font-bold text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 transition">
                   Batal
@@ -437,10 +517,153 @@ export default function SettingsPage({
         </div>
       </div>
 
+      {/* ── BAGIAN 3: PENGUMUMAN — hanya management ── */}
+      {isManagement && (
+        <>
+          <hr className="border-slate-200 dark:border-slate-800" />
+
+          <div className="space-y-4">
+            <div className="bg-white dark:bg-slate-900 p-4 rounded-xl border border-slate-100 dark:border-slate-800 shadow-sm">
+              <h2 className="text-base font-bold text-slate-800 dark:text-white flex items-center gap-2">
+                <Megaphone className="w-4 h-4 text-orange-500" /> Pengumuman
+              </h2>
+              <p className="text-[10px] text-slate-500 dark:text-slate-400 mt-0.5">
+                Kirim informasi atau update ke semua anggota
+              </p>
+            </div>
+
+            {/* Form buat pengumuman */}
+            <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-100 dark:border-slate-800 shadow-sm overflow-hidden">
+              <div className="px-4 py-3 border-b border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50">
+                <p className="text-xs font-bold text-slate-600 dark:text-slate-400 uppercase tracking-wide">
+                  Buat Pengumuman Baru
+                </p>
+              </div>
+              <div className="p-4 space-y-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className={labelCls}>Judul</label>
+                    <input
+                      className={inputCls}
+                      placeholder="Judul pengumuman"
+                      value={annForm.title}
+                      onChange={e => setAnnForm({ ...annForm, title: e.target.value })}
+                    />
+                  </div>
+                  <div>
+                    <label className={labelCls}>Tipe</label>
+                    <select
+                      className={inputCls}
+                      value={annForm.type}
+                      onChange={e => setAnnForm({ ...annForm, type: e.target.value as Announcement['type'] })}
+                    >
+                      <option value="info">ℹ️ Info</option>
+                      <option value="warning">⚠️ Peringatan</option>
+                      <option value="success">✅ Sukses</option>
+                      <option value="update">📣 Update Aplikasi</option>
+                    </select>
+                  </div>
+                </div>
+                <div>
+                  <label className={labelCls}>Pesan</label>
+                  <textarea
+                    className={`${inputCls} resize-none h-20`}
+                    placeholder="Isi pengumuman..."
+                    value={annForm.message}
+                    onChange={e => setAnnForm({ ...annForm, message: e.target.value })}
+                  />
+                </div>
+                <div>
+                  <label className={labelCls}>Berlaku Sampai (Opsional)</label>
+                  <input
+                    type="datetime-local"
+                    className={inputCls}
+                    value={annForm.expires_at}
+                    onChange={e => setAnnForm({ ...annForm, expires_at: e.target.value })}
+                  />
+                </div>
+                <div className="flex justify-end">
+                  <button
+                    onClick={handlePostAnnouncement}
+                    disabled={!annForm.title.trim() || !annForm.message.trim() || annLoading}
+                    className="bg-orange-500 text-white px-4 py-2 rounded-lg text-sm font-bold hover:bg-orange-600 shadow-sm transition disabled:opacity-50"
+                  >
+                    {annLoading ? 'Mengirim...' : 'Kirim Pengumuman'}
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* Daftar pengumuman */}
+            {announcements.length > 0 && (
+              <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-100 dark:border-slate-800 shadow-sm overflow-hidden">
+                <div className="px-4 py-3 border-b border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50">
+                  <p className="text-xs font-bold text-slate-600 dark:text-slate-400 uppercase tracking-wide flex items-center gap-2">
+                    <Bell className="w-3.5 h-3.5" /> Riwayat Pengumuman
+                  </p>
+                </div>
+                <ul className="divide-y divide-slate-100 dark:divide-slate-800">
+                  {announcements.map(a => (
+                    <li key={a.id} className="flex items-start justify-between gap-3 px-4 py-3">
+                      <div className="flex-1 min-w-0 space-y-1">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${typeColors[a.type]}`}>
+                            {typeLabels[a.type]}
+                          </span>
+                          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
+                            a.is_active
+                              ? 'bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-400 border-green-100 dark:border-green-900/40'
+                              : 'bg-slate-100 dark:bg-slate-800 text-slate-400 border-slate-200 dark:border-slate-700'
+                          }`}>
+                            {a.is_active ? 'Aktif' : 'Nonaktif'}
+                          </span>
+                        </div>
+                        <p className="text-sm font-bold text-slate-700 dark:text-slate-200 truncate">{a.title}</p>
+                        <p className="text-xs text-slate-500 dark:text-slate-400 line-clamp-2">{a.message}</p>
+                        {a.expires_at && (
+                          <p className="text-[10px] text-slate-400 dark:text-slate-500">
+                            Expired: {new Date(a.expires_at).toLocaleString('id-ID', {
+                              timeZone: 'Asia/Jakarta',
+                              day: 'numeric',
+                              month: 'short',
+                              year: 'numeric',
+                              hour: '2-digit',
+                              minute: '2-digit',
+                            })}
+                          </p>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-1 shrink-0 pt-1">
+                        <button
+                          onClick={() => handleToggleAnnouncement(a.id, a.is_active)}
+                          className={`text-xs font-bold px-2 py-1 rounded-lg transition ${
+                            a.is_active
+                              ? 'text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800'
+                              : 'text-green-600 hover:bg-green-50 dark:hover:bg-green-900/20'
+                          }`}
+                        >
+                          {a.is_active ? 'Nonaktifkan' : 'Aktifkan'}
+                        </button>
+                        <button
+                          onClick={() => handleDeleteAnnouncement(a.id)}
+                          className="p-1.5 text-slate-300 dark:text-slate-600 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </div>
+        </>
+      )}
+
       {/* ── MODAL EDIT TYPE ── */}
       {isTypeModalOpen && editingType && (
         <div className="fixed inset-0 bg-black/70 z-[99] flex items-center justify-center p-4">
-          <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl w-full max-w-sm shadow-2xl animate-in zoom-in duration-200 border dark:border-slate-800">
+          <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl w-full max-w-sm shadow-2xl animate-in zoom-in duration-200 border border-slate-100 dark:border-slate-800">
             <h3 className="font-bold text-lg mb-4 text-slate-800 dark:text-white">
               {editingType.id ? 'Edit' : 'Tambah'} Jenis Produksi
             </h3>

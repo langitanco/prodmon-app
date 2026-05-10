@@ -7,6 +7,7 @@ import {
   Archive, Activity, CalendarDays, Banknote, Receipt, BookOpen
 } from 'lucide-react';
 import { UserData } from '@/types';
+import { APP_INFO, CHANGELOG } from '@/lib/changelog';
 
 interface SidebarProps {
   sidebarOpen: boolean;
@@ -25,7 +26,7 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen, currentUser, acti
     {
       title: 'UTAMA',
       items: [
-        { id: 'dashboard',        label: 'Dashboard',          icon: Home,         visible: p?.dashboard?.view },
+        { id: 'dashboard',        label: 'Dashboard',           icon: Home,         visible: p?.dashboard?.view },
         { id: 'orders',           label: 'Pesanan Aktif',       icon: ClipboardList, visible: p?.orders?.view },
         { id: 'calendar',         label: 'Kalender Produksi',   icon: CalendarDays, visible: true },
         { id: 'completed_orders', label: 'Pesanan Selesai',     icon: Archive,      visible: p?.orders?.view },
@@ -88,7 +89,7 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen, currentUser, acti
               </h1>
               <div className="flex flex-col mt-1">
                 <span className="text-[11px] text-slate-500 dark:text-slate-400 font-bold tracking-widest uppercase">SuperApp</span>
-                <span className="text-[9px] text-slate-300 dark:text-slate-600 font-medium tracking-tight">Version 11.0</span>
+                <span className="text-[9px] text-slate-300 dark:text-slate-600 font-medium tracking-tight">{APP_INFO.version}</span>
               </div>
             </div>
           </div>

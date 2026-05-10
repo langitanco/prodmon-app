@@ -57,6 +57,19 @@ export interface UserData {
   avatar_url?: string;
 }
 
+// ─── Announcment ─────────────────────────────────────────────────────────────
+
+export interface Announcement {
+  id: string;
+  title: string;
+  message: string;
+  type: 'info' | 'warning' | 'success' | 'update';
+  is_active: boolean;
+  created_by?: string;
+  created_at: string;
+  expires_at?: string | null;
+}
+
 // ─── Order ───────────────────────────────────────────────────────────────────
 
 export type OrderStatus =
@@ -80,6 +93,7 @@ export interface Order {
   tanggal_masuk: string;
   deadline: string;
   jenis_produksi: string;
+  detail_ukuran?: SizeEntry[] | null;  // ← tambahan
   status: OrderStatus;
 
   assigned_to?: string | null;
@@ -126,4 +140,15 @@ export interface ProductionTypeData {
   id: string;
   name: string;
   value: string;
+}
+
+// ─── Size / Detail Ukuran ────────────────────────────────────────────────────
+
+export type UkuranKey = 'S' | 'M' | 'L' | 'XL' | 'XXL' | 'XXXL';
+
+export interface SizeEntry {
+  id: string;
+  warna: string;
+  lengan: 'pendek' | 'panjang';
+  ukuran: Partial<Record<string, number>>;
 }

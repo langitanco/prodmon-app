@@ -45,7 +45,7 @@ export default function StepProduksi({
   const currentSteps = isManual ? order.steps_manual : order.steps_dtf;
 
   return (
-    <div className="bg-white dark:bg-slate-900 p-4 md:p-6 rounded-2xl border dark:border-slate-800 shadow-sm">
+    <div className="bg-white dark:bg-slate-900 p-4 md:p-6 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm">
       {/* Header */}
       <div className="flex justify-between items-center mb-4">
         <h3 className="font-bold text-slate-800 dark:text-white flex items-center gap-2 text-sm md:text-lg">

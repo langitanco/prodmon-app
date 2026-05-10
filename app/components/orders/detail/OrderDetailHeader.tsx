@@ -107,7 +107,7 @@ export default function OrderDetailHeader({
       </div>
 
       {/* Info pesanan */}
-      <div className="bg-white dark:bg-slate-900 p-4 md:p-6 rounded-2xl border dark:border-slate-800 shadow-sm flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+      <div className="bg-white dark:bg-slate-900 p-4 md:p-6 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div className="flex-1">
           <h1 className="text-xl md:text-2xl font-extrabold text-slate-800 dark:text-white mb-1">
             {order.nama_pemesan}

@@ -6,6 +6,7 @@ import jsPDF from 'jspdf';
 import { useOrderDetail } from '@/hooks/useOrderDetail';
 import LabelPengiriman from './detail/LabelPengiriman';
 import OrderDetailHeader from './detail/OrderDetailHeader';
+import DetailUkuran from './detail/DetailUkuran';
 import StepApproval from './detail/StepApproval';
 import StepProduksi from './detail/StepProduksi';
 import StepFinishing from './detail/StepFinishing';
@@ -108,6 +109,8 @@ export default function OrderDetail({
         onDelete={onDelete}
         onPrintLabel={handlePrintLabel}
       />
+
+      <DetailUkuran data={order.detail_ukuran} />
 
       <StepApproval
         order={order}

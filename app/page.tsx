@@ -312,9 +312,13 @@ export default function ProductionApp() {
 
             {activeTab === 'settings' && p?.settings?.view && (
               <SettingsPage
-                users={usersList} productionTypes={productionTypes}
-                onSaveUser={handleSaveUser} onDeleteUser={handleDeleteUser}
-                onSaveProductionType={handleSaveType} onDeleteProductionType={handleDeleteType}
+                currentUser={currentUser}
+                users={usersList} 
+                productionTypes={productionTypes}
+                onSaveUser={handleSaveUser} 
+                onDeleteUser={handleDeleteUser}
+                onSaveProductionType={handleSaveType} 
+                onDeleteProductionType={handleDeleteType}
               />
             )}
 

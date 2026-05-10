@@ -36,7 +36,7 @@ export default function StepFinishing({
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
 
         {/* KIRI: QC */}
-        <div className="bg-white dark:bg-slate-900 p-4 md:p-6 rounded-2xl border dark:border-slate-800 shadow-sm flex flex-col h-full">
+        <div className="bg-white dark:bg-slate-900 p-4 md:p-6 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm flex flex-col h-full">
           <div className="flex items-center gap-2 mb-4 border-b border-slate-100 dark:border-slate-800 pb-2">
             <div className="bg-slate-100 dark:bg-slate-800 w-6 h-6 rounded-full flex items-center justify-center text-xs text-slate-600 dark:text-slate-400 font-bold">3a</div>
             <h3 className="font-bold text-slate-800 dark:text-white text-sm md:text-base">Quality Control</h3>
@@ -118,7 +118,7 @@ export default function StepFinishing({
         </div>
 
         {/* KANAN: PACKING */}
-        <div className="bg-white dark:bg-slate-900 p-4 md:p-6 rounded-2xl border dark:border-slate-800 shadow-sm flex flex-col h-full">
+        <div className="bg-white dark:bg-slate-900 p-4 md:p-6 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm flex flex-col h-full">
           <div className="flex items-center gap-2 mb-4 border-b border-slate-100 dark:border-slate-800 pb-2">
             <div className="bg-slate-100 dark:bg-slate-800 w-6 h-6 rounded-full flex items-center justify-center text-xs text-slate-600 dark:text-slate-400 font-bold">3b</div>
             <h3 className="font-bold text-slate-800 dark:text-white text-sm md:text-base">Packing</h3>
@@ -191,7 +191,7 @@ export default function StepFinishing({
       </div>
 
       {/* --- STEP 4: PENGIRIMAN --- */}
-      <div className="bg-white dark:bg-slate-900 p-4 md:p-6 rounded-2xl border dark:border-slate-800 shadow-sm">
+      <div className="bg-white dark:bg-slate-900 p-4 md:p-6 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm">
         <h3 className="font-bold text-slate-800 dark:text-white mb-4 flex items-center gap-2 text-sm md:text-lg">
           <div className="bg-slate-100 dark:bg-slate-800 w-8 h-8 rounded-full flex items-center justify-center text-sm">4</div>
           Pengiriman

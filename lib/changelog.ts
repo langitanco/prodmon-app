@@ -2,10 +2,10 @@
 
 export const APP_INFO = {
   name: "LCO SuperApp",
-  version: "V.12",
+  version: "V.12.5",
   purpose: "Aplikasi produksi Sablon, Langitan.co.",
-  creator: "Tim Developer Langitan.co",
-  creationDate: "Desember 2025",
+  creator: "abdllahmajid",
+  creationDate: "11 Desember 2025",
 };
 
 export interface ChangelogEntry {
@@ -15,6 +15,16 @@ export interface ChangelogEntry {
 }
 
 export const CHANGELOG: ChangelogEntry[] = [
+    {
+    version: "12.5",
+    date: "2026-05-11",
+    changes: [
+      "Penambahan kolom input ukuran di bagian buat pesanan baru.",
+      "Membuat logika baru untuk input nomor telpon di input pesanan baru, agar support wa.",
+      "Sekarang detail ukuran bisa dilihat di detail produksi",
+      "Menambahkan fitur pengumuman yg ditampilkan di setiap dashboard users"
+    ],
+  },
   {
     version: "12",
     date: "2026-05-03",

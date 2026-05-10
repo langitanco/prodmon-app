@@ -10,7 +10,7 @@ import {
   PieChart, Pie, Cell, Legend 
 } from 'recharts';
 import { TrendingUp, PieChart as PieIcon, AlertCircle, CheckCircle2, Package, AlertTriangle, Share2, Loader2, Clock } from 'lucide-react'; 
-
+import AnnouncementBanner from '@/app/components/ui/AnnouncementBanner';
 import { getDeadlineStatus, formatDate } from '@/lib/utils';
 import { toPng } from 'html-to-image';
 
@@ -147,7 +147,10 @@ export default function Dashboard({ role, orders, onSelectOrder }: DashboardProp
 
   return (
     <div className="space-y-4 md:space-y-6 pb-10">
-      
+
+      {/* ANNOUNCMENT */}
+      <AnnouncementBanner />
+
       {/* HERO SECTION */}
       <HeroSectionOptimized stats={stats} />
 
