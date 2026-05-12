@@ -1,7 +1,7 @@
-// app/hooks/useNotifications.ts
+// hooks/useNotifications.ts
 
-import { useState, useCallback } from 'react';
-import { SupabaseClient } from '@supabase/supabase-js';
+import { useState, useCallback, useEffect, useRef } from 'react';
+import { SupabaseClient, RealtimeChannel } from '@supabase/supabase-js';
 
 export interface Notification {
   id: string;
@@ -20,6 +20,20 @@ interface UseNotificationsProps {
 
 export function useNotifications({ currentUserId, supabase }: UseNotificationsProps) {
   const [notifications, setNotifications] = useState<Notification[]>([]);
+  const channelRef = useRef<RealtimeChannel | null>(null);
+
+  const mapNotification = (n: any): Notification => ({
+    id: n.id,
+    title: n.title,
+    message: n.message,
+    time: new Date(n.created_at).toLocaleString('id-ID', {
+      day: '2-digit', month: 'short', year: 'numeric',
+      hour: '2-digit', minute: '2-digit',
+    }),
+    isRead: n.is_read,
+    orderId: n.order_id,
+    type: n.type ?? 'info',
+  });
 
   const fetchNotifications = useCallback(async () => {
     if (!currentUserId) return;
@@ -32,25 +46,80 @@ export function useNotifications({ currentUserId, supabase }: UseNotificationsPr
         .limit(20);
 
       if (data) {
-        setNotifications(
-          data.map((n: any) => ({
-            id: n.id,
-            title: n.title,
-            message: n.message,
-            time: new Date(n.created_at).toLocaleString('id-ID', {
-              day: '2-digit', month: 'short', year: 'numeric',
-              hour: '2-digit', minute: '2-digit',
-            }),
-            isRead: n.is_read,
-            orderId: n.order_id,
-            type: n.type ?? 'info',
-          }))
-        );
+        setNotifications(data.map(mapNotification));
       }
     } catch (error) {
       console.error('Err fetch notifications:', error);
     }
   }, [currentUserId, supabase]);
+
+  // ─── Realtime subscription ──────────────────────────────────────────────────
+  // Menggantikan setInterval 60 detik — notifikasi muncul instan saat INSERT
+  useEffect(() => {
+    if (!currentUserId) return;
+
+    // Fetch awal
+    fetchNotifications();
+
+    // Bersihkan channel lama jika ada (misal user berganti)
+    if (channelRef.current) {
+      supabase.removeChannel(channelRef.current);
+    }
+
+    const channel = supabase
+      .channel(`notifications:${currentUserId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'notifications',
+          filter: `user_id=eq.${currentUserId}`,
+        },
+        (payload) => {
+          // Tambah notifikasi baru langsung ke state tanpa fetch ulang
+          const newNotif = mapNotification(payload.new);
+          setNotifications(prev => {
+            // Cegah duplikat jika somehow event datang dua kali
+            if (prev.some(n => n.id === newNotif.id)) return prev;
+            return [newNotif, ...prev].slice(0, 20);
+          });
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'notifications',
+          filter: `user_id=eq.${currentUserId}`,
+        },
+        (payload) => {
+          // Sync status is_read secara realtime (misal dibaca di tab lain)
+          setNotifications(prev =>
+            prev.map(n =>
+              n.id === payload.new.id ? { ...n, isRead: payload.new.is_read } : n
+            )
+          );
+        }
+      )
+      .subscribe((status) => {
+        if (status === 'SUBSCRIBED') {
+          console.log('✅ Realtime notifications aktif');
+        }
+        if (status === 'CHANNEL_ERROR') {
+          console.warn('⚠️ Realtime error, fallback ke fetch manual');
+          fetchNotifications();
+        }
+      });
+
+    channelRef.current = channel;
+
+    return () => {
+      supabase.removeChannel(channel);
+      channelRef.current = null;
+    };
+  }, [currentUserId, supabase]); // fetchNotifications sengaja tidak dimasukkan agar tidak re-subscribe
 
   const markAsRead = useCallback(async (notificationId: string) => {
     try {
@@ -59,6 +128,7 @@ export function useNotifications({ currentUserId, supabase }: UseNotificationsPr
         .update({ is_read: true })
         .eq('id', notificationId);
 
+      // Optimistic update — tidak perlu tunggu Realtime
       setNotifications(prev =>
         prev.map(n => n.id === notificationId ? { ...n, isRead: true } : n)
       );

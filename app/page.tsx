@@ -133,10 +133,10 @@ export default function ProductionApp() {
 
   useEffect(() => {
     if (!currentUser) return;
-    Promise.all([fetchOrders(), fetchUsers(), fetchProductionTypes(), fetchNotifications()]);
-    const interval = setInterval(fetchNotifications, 60000);
-    return () => clearInterval(interval);
-  }, [currentUser, fetchOrders, fetchUsers, fetchProductionTypes, fetchNotifications]);
+    // fetchNotifications tidak perlu dipanggil di sini lagi —
+    // useNotifications sudah menangani fetch awal + Realtime subscription secara otomatis.
+    Promise.all([fetchOrders(), fetchUsers(), fetchProductionTypes()]);
+  }, [currentUser, fetchOrders, fetchUsers, fetchProductionTypes]);
 
   // ─── Navigation ────────────────────────────────────────────────────────────
 
