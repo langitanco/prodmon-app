@@ -1,7 +1,7 @@
 // app/page.tsx
 'use client';
 
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { createBrowserClient } from '@supabase/ssr';
 
 // ─── Hooks ───────────────────────────────────────────────────────────────────
@@ -65,6 +65,9 @@ export default function ProductionApp() {
     isOpen: boolean; title: string; message: string;
     type: 'success' | 'error' | 'confirm'; onConfirm?: () => void;
   }>({ isOpen: false, title: '', message: '', type: 'success' });
+
+  // ─── Ref untuk scroll container utama ──────────────────────────────────────
+  const mainRef = useRef<HTMLDivElement>(null);
 
   const showAlert = useCallback((title: string, message: string, type: 'success' | 'error' = 'success') => {
     setAlertState({ isOpen: true, title, message, type, onConfirm: undefined });
@@ -133,8 +136,6 @@ export default function ProductionApp() {
 
   useEffect(() => {
     if (!currentUser) return;
-    // fetchNotifications tidak perlu dipanggil di sini lagi —
-    // useNotifications sudah menangani fetch awal + Realtime subscription secara otomatis.
     Promise.all([fetchOrders(), fetchUsers(), fetchProductionTypes()]);
   }, [currentUser, fetchOrders, fetchUsers, fetchProductionTypes]);
 
@@ -148,6 +149,11 @@ export default function ProductionApp() {
     if (activeTab !== 'dashboard') window.history.pushState({ tab: activeTab }, '', `?tab=${activeTab}`);
     return () => window.removeEventListener('popstate', handlePopState);
   }, [activeTab]);
+
+  // ─── Scroll to top saat view atau tab berubah ───────────────────────────────
+  useEffect(() => {
+    mainRef.current?.scrollTo({ top: 0, behavior: 'instant' });
+  }, [view, selectedOrderId, activeTab]);
 
   // ─── Handlers ──────────────────────────────────────────────────────────────
 
@@ -241,7 +247,8 @@ export default function ProductionApp() {
           onMarkAllRead={markAllAsRead}
         />
 
-        <main className="flex-1 overflow-y-auto px-4 md:px-6 py-2 md:py-3 pb-32 relative bg-gray-100 dark:bg-slate-950 no-scrollbar">
+        {/* ref ditambahkan di sini agar scroll bisa dikontrol secara programatik */}
+        <main ref={mainRef} className="flex-1 overflow-y-auto px-4 md:px-6 py-2 md:py-3 pb-32 relative bg-gray-100 dark:bg-slate-950 no-scrollbar">
           <div className="max-w-7xl mx-auto h-full">
 
             {activeTab === 'dashboard' && p?.dashboard?.view && (
@@ -313,11 +320,11 @@ export default function ProductionApp() {
             {activeTab === 'settings' && p?.settings?.view && (
               <SettingsPage
                 currentUser={currentUser}
-                users={usersList} 
+                users={usersList}
                 productionTypes={productionTypes}
-                onSaveUser={handleSaveUser} 
+                onSaveUser={handleSaveUser}
                 onDeleteUser={handleDeleteUser}
-                onSaveProductionType={handleSaveType} 
+                onSaveProductionType={handleSaveType}
                 onDeleteProductionType={handleDeleteType}
               />
             )}
