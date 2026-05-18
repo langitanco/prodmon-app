@@ -1,17 +1,10 @@
 // app/components/orders/OrderList.tsx
 
 import React, { useState } from "react";
-import Link from "next/link";
-import {
-  formatDate,
-  getDeadlineStatus,
-  getStatusColor,
-  MONTHS,
-} from "@/lib/utils";
+import { formatDate, getDeadlineStatus, MONTHS } from "@/lib/utils";
 import { Order, ProductionTypeData, UserData } from "@/types";
 import {
   AlertTriangle,
-  BarChart3,
   Calendar,
   ClipboardList,
   Clock,
@@ -108,7 +101,7 @@ function ProgressBar({ status }: { status: string }) {
         })}
       </div>
       <div className="flex justify-between">
-        {STATUS_FLOW.map((step, i) => {
+        {STATUS_FLOW.map((_, i) => {
           let labelClass = "text-[8px] flex-1 text-center ";
           if (i < currentStep) {
             labelClass += "text-emerald-600 dark:text-emerald-400 font-medium";
@@ -146,6 +139,7 @@ interface MobileCardProps {
   order: Order;
   isManagement: boolean;
   canDeleteOrder: boolean;
+  onSelectOrder: (id: string) => void;
   onDeleteOrder: (id: string) => void;
 }
 
@@ -153,6 +147,7 @@ function MobileCard({
   order,
   isManagement,
   canDeleteOrder,
+  onSelectOrder,
   onDeleteOrder,
 }: MobileCardProps) {
   const isOverdue =
@@ -173,11 +168,9 @@ function MobileCard({
       "border-t-2 border-t-emerald-400 border-x-slate-200 border-b-slate-200 dark:border-t-emerald-600 dark:border-x-slate-800 dark:border-b-slate-800";
 
   return (
-    <Link
-      href={`/orders/${order.id}`}
-      target="_blank"
-      rel="noopener noreferrer"
-      className={`block bg-white dark:bg-slate-900 rounded-xl border ${borderAccent} p-3 active:scale-[0.98] transition-transform`}
+    <div
+      onClick={() => onSelectOrder(order.id)}
+      className={`block bg-white dark:bg-slate-900 rounded-xl border ${borderAccent} p-3 active:scale-[0.98] transition-transform cursor-pointer`}
     >
       {/* Row 1: kode + badge status */}
       <div className="flex items-center justify-between mb-1.5">
@@ -239,11 +232,10 @@ function MobileCard({
         </div>
       )}
 
-      {/* Tombol hapus — stopPropagation agar tidak trigger Link */}
+      {/* Tombol hapus */}
       {canDeleteOrder && (
         <button
           onClick={(e) => {
-            e.preventDefault();
             e.stopPropagation();
             onDeleteOrder(order.id);
           }}
@@ -252,7 +244,7 @@ function MobileCard({
           <Trash2 className="w-3 h-3" /> Hapus
         </button>
       )}
-    </Link>
+    </div>
   );
 }
 
@@ -314,6 +306,7 @@ interface KanbanCardProps {
   order: Order;
   isManagement: boolean;
   canDeleteOrder: boolean;
+  onSelectOrder: (id: string) => void;
   onDeleteOrder: (id: string) => void;
 }
 
@@ -321,6 +314,7 @@ function KanbanCard({
   order,
   isManagement,
   canDeleteOrder,
+  onSelectOrder,
   onDeleteOrder,
 }: KanbanCardProps) {
   const isOverdue =
@@ -338,11 +332,9 @@ function KanbanCard({
     leftBorder = "border-l-2 border-l-amber-400 dark:border-l-amber-500";
 
   return (
-    <Link
-      href={`/orders/${order.id}`}
-      target="_blank"
-      rel="noopener noreferrer"
-      className={`block bg-white dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-800 ${leftBorder} p-3 hover:shadow-sm hover:border-slate-300 dark:hover:border-slate-700 transition group`}
+    <div
+      onClick={() => onSelectOrder(order.id)}
+      className={`block bg-white dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-800 ${leftBorder} p-3 hover:shadow-sm hover:border-slate-300 dark:hover:border-slate-700 transition group cursor-pointer`}
     >
       {/* Kode + Badge */}
       <div className="flex items-start justify-between gap-1 mb-1.5">
@@ -413,7 +405,6 @@ function KanbanCard({
       {canDeleteOrder && (
         <button
           onClick={(e) => {
-            e.preventDefault();
             e.stopPropagation();
             onDeleteOrder(order.id);
           }}
@@ -422,7 +413,7 @@ function KanbanCard({
           <Trash2 className="w-2.5 h-2.5" /> Hapus
         </button>
       )}
-    </Link>
+    </div>
   );
 }
 
@@ -463,6 +454,7 @@ interface KanbanBoardProps {
   orders: Order[];
   isManagement: boolean;
   canDeleteOrder: boolean;
+  onSelectOrder: (id: string) => void;
   onDeleteOrder: (id: string) => void;
 }
 
@@ -470,6 +462,7 @@ function KanbanBoard({
   orders,
   isManagement,
   canDeleteOrder,
+  onSelectOrder,
   onDeleteOrder,
 }: KanbanBoardProps) {
   const sortedOrders = sortByUrgency(orders);
@@ -500,6 +493,7 @@ function KanbanBoard({
                   order={order}
                   isManagement={isManagement}
                   canDeleteOrder={canDeleteOrder}
+                  onSelectOrder={onSelectOrder}
                   onDeleteOrder={onDeleteOrder}
                 />
               ))}
@@ -668,6 +662,7 @@ export default function OrderList({
             orders={filteredOrders}
             isManagement={isManagement}
             canDeleteOrder={canDeleteOrder}
+            onSelectOrder={onSelectOrder}
             onDeleteOrder={onDeleteOrder}
           />
         ) : (
@@ -686,6 +681,7 @@ export default function OrderList({
               order={order}
               isManagement={isManagement}
               canDeleteOrder={canDeleteOrder}
+              onSelectOrder={onSelectOrder}
               onDeleteOrder={onDeleteOrder}
             />
           ))
