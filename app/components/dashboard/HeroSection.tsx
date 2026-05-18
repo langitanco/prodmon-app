@@ -1,6 +1,15 @@
-import { memo } from 'react';
-import { TrendingUp, AlertCircle, Package, AlertTriangle, CheckCircle2, Clock } from 'lucide-react';
-import { DashboardStats } from '@/hooks/useDashboard';
+import { memo, useMemo } from "react";
+import {
+  TrendingUp,
+  AlertCircle,
+  Package,
+  AlertTriangle,
+  CheckCircle2,
+  Clock,
+  Calendar,
+  BarChart2,
+} from "lucide-react";
+import { DashboardStats } from "@/hooks/useDashboard";
 
 // ─── Hero Stat Card ───────────────────────────────────────────────────────────
 
@@ -12,10 +21,18 @@ interface HeroStatCardProps {
   gradient: string;
 }
 
-function HeroStatCard({ title, value, label, icon, gradient }: HeroStatCardProps) {
+function HeroStatCard({
+  title,
+  value,
+  label,
+  icon,
+  gradient,
+}: HeroStatCardProps) {
   return (
     <div className="group relative overflow-hidden rounded-2xl backdrop-blur-md bg-white/10 border border-white/20 p-4 md:p-5 hover:bg-white/20 transition-all duration-300 hover:scale-105 hover:shadow-2xl will-change-transform">
-      <div className={`absolute inset-0 bg-gradient-to-br ${gradient} opacity-0 group-hover:opacity-20 transition-opacity duration-300`} />
+      <div
+        className={`absolute inset-0 bg-gradient-to-br ${gradient} opacity-0 group-hover:opacity-20 transition-opacity duration-300`}
+      />
       <div className="relative z-10">
         <div className="flex items-center justify-between mb-3">
           <span className="text-xs md:text-sm text-white/80 font-semibold uppercase tracking-wider">
@@ -27,9 +44,11 @@ function HeroStatCard({ title, value, label, icon, gradient }: HeroStatCardProps
         </div>
         <div className="space-y-1">
           <span className="text-3xl md:text-4xl lg:text-5xl font-extrabold text-white block drop-shadow-lg">
-            {value}
+            {value.toLocaleString("id-ID")}
           </span>
-          <span className="text-xs md:text-sm text-white/70 font-medium">{label}</span>
+          <span className="text-xs md:text-sm text-white/70 font-medium">
+            {label}
+          </span>
         </div>
       </div>
     </div>
@@ -43,6 +62,14 @@ interface HeroSectionProps {
 }
 
 const HeroSection = memo(function HeroSection({ stats }: HeroSectionProps) {
+  // Label bulan aktif, misal: "Mei 2025"
+  const monthLabel = useMemo(() => {
+    return new Date().toLocaleDateString("id-ID", {
+      month: "long",
+      year: "numeric",
+    });
+  }, []);
+
   return (
     <div className="relative rounded-3xl overflow-hidden shadow-2xl dark:shadow-slate-900/50">
       {/* Background */}
@@ -51,8 +78,8 @@ const HeroSection = memo(function HeroSection({ stats }: HeroSectionProps) {
           className="absolute inset-0 opacity-5"
           style={{
             backgroundImage:
-              'linear-gradient(30deg, #3b82f6 12%, transparent 12.5%, transparent 87%, #3b82f6 87.5%)',
-            backgroundSize: '80px 140px',
+              "linear-gradient(30deg, #3b82f6 12%, transparent 12.5%, transparent 87%, #3b82f6 87.5%)",
+            backgroundSize: "80px 140px",
           }}
         />
         <div className="absolute top-0 right-0 w-96 h-96 bg-blue-500/10 rounded-full blur-3xl" />
@@ -62,8 +89,8 @@ const HeroSection = memo(function HeroSection({ stats }: HeroSectionProps) {
         className="absolute inset-0 opacity-3"
         style={{
           backgroundImage:
-            'linear-gradient(rgba(255,255,255,0.05) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.05) 1px, transparent 1px)',
-          backgroundSize: '50px 50px',
+            "linear-gradient(rgba(255,255,255,0.05) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.05) 1px, transparent 1px)",
+          backgroundSize: "50px 50px",
         }}
       />
 
@@ -94,7 +121,7 @@ const HeroSection = memo(function HeroSection({ stats }: HeroSectionProps) {
           </div>
         </div>
 
-        {/* Stat Cards */}
+        {/* Baris 1 — Stat Lifetime */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
           <HeroStatCard
             title="Total Pesanan"
@@ -123,6 +150,34 @@ const HeroSection = memo(function HeroSection({ stats }: HeroSectionProps) {
             label="Completed"
             icon={<CheckCircle2 className="w-5 h-5" />}
             gradient="from-green-500 to-green-600"
+          />
+        </div>
+
+        {/* Divider bulan aktif */}
+        <div className="flex items-center gap-3 mt-5 mb-3">
+          <div className="h-px flex-1 bg-white/10" />
+          <span className="text-xs text-white/50 font-semibold uppercase tracking-widest flex items-center gap-1.5">
+            <Calendar className="w-3.5 h-3.5" />
+            {monthLabel}
+          </span>
+          <div className="h-px flex-1 bg-white/10" />
+        </div>
+
+        {/* Baris 2 — Stat Bulan Ini */}
+        <div className="grid grid-cols-2 gap-3 md:gap-4">
+          <HeroStatCard
+            title="Pesanan Masuk"
+            value={stats.monthlyOrders}
+            label={`Bulan ${monthLabel}`}
+            icon={<Calendar className="w-5 h-5" />}
+            gradient="from-teal-500 to-teal-600"
+          />
+          <HeroStatCard
+            title="PCS Terproduksi"
+            value={stats.monthlyPcs}
+            label={`Bulan ${monthLabel}`}
+            icon={<BarChart2 className="w-5 h-5" />}
+            gradient="from-cyan-500 to-cyan-600"
           />
         </div>
       </div>

@@ -22,6 +22,8 @@ export interface DashboardStats {
   trouble: number;
   onProcess: number;
   selesai: number;
+  monthlyOrders: number; // pesanan masuk bulan aktif
+  monthlyPcs: number;    // pcs terproduksi bulan aktif
 }
 
 export interface MonthlyDataPoint {
@@ -100,15 +102,28 @@ export function useDashboard(orders: Order[]): UseDashboardReturn {
     }));
   }, [orders]);
 
-  const stats = useMemo<DashboardStats>(() => ({
-    totalOrders: orders.length,
-    totalPcs: orders.reduce((acc, curr) => acc + curr.jumlah, 0),
-    warning: orders.filter((o) => getDeadlineStatus(o.deadline, o.status) === 'warning').length,
-    overdue: orders.filter((o) => getDeadlineStatus(o.deadline, o.status) === 'overdue').length,
-    trouble: orders.filter((o) => o.kendala && o.kendala.some((k) => !k.isResolved)).length,
-    onProcess: orders.filter((o) => o.status === 'On Process').length,
-    selesai: orders.filter((o) => o.status === 'Selesai').length,
-  }), [orders]);
+  const stats = useMemo<DashboardStats>(() => {
+    const now = new Date();
+    const currentMonth = now.getMonth();
+    const currentYear = now.getFullYear();
+
+    const thisMonthOrders = orders.filter((o) => {
+      const d = new Date(o.tanggal_masuk);
+      return d.getMonth() === currentMonth && d.getFullYear() === currentYear;
+    });
+
+    return {
+      totalOrders: orders.length,
+      totalPcs: orders.reduce((acc, curr) => acc + curr.jumlah, 0),
+      warning: orders.filter((o) => getDeadlineStatus(o.deadline, o.status) === 'warning').length,
+      overdue: orders.filter((o) => getDeadlineStatus(o.deadline, o.status) === 'overdue').length,
+      trouble: orders.filter((o) => o.kendala && o.kendala.some((k) => !k.isResolved)).length,
+      onProcess: orders.filter((o) => o.status === 'On Process').length,
+      selesai: orders.filter((o) => o.status === 'Selesai').length,
+      monthlyOrders: thisMonthOrders.length,
+      monthlyPcs: thisMonthOrders.reduce((acc, curr) => acc + curr.jumlah, 0),
+    };
+  }, [orders]);
 
   const actionItems = useMemo<ActionItem[]>(() => {
     const items: ActionItem[] = [];
