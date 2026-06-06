@@ -9,6 +9,7 @@ interface ModuleView     { view: boolean }
 interface ModuleViewEdit { view: boolean; edit: boolean }
 interface ModuleTrash    { view: boolean; delete: boolean }
 
+
 // ─── Definisi Hak Akses ──────────────────────────────────────────────────────
 
 export interface UserPermissions {
@@ -24,10 +25,10 @@ export interface UserPermissions {
   config_harga: ModuleViewEdit;
   trash:        ModuleTrash;
   nota:         ModuleView;
+  keuangan:     ModuleViewEdit;   // ← TAMBAHKAN INI
 }
 
-// ─── Default Permissions ─────────────────────────────────────────────────────
-
+// ───  DEFAULT_PERMISSIONS — tambahkan baris keuangan ───
 export const DEFAULT_PERMISSIONS: UserPermissions = {
   dashboard:    { view: true  },
   orders:       { view: true,  create: false, edit: false, delete: false },
@@ -41,6 +42,7 @@ export const DEFAULT_PERMISSIONS: UserPermissions = {
   config_harga: { view: false, edit: false },
   trash:        { view: false, delete: false },
   nota:         { view: false },
+  keuangan:     { view: false, edit: false },  // ← TAMBAHKAN INI
 };
 
 // ─── User ────────────────────────────────────────────────────────────────────
@@ -113,6 +115,11 @@ export interface Order {
   };
   kendala: KendalaNote[];
   deleted_at?: string | null;
+  // Tambahkan di akhir interface Order, sebelum kurung kurawal penutup `}`
+  harga_per_pcs?:      number;
+  total_harga?:        number;
+  dp_masuk?:           number;
+  status_pembayaran?:  'Belum DP' | 'DP' | 'Lunas';
 }
 
 export interface ProductionStep {

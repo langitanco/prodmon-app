@@ -23,6 +23,18 @@ export function useOrders({
 }: UseOrdersProps) {
   const [orders, setOrders] = useState<Order[]>([]);
 
+  const syncToGoogleSheets = useCallback(async (orderData: Order) => {
+    try {
+      await fetch('/api/sync-sheets', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(orderData),
+      });
+    } catch (error) {
+      console.error('Gagal sync ke Sheets:', error);
+    }
+  }, []);
+
   // ─── Fetch ────────────────────────────────────────────────────────────────
 
   const fetchOrders = useCallback(async () => {
@@ -191,6 +203,7 @@ export function useOrders({
       setView('list');
       showAlert('Sukses', 'Pesanan dibuat');
       triggerOrderNotifications(data);
+      await syncToGoogleSheets(data);
     } else {
       showAlert('Error', error.message, 'error');
     }
@@ -305,6 +318,35 @@ export function useOrders({
     });
   }, [showConfirm, supabase, fetchOrders, showAlert]);
 
+  const handleUpdatePayment = useCallback(async (
+    orderId: string,
+    paymentData: {
+      harga_per_pcs: number;
+      total_harga: number;
+      dp_masuk: number;
+      status_pembayaran: 'Belum DP' | 'DP' | 'Lunas';
+    }
+  ) => {
+    const { error } = await supabase
+      .from('orders')
+      .update(paymentData)
+      .eq('id', orderId);
+
+    if (error) {
+      showAlert('Gagal', error.message, 'error');
+      return;
+    }
+
+    const existingOrder = orders.find(o => o.id === orderId);
+    if (existingOrder) {
+      const updatedOrder: Order = { ...existingOrder, ...paymentData };
+      await syncToGoogleSheets(updatedOrder);
+    }
+
+    showAlert('Sukses', 'Data keuangan berhasil disimpan & tersinkronisasi ke Buku Besar');
+    await fetchOrders();
+  }, [supabase, orders, fetchOrders, showAlert, syncToGoogleSheets]);
+
   return {
     orders,
     activeOrders,
@@ -316,5 +358,6 @@ export function useOrders({
     handleDeleteOrder,
     handleRestoreOrder,
     handlePermanentDelete,
+    handleUpdatePayment,
   };
 }
