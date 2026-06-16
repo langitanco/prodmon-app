@@ -19,6 +19,7 @@ import {
   Receipt,
   BookOpen,
   Wallet,
+  ShoppingBag,
 } from "lucide-react";
 import { UserData } from "@/types";
 import { APP_INFO, CHANGELOG } from "@/lib/changelog";
@@ -82,6 +83,13 @@ export default function Sidebar({
           label: "Keuangan",
           icon: Wallet,
           visible: p?.keuangan?.view,
+        },
+        {
+          id: "po_management",
+          label: "PO Management",
+          icon: ShoppingBag,
+          visible:
+            currentUser.role === "supervisor" || currentUser.role === "admin", // Sesuaikan nama role kamu
         },
         {
           id: "logs",

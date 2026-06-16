@@ -81,6 +81,7 @@ const FinanceView = dynamic(
     ssr: false,
   },
 );
+import POManagementView from "@/app/components/po/POManagementView";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 import {
@@ -107,7 +108,8 @@ type ActiveTab =
   | "salary"
   | "nota"
   | "weekly_notes"
-  | "finance";
+  | "finance"
+  | "po_management";
 
 interface CurrentUser extends UserData {
   id: string;
@@ -508,6 +510,7 @@ export default function ProductionApp() {
                 onUpdatePayment={handleUpdatePayment}
               />
             )}
+            {activeTab === "po_management" && <POManagementView />}
             {activeTab === "kalkulator" && p?.kalkulator?.view && (
               <CalculatorView />
             )}
