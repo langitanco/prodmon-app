@@ -51,6 +51,8 @@ interface ModuleDef {
   deleteLabel?: string;
 }
 
+// Ganti seluruh array MODULES di SettingsPage.tsx dengan ini:
+
 const MODULES: ModuleDef[] = [
   {
     key: "dashboard",
@@ -157,6 +159,17 @@ const MODULES: ModuleDef[] = [
     hasCreate: false,
     hasEdit: false,
     hasDelete: false,
+  },
+  // ── TAMBAHAN ──
+  {
+    key: "po_management",
+    label: "PO Management",
+    hasCreate: true,
+    hasEdit: true,
+    hasDelete: true,
+    createLabel: "Tambah produk & reseller",
+    editLabel: "Edit setting PO, produk, aktif/nonaktif",
+    deleteLabel: "Hapus produk & reseller",
   },
 ];
 
@@ -431,6 +444,13 @@ export default function SettingsPage({
         edit: false,
         ...((u.permissions as any)?.keuangan || {}),
       },
+      po_management: {
+        view: false,
+        create: false,
+        edit: false,
+        delete: false,
+        ...((u.permissions as any)?.po_management || {}),
+      }, // ← TAMBAHAN
     };
     setPermissions(merged);
   };

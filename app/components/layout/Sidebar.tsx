@@ -88,8 +88,7 @@ export default function Sidebar({
           id: "po_management",
           label: "PO Management",
           icon: ShoppingBag,
-          visible:
-            currentUser.role === "supervisor" || currentUser.role === "admin", // Sesuaikan nama role kamu
+          visible: p?.po_management?.view, // ← ikuti sistem permission seperti menu lain
         },
         {
           id: "logs",

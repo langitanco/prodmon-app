@@ -13,36 +13,39 @@ interface ModuleTrash    { view: boolean; delete: boolean }
 // ─── Definisi Hak Akses ──────────────────────────────────────────────────────
 
 export interface UserPermissions {
-  dashboard:    ModuleView;
-  orders:       ModuleFull;
-  produksi:     ModuleFull;
-  finishing:    ModuleFull;
-  salary:       ModuleView;
-  logs:         ModuleView;
-  weekly_notes: ModuleView;
-  settings:     ModuleFull;
-  kalkulator:   ModuleView;
-  config_harga: ModuleViewEdit;
-  trash:        ModuleTrash;
-  nota:         ModuleView;
-  keuangan:     ModuleViewEdit;   // ← TAMBAHKAN INI
+  dashboard:     ModuleView;
+  orders:        ModuleFull;
+  produksi:      ModuleFull;
+  finishing:     ModuleFull;
+  salary:        ModuleView;
+  logs:          ModuleView;
+  weekly_notes:  ModuleView;
+  settings:      ModuleFull;
+  kalkulator:    ModuleView;
+  config_harga:  ModuleViewEdit;
+  trash:         ModuleTrash;
+  nota:          ModuleView;
+  keuangan:      ModuleViewEdit;
+  po_management: ModuleFull;   // ← TAMBAHAN
 }
 
-// ───  DEFAULT_PERMISSIONS — tambahkan baris keuangan ───
+// ─── DEFAULT_PERMISSIONS ─────────────────────────────────────────────────────
+
 export const DEFAULT_PERMISSIONS: UserPermissions = {
-  dashboard:    { view: true  },
-  orders:       { view: true,  create: false, edit: false, delete: false },
-  produksi:     { view: true,  create: false, edit: false, delete: false },
-  finishing:    { view: true,  create: false, edit: false, delete: false },
-  salary:       { view: false },
-  logs:         { view: false },
-  weekly_notes: { view: false },
-  settings:     { view: false, create: false, edit: false, delete: false },
-  kalkulator:   { view: true  },
-  config_harga: { view: false, edit: false },
-  trash:        { view: false, delete: false },
-  nota:         { view: false },
-  keuangan:     { view: false, edit: false },  // ← TAMBAHKAN INI
+  dashboard:     { view: true  },
+  orders:        { view: true,  create: false, edit: false, delete: false },
+  produksi:      { view: true,  create: false, edit: false, delete: false },
+  finishing:     { view: true,  create: false, edit: false, delete: false },
+  salary:        { view: false },
+  logs:          { view: false },
+  weekly_notes:  { view: false },
+  settings:      { view: false, create: false, edit: false, delete: false },
+  kalkulator:    { view: true  },
+  config_harga:  { view: false, edit: false },
+  trash:         { view: false, delete: false },
+  nota:          { view: false },
+  keuangan:      { view: false, edit: false },
+  po_management: { view: false, create: false, edit: false, delete: false }, // ← TAMBAHAN
 };
 
 // ─── User ────────────────────────────────────────────────────────────────────
@@ -95,7 +98,7 @@ export interface Order {
   tanggal_masuk: string;
   deadline: string;
   jenis_produksi: string;
-  detail_ukuran?: SizeEntry[] | null;  // ← tambahan
+  detail_ukuran?: SizeEntry[] | null;
   status: OrderStatus;
 
   assigned_to?: string | null;
@@ -115,7 +118,6 @@ export interface Order {
   };
   kendala: KendalaNote[];
   deleted_at?: string | null;
-  // Tambahkan di akhir interface Order, sebelum kurung kurawal penutup `}`
   harga_per_pcs?:      number;
   total_harga?:        number;
   dp_masuk?:           number;
