@@ -69,12 +69,16 @@ export async function submitOrder(
   const validatedItems = payload.order_items.map((item) => {
     const product = products.find((p) => p.id === item.product_id);
     const basePrice = product ? product.base_price : 0;
+    
+    // PERBAIKAN DI SINI: Tambahkan item.qty sebagai argumen ke-4
     const hargaSatuan = calculateItemPrice(
       basePrice,
       item.ukuran,
       item.lengan,
-      pricingSettings
+      product || {},   // <--- Argumen ke-4: Data produk (pakai {} untuk jaga-jaga jika produk undefined)
+      pricingSettings  // <--- Argumen ke-5: Setting harga
     );
+    
     const subtotal = hargaSatuan * item.qty;
     totalAmount += subtotal;
 

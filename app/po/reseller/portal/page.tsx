@@ -98,11 +98,13 @@ export default function ResellerPortalPage() {
     selectedProduct.available_sizes.forEach((ukuran, ui) => {
       const qty = matrixData[`${vi}_${ui}`] ?? 0;
       if (qty > 0) {
+        // Hapus 'qty' dan ganti dengan 'selectedProduct'
         const harga = calculateItemPrice(
           selectedProduct.base_price,
           ukuran,
           v.lengan,
-          pricingSettings,
+          selectedProduct, // <--- Argumen ke-4: Data produk
+          pricingSettings, // <--- Argumen ke-5: Setting harga
         );
         totalRp += harga * qty;
         totalPcs += qty;
@@ -141,6 +143,7 @@ export default function ResellerPortalPage() {
             selectedProduct.base_price,
             ukuran,
             v.lengan,
+            selectedProduct, // <--- Pastikan di sini tertulis selectedProduct, BUKAN qty
             pricingSettings,
           );
           newItems.push({
