@@ -71,6 +71,7 @@ export default function POSettings() {
     periode_selesai: "",
     sleeve_surcharge: 0,
     xxl_surcharge: 0,
+    sweater_xxl_surcharge: 0,
     wa_admin_phone: "",
     bank_account_info: "",
   });
@@ -88,6 +89,7 @@ export default function POSettings() {
           periode_selesai: data.periode_selesai || "",
           sleeve_surcharge: data.sleeve_surcharge,
           xxl_surcharge: data.xxl_surcharge,
+          sweater_xxl_surcharge: data.sweater_xxl_surcharge ?? 0,
           wa_admin_phone: data.wa_admin_phone || "",
           bank_account_info: data.bank_account_info || "",
         });
@@ -240,7 +242,7 @@ export default function POSettings() {
       </div>
 
       <SectionHeading>Harga Tambahan</SectionHeading>
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-5">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-3 md:gap-5">
         <Field
           label="Tambahan Lengan Panjang (Rp)"
           icon={CirclePlus}
@@ -276,6 +278,30 @@ export default function POSettings() {
             value={form.xxl_surcharge}
             onChange={(e) =>
               setForm({ ...form, xxl_surcharge: Number(e.target.value) })
+            }
+            className={INPUT}
+          />
+        </Field>
+        <Field
+          label="Tambahan Sweater Size 2XL+ (Rp)"
+          icon={CirclePlus}
+          hint={
+            form.sweater_xxl_surcharge > 0 ? (
+              <span>
+                2XL +{formatRupiah(form.sweater_xxl_surcharge)}&nbsp;·&nbsp;3XL
+                +{formatRupiah(form.sweater_xxl_surcharge * 2)}&nbsp;dst.
+              </span>
+            ) : undefined
+          }
+        >
+          <input
+            type="number"
+            value={form.sweater_xxl_surcharge}
+            onChange={(e) =>
+              setForm({
+                ...form,
+                sweater_xxl_surcharge: Number(e.target.value),
+              })
             }
             className={INPUT}
           />

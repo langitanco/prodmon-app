@@ -27,6 +27,7 @@ const EMPTY_PRODUCT: Omit<POProduct, "id"> = {
   sort_order: 0,
   enable_sleeve_surcharge: false,
   enable_xxl_surcharge: false,
+  enable_sweater_xxl_surcharge: false,
 };
 
 function arrayToStr(arr: string[]) {
@@ -77,9 +78,22 @@ export default function POProductList() {
   const [newFiles, setNewFiles] = useState<File[]>([]);
   const [previewUrls, setPreviewUrls] = useState<string[]>([]);
 
+  const [rawSizes, setRawSizes] = useState("");
+  const [rawSleeves, setRawSleeves] = useState("");
+  const [rawColors, setRawColors] = useState("");
+
   useEffect(() => {
     load();
   }, []);
+
+  useEffect(() => {
+    if (showForm) {
+      setRawSizes(arrayToStr(form.available_sizes));
+      setRawSleeves(arrayToStr(form.sleeve_types));
+      setRawColors(arrayToStr(form.colors));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [showForm]);
 
   async function load() {
     setLoading(true);
@@ -111,6 +125,7 @@ export default function POProductList() {
       sort_order: p.sort_order,
       enable_sleeve_surcharge: p.enable_sleeve_surcharge ?? false,
       enable_xxl_surcharge: p.enable_xxl_surcharge ?? false,
+      enable_sweater_xxl_surcharge: p.enable_sweater_xxl_surcharge ?? false,
     });
     setNewFiles([]);
     setPreviewUrls([]);
@@ -292,12 +307,10 @@ export default function POProductList() {
             <Field label="Ukuran Tersedia" hint="(pisah koma)">
               <input
                 type="text"
-                value={arrayToStr(form.available_sizes)}
-                onChange={(e) =>
-                  setForm({
-                    ...form,
-                    available_sizes: strToArray(e.target.value),
-                  })
+                value={rawSizes}
+                onChange={(e) => setRawSizes(e.target.value)}
+                onBlur={() =>
+                  setForm({ ...form, available_sizes: strToArray(rawSizes) })
                 }
                 placeholder="S, M, L, XL, 2XL, 3XL"
                 className={inputCls}
@@ -306,9 +319,10 @@ export default function POProductList() {
             <Field label="Jenis Lengan" hint="(pisah koma)">
               <input
                 type="text"
-                value={arrayToStr(form.sleeve_types)}
-                onChange={(e) =>
-                  setForm({ ...form, sleeve_types: strToArray(e.target.value) })
+                value={rawSleeves}
+                onChange={(e) => setRawSleeves(e.target.value)}
+                onBlur={() =>
+                  setForm({ ...form, sleeve_types: strToArray(rawSleeves) })
                 }
                 placeholder="Pendek, Panjang"
                 className={inputCls}
@@ -317,9 +331,10 @@ export default function POProductList() {
             <Field label="Warna Tersedia" hint="(pisah koma)">
               <input
                 type="text"
-                value={arrayToStr(form.colors)}
-                onChange={(e) =>
-                  setForm({ ...form, colors: strToArray(e.target.value) })
+                value={rawColors}
+                onChange={(e) => setRawColors(e.target.value)}
+                onBlur={() =>
+                  setForm({ ...form, colors: strToArray(rawColors) })
                 }
                 placeholder="Hitam, Putih, Abu-abu"
                 className={inputCls}
@@ -397,7 +412,7 @@ export default function POProductList() {
           </Field>
 
           {/* Pengaturan Penyesuaian Harga */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4 border-t border-slate-100 dark:border-slate-800">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-4 border-t border-slate-100 dark:border-slate-800">
             <label className="flex items-center gap-3 cursor-pointer p-3 border border-slate-200 dark:border-slate-700 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors">
               <input
                 type="checkbox"
@@ -435,6 +450,28 @@ export default function POProductList() {
                 </span>
                 <span className="text-[11px] text-slate-500">
                   Sesuaikan harga untuk ukuran XXL atau lebih
+                </span>
+              </div>
+            </label>
+            {/* Setelah label enable_xxl_surcharge yang sudah ada */}
+            <label className="flex items-center gap-3 cursor-pointer p-3 border border-slate-200 dark:border-slate-700 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors">
+              <input
+                type="checkbox"
+                checked={form.enable_sweater_xxl_surcharge}
+                onChange={(e) =>
+                  setForm({
+                    ...form,
+                    enable_sweater_xxl_surcharge: e.target.checked,
+                  })
+                }
+                className="w-5 h-5 rounded text-blue-600 focus:ring-blue-500"
+              />
+              <div className="flex flex-col">
+                <span className="text-sm font-bold text-slate-800 dark:text-slate-200">
+                  Tambahan Sweater Size 2XL+
+                </span>
+                <span className="text-[11px] text-slate-500">
+                  Harga berlipat mulai ukuran 2XL ke atas
                 </span>
               </div>
             </label>

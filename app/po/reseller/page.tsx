@@ -33,6 +33,9 @@ function ResellerLoginContent() {
     }
 
     sessionStorage.setItem("po_reseller", JSON.stringify(result.reseller));
+    if (slug) {
+      sessionStorage.setItem("po_slug", slug);
+    }
     router.push(
       slug ? `/po/reseller/portal?slug=${slug}` : "/po/reseller/portal",
     );

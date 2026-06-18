@@ -8,7 +8,7 @@ import {
   getAllPOProducts,
   submitOrder,
 } from "@/lib/po/admin";
-import { formatRupiah } from "@/lib/po/pricing";
+import { formatRupiah, calculateItemPrice } from "@/lib/po/pricing";
 import { POSetting, POProduct } from "@/types/po";
 import {
   Package,
@@ -87,28 +87,32 @@ function OrderFormContent() {
     if (!selectedProduct || !setting)
       return { dasar: 0, lengan: 0, size: 0, final: 0 };
 
+    const settings = {
+      sleeveSurcharge: setting.sleeve_surcharge ?? 0,
+      xxlSurcharge: setting.xxl_surcharge ?? 0,
+      sweaterXxlSurcharge: setting.sweater_xxl_surcharge ?? 0,
+    };
+
+    const final = calculateItemPrice(
+      selectedProduct.base_price,
+      varian.ukuran,
+      varian.lengan,
+      selectedProduct,
+      settings,
+    );
+
     const dasar = selectedProduct.base_price;
-    let lengan = 0;
-    let size = 0;
 
-    if (varian.lengan.toLowerCase().includes("panjang")) {
-      lengan = setting.sleeve_surcharge || 0;
-    }
+    // Breakdown untuk UI — ikuti logika yang sama dengan calculateItemPrice
+    const lengan =
+      selectedProduct.enable_sleeve_surcharge &&
+      varian.lengan.toLowerCase().includes("panjang")
+        ? settings.sleeveSurcharge
+        : 0;
 
-    const uk = varian.ukuran.toUpperCase();
-    if (uk.includes("L") && uk !== "L" && uk !== "XL") {
-      let multiplier = 0;
-      const match = uk.match(/(\d+)XL/);
-      if (match && parseInt(match[1]) >= 2) {
-        multiplier = parseInt(match[1]) - 1;
-      } else {
-        const xCount = (uk.match(/X/g) || []).length;
-        if (xCount >= 2) multiplier = xCount - 1;
-      }
-      size = (setting.xxl_surcharge || 0) * multiplier;
-    }
+    const size = final - dasar - lengan;
 
-    return { dasar, lengan, size, final: dasar + lengan + size };
+    return { dasar, lengan, size, final };
   };
 
   const hargaPreview = hitungHarga();

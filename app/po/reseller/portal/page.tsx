@@ -9,6 +9,10 @@ import { calculateItemPrice, formatRupiah } from "@/lib/po/pricing";
 
 export default function ResellerPortalPage() {
   const router = useRouter();
+  // ── Tambahkan ini ──
+  const [slug, setSlug] = useState<string | null>(null);
+  const katalogHref = slug ? `/po/${slug}` : "/po";
+  // ──────────────────
 
   const [reseller, setReseller] = useState<POReseller | null>(null);
   const [setting, setSetting] = useState<POSetting | null>(null);
@@ -25,9 +29,15 @@ export default function ResellerPortalPage() {
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
+    // Baca slug dari sessionStorage
+    const savedSlug = sessionStorage.getItem("po_slug");
+    setSlug(savedSlug);
+
     const stored = sessionStorage.getItem("po_reseller");
     if (!stored) {
-      router.replace("/po/reseller");
+      router.replace(
+        savedSlug ? `/po/reseller?slug=${savedSlug}` : "/po/reseller",
+      );
       return;
     }
     setReseller(JSON.parse(stored));
@@ -89,6 +99,7 @@ export default function ResellerPortalPage() {
     const pricingSettings = {
       sleeveSurcharge: setting!.sleeve_surcharge,
       xxlSurcharge: setting!.xxl_surcharge,
+      sweaterXxlSurcharge: setting!.sweater_xxl_surcharge ?? 0,
     };
     const varianList = buildVarianList(selectedProduct);
     const v = varianList[vi];
@@ -131,6 +142,7 @@ export default function ResellerPortalPage() {
     const pricingSettings = {
       sleeveSurcharge: setting!.sleeve_surcharge,
       xxlSurcharge: setting!.xxl_surcharge,
+      sweaterXxlSurcharge: setting!.sweater_xxl_surcharge ?? 0,
     };
     const varianList = buildVarianList(selectedProduct);
     const newItems: CartItem[] = [];
@@ -235,7 +247,7 @@ export default function ResellerPortalPage() {
     if (!confirm("Yakin ingin keluar? Keranjang belum dikirim akan hilang."))
       return;
     sessionStorage.removeItem("po_reseller");
-    router.push("/po/reseller");
+    router.push(slug ? `/po/reseller?slug=${slug}` : "/po/reseller");
   }
 
   // ── SUKSES STATE ──
@@ -288,6 +300,13 @@ export default function ResellerPortalPage() {
           >
             Buat Pesanan Baru
           </button>
+
+          <a
+            href={katalogHref}
+            className="w-full flex items-center justify-center mt-2 text-[#9ca3af] hover:text-[#0e0e0e] py-2 text-[12.8px] font-semibold transition-colors"
+          >
+            ← Kembali ke Katalog
+          </a>
         </div>
       </div>
     );
