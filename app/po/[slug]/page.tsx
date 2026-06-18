@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { getPOSettingAdmin, getAllPOProducts } from "@/lib/po/admin";
-import { formatRupiah } from "@/lib/po/pricing";
+import { formatRupiah, calculateItemPrice } from "@/lib/po/pricing";
 import { POSetting, POProduct } from "@/types/po";
 import {
   Package,
@@ -22,13 +22,44 @@ import {
   ChevronLeft,
   ChevronRight,
   X,
+  ShoppingCart,
+  Plus,
+  Minus,
+  Check,
 } from "lucide-react";
+
+// ── Tipe keranjang yang disimpan di sessionStorage ──
+export type CartItemSession = {
+  cart_id: string;
+  product_id: string;
+  product_name: string;
+  warna: string;
+  lengan: string;
+  ukuran: string;
+  qty: number;
+  harga_satuan: number;
+  subtotal: number;
+};
+
+const CART_KEY = "po_cart";
+
+function loadCart(): CartItemSession[] {
+  if (typeof window === "undefined") return [];
+  try {
+    return JSON.parse(sessionStorage.getItem(CART_KEY) || "[]");
+  } catch {
+    return [];
+  }
+}
+
+function saveCart(items: CartItemSession[]) {
+  sessionStorage.setItem(CART_KEY, JSON.stringify(items));
+}
 
 export default function CatalogPage() {
   const params = useParams();
   const slug = params?.slug as string;
 
-  // Helper: tambahkan slug sebagai query param ke link tujuan
   const withSlug = (path: string) => (slug ? `${path}?slug=${slug}` : path);
 
   const [setting, setSetting] = useState<POSetting | null>(null);
@@ -40,22 +71,35 @@ export default function CatalogPage() {
     null,
   );
   const [imageIndex, setImageIndex] = useState(0);
-
-  // Swipe states for mobile modal
   const [touchStart, setTouchStart] = useState(0);
 
+  // Varian picker states (di dalam modal)
+  const [pickerWarna, setPickerWarna] = useState("");
+  const [pickerLengan, setPickerLengan] = useState("");
+  const [pickerUkuran, setPickerUkuran] = useState("");
+  const [pickerQty, setPickerQty] = useState(1);
+  const [addedFeedback, setAddedFeedback] = useState(false);
+
+  // Keranjang
+  const [cart, setCart] = useState<CartItemSession[]>([]);
+
   useEffect(() => {
+    // Simpan slug ke sessionStorage agar halaman lain bisa membacanya
+    if (slug) sessionStorage.setItem("po_slug", slug);
+
+    // Load keranjang dari sessionStorage
+    setCart(loadCart());
+
     async function loadData() {
       setLoading(true);
       const set = await getPOSettingAdmin();
       const prods = await getAllPOProducts();
-
       setSetting(set);
       setProducts(prods.filter((p) => p.is_active));
       setLoading(false);
     }
     loadData();
-  }, []);
+  }, [slug]);
 
   // Keyboard navigation for Modal
   useEffect(() => {
@@ -72,11 +116,18 @@ export default function CatalogPage() {
   const isActive = setting?.is_active ?? false;
   const brandName = setting?.title || "Katalog PO";
   const periode = `${setting?.periode_mulai || "-"} — ${setting?.periode_selesai || "-"}`;
+  const cartCount = cart.reduce((s, i) => s + i.qty, 0);
 
   /* ── Modal Handlers ── */
   const openModal = (product: POProduct) => {
     setSelectedProduct(product);
     setImageIndex(0);
+    // Reset picker ke default pertama
+    setPickerWarna(product.colors[0] || "");
+    setPickerLengan(product.sleeve_types[0] || "");
+    setPickerUkuran(product.available_sizes[0] || "");
+    setPickerQty(1);
+    setAddedFeedback(false);
     document.body.style.overflow = "hidden";
   };
 
@@ -106,6 +157,53 @@ export default function CatalogPage() {
     if (diff < -45) prevImage();
   };
 
+  /* ── Hitung harga preview di modal ── */
+  const hitungHargaModal = () => {
+    if (!selectedProduct || !setting) return 0;
+    return calculateItemPrice(
+      selectedProduct.base_price,
+      pickerUkuran,
+      pickerLengan,
+      selectedProduct,
+      {
+        sleeveSurcharge: setting.sleeve_surcharge ?? 0,
+        xxlSurcharge: setting.xxl_surcharge ?? 0,
+        sweaterXxlSurcharge: setting.sweater_xxl_surcharge ?? 0,
+      },
+    );
+  };
+
+  const hargaSatuan = hitungHargaModal();
+  const hargaTotal = hargaSatuan * pickerQty;
+
+  /* ── Tambah ke keranjang ── */
+  const handleAddToCart = () => {
+    if (!selectedProduct || !setting) return;
+
+    const newItem: CartItemSession = {
+      cart_id: crypto.randomUUID(),
+      product_id: selectedProduct.id,
+      product_name: selectedProduct.name,
+      warna: pickerWarna || "-",
+      lengan: pickerLengan || "-",
+      ukuran: pickerUkuran || "-",
+      qty: pickerQty,
+      harga_satuan: hargaSatuan,
+      subtotal: hargaSatuan * pickerQty,
+    };
+
+    const updated = [...cart, newItem];
+    setCart(updated);
+    saveCart(updated);
+
+    // Feedback visual sebentar lalu tutup modal
+    setAddedFeedback(true);
+    setTimeout(() => {
+      closeModal();
+      setAddedFeedback(false);
+    }, 900);
+  };
+
   return (
     <div className="min-h-screen bg-stone-100 text-zinc-950 font-sans selection:bg-zinc-200">
       {/* ── HEADER ── */}
@@ -121,18 +219,40 @@ export default function CatalogPage() {
           </span>
           <Link
             href={withSlug("/po/reseller")}
-            className="hidden sm:flex items-center gap-1.5 bg-transparent text-zinc-950 border border-gray-300 px-4 py-2 rounded-full text-xs font-bold hover:bg-stone-100 hover:border-zinc-950 transition-all"
+            className="flex items-center gap-1.5 bg-transparent text-zinc-950 border border-gray-300 px-3 sm:px-4 py-2 rounded-full text-xs font-bold hover:bg-stone-100 hover:border-zinc-950 transition-all"
+            title="Portal Reseller"
           >
             <Users size={14} />
-            Reseller
+            <span className="hidden sm:inline">Reseller</span>
           </Link>
+
+          {/* Tombol Keranjang */}
+          {isActive && (
+            <Link
+              href={withSlug("/po/order")}
+              className="relative flex items-center gap-1.5 bg-transparent text-zinc-950 border border-gray-300 px-4 py-2 rounded-full text-xs font-bold hover:bg-stone-100 hover:border-zinc-950 transition-all"
+            >
+              <ShoppingCart size={14} />
+              <span className="hidden sm:inline">Keranjang</span>
+              {cartCount > 0 && (
+                <span className="absolute -top-1.5 -right-1.5 w-4 h-4 bg-zinc-950 text-white text-[10px] font-extrabold rounded-full flex items-center justify-center">
+                  {cartCount > 9 ? "9+" : cartCount}
+                </span>
+              )}
+            </Link>
+          )}
+
           {isActive ? (
             <Link
               href={withSlug("/po/order")}
               className="flex items-center gap-1.5 bg-zinc-950 text-white px-4 py-2 rounded-full text-xs font-bold hover:opacity-80 transition-opacity"
             >
               <ArrowRight size={14} />
-              <span className="hidden sm:inline">Buka Form Pemesanan</span>
+              <span className="hidden sm:inline">
+                {cartCount > 0
+                  ? `Pesan Sekarang (${cartCount})`
+                  : "Pesan Sekarang"}
+              </span>
               <span className="sm:hidden">Pesan</span>
             </Link>
           ) : (
@@ -156,27 +276,21 @@ export default function CatalogPage() {
               "radial-gradient(circle at 72% 30%, #1f2937 0%, transparent 52%), radial-gradient(circle at 20% 80%, #111827 0%, transparent 45%)",
           }}
         />
-
         <div className="max-w-2xl relative z-10">
           <div className="inline-flex items-center gap-2 text-[11px] font-bold tracking-widest uppercase text-white/55 mb-5">
             <div
-              className={`w-1.5 h-1.5 rounded-full ${
-                isActive ? "bg-green-400" : "bg-red-400"
-              }`}
+              className={`w-1.5 h-1.5 rounded-full ${isActive ? "bg-green-400" : "bg-red-400"}`}
             />
             <span>{isActive ? "Pre-Order Aktif" : "PO Ditutup"}</span>
           </div>
-
           <h1 className="text-4xl md:text-5xl lg:text-6xl font-extrabold leading-[1.08] tracking-tight mb-5">
             Temukan produk <em className="not-italic text-white/40">favorit</em>{" "}
             kamu di sini
           </h1>
-
           <p className="text-sm md:text-base text-white/60 max-w-md mb-9 leading-relaxed">
-            Periode PO: {periode}. Pilih produk, lihat detail dan foto lengkap,
-            lalu lanjut ke form pemesanan.
+            Periode PO: {periode}. Pilih produk, tambahkan ke keranjang, lalu
+            lanjut ke form pemesanan.
           </p>
-
           <div className="flex flex-wrap gap-3">
             <button
               onClick={() =>
@@ -189,13 +303,13 @@ export default function CatalogPage() {
               <LayoutGrid size={16} />
               Lihat Katalog
             </button>
-            {isActive && (
+            {isActive && cartCount > 0 && (
               <Link
                 href={withSlug("/po/order")}
                 className="inline-flex items-center gap-2 bg-transparent border border-white/25 text-white/85 px-6 py-3 rounded-full font-bold text-sm hover:border-white/55 hover:text-white transition-all"
               >
-                <Pencil size={16} />
-                Buka Form Pemesanan
+                <ShoppingCart size={16} />
+                Lihat Keranjang ({cartCount} item)
               </Link>
             )}
           </div>
@@ -213,7 +327,7 @@ export default function CatalogPage() {
               Katalog Produk
             </h2>
             <p className="text-sm text-gray-400 mt-1">
-              Klik produk untuk melihat detail, foto, dan varian lengkap.
+              Klik produk untuk melihat detail dan menambahkannya ke keranjang.
             </p>
           </div>
           <span className="text-xs font-bold text-gray-400 bg-gray-200/50 px-3 py-1 rounded-full">
@@ -229,7 +343,7 @@ export default function CatalogPage() {
                 <CheckCircle2 size={18} className="shrink-0 mt-0.5" />
                 <span>
                   PO sedang <strong className="font-extrabold">AKTIF</strong> —
-                  Silakan lakukan pemesanan sekarang.
+                  Klik produk untuk memilih dan tambahkan ke keranjang.
                 </span>
               </div>
             ) : (
@@ -244,17 +358,12 @@ export default function CatalogPage() {
           </div>
         )}
 
-        {/* Grid Area */}
+        {/* Grid produk */}
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 md:gap-5">
           {loading ? (
             <div className="col-span-full text-center py-16 text-gray-400 text-sm">
               <div className="w-8 h-8 border-[3px] border-gray-200 border-t-zinc-950 rounded-full animate-spin mx-auto mb-3" />
               <p>Memuat produk...</p>
-            </div>
-          ) : !isActive && products.length === 0 ? (
-            <div className="col-span-full text-center py-16 text-gray-400 text-sm">
-              <Clock size={32} className="mx-auto mb-3 opacity-50" />
-              <p>Pemesanan sedang ditutup.</p>
             </div>
           ) : products.length === 0 ? (
             <div className="col-span-full text-center py-16 text-gray-400 text-sm">
@@ -268,7 +377,6 @@ export default function CatalogPage() {
                 onClick={() => openModal(p)}
                 className="bg-white border border-gray-200 rounded-xl md:rounded-2xl overflow-hidden cursor-pointer flex flex-col transition-all duration-200 hover:border-gray-300 hover:-translate-y-1 group"
               >
-                {/* Thumbnail */}
                 <div className="w-full aspect-[4/3] bg-slate-100 relative overflow-hidden shrink-0">
                   {p.image_urls[0] ? (
                     <img
@@ -289,8 +397,6 @@ export default function CatalogPage() {
                     </div>
                   )}
                 </div>
-
-                {/* Body */}
                 <div className="p-3.5 md:p-4 flex-1 flex flex-col">
                   <h3 className="text-sm md:text-[15px] font-bold leading-snug text-zinc-950">
                     {p.name}
@@ -303,11 +409,9 @@ export default function CatalogPage() {
                       {p.description}
                     </p>
                   )}
-
-                  {/* CTA Footer Card */}
                   <div className="mt-auto pt-3 border-t border-gray-100 flex items-center justify-between">
                     <span className="text-[11px] md:text-xs font-bold text-gray-500 flex items-center gap-1">
-                      <Eye size={13} /> Detail
+                      <Eye size={13} /> Detail & Pilih
                     </span>
                     <div className="flex gap-1 overflow-hidden">
                       {p.available_sizes.slice(0, 3).map((s) => (
@@ -335,10 +439,14 @@ export default function CatalogPage() {
       {/* ── CTA BOTTOM ── */}
       <section className="bg-zinc-950 text-white px-5 md:px-10 lg:px-16 py-14 md:py-20 text-center">
         <h2 className="text-2xl md:text-3xl font-extrabold tracking-tight mb-2.5">
-          Siap untuk memesan?
+          {cartCount > 0
+            ? `${cartCount} item di keranjangmu`
+            : "Siap untuk memesan?"}
         </h2>
         <p className="text-sm text-white/55 mb-7 max-w-md mx-auto">
-          Isi form pemesanan sekarang sebelum periode PO berakhir.
+          {cartCount > 0
+            ? "Lanjutkan ke form pemesanan untuk menyelesaikan pesanan."
+            : "Pilih produk dari katalog, tambahkan ke keranjang, lalu checkout."}
         </p>
         {isActive ? (
           <Link
@@ -346,7 +454,7 @@ export default function CatalogPage() {
             className="inline-flex items-center gap-2 bg-white text-zinc-950 px-8 py-3.5 rounded-full font-extrabold text-sm hover:opacity-90 transition-opacity"
           >
             <ArrowRight size={16} />
-            Buka Form Pemesanan
+            {cartCount > 0 ? "Lanjut ke Pemesanan" : "Buka Form Pemesanan"}
           </Link>
         ) : (
           <button
@@ -363,28 +471,36 @@ export default function CatalogPage() {
         <p>© {new Date().getFullYear()} Katalog PO — Langitan.co</p>
       </footer>
 
-      {/* ── MODAL DETAIL ── */}
+      {/* ══════════════════════════════════════════════════
+          MODAL DETAIL + VARIAN PICKER
+      ══════════════════════════════════════════════════ */}
       {selectedProduct && (
         <div
-          className="fixed inset-0 bg-black/75 z-50 flex items-end sm:items-center justify-center p-3 sm:p-5 backdrop-blur-sm transition-opacity"
+          className="fixed inset-0 bg-black/75 z-50 flex items-end sm:items-center justify-center p-3 sm:p-5 backdrop-blur-sm"
           onClick={closeModal}
         >
           <div
-            className="bg-white rounded-t-3xl sm:rounded-2xl w-full max-w-4xl max-h-[90vh] sm:max-h-[85vh] overflow-hidden flex flex-col sm:flex-row shadow-2xl animate-in slide-in-from-bottom-8 sm:slide-in-from-bottom-0 sm:fade-in sm:zoom-in-95 duration-200"
+            className="bg-white rounded-t-3xl sm:rounded-2xl w-full max-w-4xl max-h-[92vh] sm:max-h-[88vh] overflow-hidden flex flex-col sm:flex-row shadow-2xl animate-in slide-in-from-bottom-8 sm:slide-in-from-bottom-0 sm:fade-in sm:zoom-in-95 duration-200"
             onClick={(e) => e.stopPropagation()}
           >
-            {/* Slider Side */}
+            {/* ── Sisi Foto ── */}
             <div
-              className="w-full sm:flex-[1.2] bg-slate-100 relative overflow-hidden flex items-center justify-center aspect-[4/3] sm:aspect-auto sm:min-h-[360px] select-none"
+              className="w-full sm:flex-[1.2] bg-slate-100 relative overflow-hidden flex items-center justify-center aspect-[4/3] sm:aspect-auto sm:min-h-[420px] select-none"
               onTouchStart={(e) => setTouchStart(e.touches[0].clientX)}
               onTouchEnd={handleTouchEnd}
             >
-              <img
-                src={selectedProduct.image_urls[imageIndex] || ""}
-                alt={selectedProduct.name}
-                className="w-full h-full object-cover animate-in fade-in duration-300"
-                key={imageIndex}
-              />
+              {selectedProduct.image_urls[imageIndex] ? (
+                <img
+                  src={selectedProduct.image_urls[imageIndex]}
+                  alt={selectedProduct.name}
+                  className="w-full h-full object-cover animate-in fade-in duration-300"
+                  key={imageIndex}
+                />
+              ) : (
+                <div className="w-full h-full flex items-center justify-center text-gray-300">
+                  <Shirt size={48} />
+                </div>
+              )}
 
               {selectedProduct.image_urls.length > 1 && (
                 <>
@@ -424,100 +540,191 @@ export default function CatalogPage() {
               </button>
             </div>
 
-            {/* Info Side */}
-            <div className="flex-1 flex flex-col p-4 sm:p-7 overflow-y-auto">
-              <div className="hidden sm:flex items-center justify-between mb-2">
-                <span className="text-[11px] font-bold tracking-widest uppercase text-gray-400">
-                  Pre-Order
-                </span>
-                <button
-                  onClick={closeModal}
-                  className="bg-stone-100 hover:bg-stone-200 text-zinc-950 w-8 h-8 rounded-full flex items-center justify-center transition-colors"
-                >
-                  <X size={16} />
-                </button>
-              </div>
-
-              <h2 className="text-[17px] sm:text-2xl font-extrabold leading-tight text-zinc-950 mb-1 sm:mb-2">
-                {selectedProduct.name}
-              </h2>
-              <p className="text-[17px] sm:text-xl font-extrabold text-zinc-950 pb-3 sm:pb-5 border-b border-gray-200 mb-3 sm:mb-5">
-                {formatRupiah(selectedProduct.base_price)}
-              </p>
-
-              <div className="hidden sm:block text-[11px] font-bold tracking-widest uppercase text-gray-400 mb-3">
-                Spesifikasi
-              </div>
-
-              <div className="flex flex-col gap-1 sm:gap-0 sm:mb-6">
-                <div className="flex sm:items-start gap-3 py-1 sm:py-2.5 sm:border-b sm:border-gray-100 text-[13px] sm:text-sm">
-                  <span className="text-gray-400 font-medium w-16 sm:w-24 shrink-0">
-                    Ukuran
+            {/* ── Sisi Info + Picker ── */}
+            <div className="flex-1 flex flex-col overflow-y-auto">
+              {/* Header info sisi kanan */}
+              <div className="p-4 sm:p-6 border-b border-gray-100">
+                <div className="hidden sm:flex items-center justify-between mb-2">
+                  <span className="text-[11px] font-bold tracking-widest uppercase text-gray-400">
+                    Pre-Order
                   </span>
-                  <div className="flex flex-wrap gap-1.5 flex-1">
-                    {selectedProduct.available_sizes.length > 0
-                      ? selectedProduct.available_sizes.map((s) => (
-                          <span
-                            key={s}
-                            className="text-[11px] sm:text-xs font-semibold px-2 sm:px-2.5 py-0.5 sm:py-1 rounded-full bg-stone-100 border border-gray-200 text-gray-500"
-                          >
-                            {s}
-                          </span>
-                        ))
-                      : "-"}
-                  </div>
-                </div>
-
-                <div className="flex sm:items-start gap-3 py-1 sm:py-2.5 sm:border-b sm:border-gray-100 text-[13px] sm:text-sm">
-                  <span className="text-gray-400 font-medium w-16 sm:w-24 shrink-0">
-                    Warna
-                  </span>
-                  <div className="flex flex-wrap gap-1.5 flex-1">
-                    {selectedProduct.colors.length > 0
-                      ? selectedProduct.colors.map((w) => (
-                          <span
-                            key={w}
-                            className="text-[11px] sm:text-xs font-semibold px-2 sm:px-2.5 py-0.5 sm:py-1 rounded-full bg-stone-100 border border-gray-200 text-gray-500"
-                          >
-                            {w}
-                          </span>
-                        ))
-                      : "-"}
-                  </div>
-                </div>
-
-                <div className="flex sm:items-start gap-3 py-1 sm:py-2.5 sm:border-b sm:border-gray-100 text-[13px] sm:text-sm">
-                  <span className="text-gray-400 font-medium w-16 sm:w-24 shrink-0">
-                    Lengan
-                  </span>
-                  <span className="font-semibold text-zinc-950">
-                    {selectedProduct.sleeve_types.length > 0
-                      ? selectedProduct.sleeve_types.join(", ")
-                      : "-"}
-                  </span>
-                </div>
-              </div>
-
-              {selectedProduct.description && (
-                <p className="hidden sm:block text-sm text-gray-500 leading-relaxed mb-6 mt-1">
-                  {selectedProduct.description}
-                </p>
-              )}
-
-              {/* Order Button in Modal */}
-              <div className="mt-4 sm:mt-auto pt-2">
-                {isActive ? (
-                  <Link
-                    href={withSlug("/po/order")}
-                    className="w-full flex items-center justify-center gap-2 bg-zinc-950 text-white px-5 py-3 sm:py-3.5 rounded-xl font-bold text-sm hover:opacity-80 transition-opacity"
+                  <button
+                    onClick={closeModal}
+                    className="bg-stone-100 hover:bg-stone-200 text-zinc-950 w-8 h-8 rounded-full flex items-center justify-center transition-colors"
                   >
-                    <Pencil size={16} />
-                    Isi Form Pemesanan
-                  </Link>
+                    <X size={16} />
+                  </button>
+                </div>
+                <h2 className="text-[17px] sm:text-xl font-extrabold leading-tight text-zinc-950 mb-1">
+                  {selectedProduct.name}
+                </h2>
+                <p className="text-lg sm:text-xl font-extrabold text-zinc-950">
+                  {formatRupiah(selectedProduct.base_price)}
+                  {hargaSatuan > selectedProduct.base_price && (
+                    <span className="ml-2 text-sm font-semibold text-blue-600">
+                      → {formatRupiah(hargaSatuan)} (varian dipilih)
+                    </span>
+                  )}
+                </p>
+                {selectedProduct.description && (
+                  <p className="text-xs text-gray-500 mt-2 leading-relaxed">
+                    {selectedProduct.description}
+                  </p>
+                )}
+              </div>
+
+              {/* ── VARIAN PICKER ── */}
+              <div className="p-4 sm:p-6 flex-1 space-y-4">
+                {/* Warna */}
+                {selectedProduct.colors.length > 0 && (
+                  <div>
+                    <p className="text-xs font-bold text-zinc-950 mb-2 uppercase tracking-wide">
+                      Warna{" "}
+                      <span className="font-semibold text-gray-400 normal-case tracking-normal">
+                        — {pickerWarna}
+                      </span>
+                    </p>
+                    <div className="flex flex-wrap gap-2">
+                      {selectedProduct.colors.map((w) => (
+                        <button
+                          key={w}
+                          onClick={() => setPickerWarna(w)}
+                          className={`px-3 py-1.5 rounded-lg border text-sm font-semibold transition-all ${
+                            pickerWarna === w
+                              ? "border-zinc-950 bg-zinc-950 text-white"
+                              : "border-gray-200 text-gray-600 hover:border-gray-400"
+                          }`}
+                        >
+                          {w}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Lengan */}
+                {selectedProduct.sleeve_types.length > 0 && (
+                  <div>
+                    <p className="text-xs font-bold text-zinc-950 mb-2 uppercase tracking-wide">
+                      Lengan{" "}
+                      <span className="font-semibold text-gray-400 normal-case tracking-normal">
+                        — {pickerLengan}
+                      </span>
+                    </p>
+                    <div className="flex flex-wrap gap-2">
+                      {selectedProduct.sleeve_types.map((l) => (
+                        <button
+                          key={l}
+                          onClick={() => setPickerLengan(l)}
+                          className={`px-3 py-1.5 rounded-lg border text-sm font-semibold transition-all ${
+                            pickerLengan === l
+                              ? "border-zinc-950 bg-zinc-950 text-white"
+                              : "border-gray-200 text-gray-600 hover:border-gray-400"
+                          }`}
+                        >
+                          {l}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Ukuran */}
+                {selectedProduct.available_sizes.length > 0 && (
+                  <div>
+                    <p className="text-xs font-bold text-zinc-950 mb-2 uppercase tracking-wide">
+                      Ukuran{" "}
+                      <span className="font-semibold text-gray-400 normal-case tracking-normal">
+                        — {pickerUkuran}
+                      </span>
+                    </p>
+                    <div className="flex flex-wrap gap-2">
+                      {selectedProduct.available_sizes.map((u) => (
+                        <button
+                          key={u}
+                          onClick={() => setPickerUkuran(u)}
+                          className={`w-12 py-1.5 rounded-lg border text-sm font-bold transition-all ${
+                            pickerUkuran === u
+                              ? "border-zinc-950 bg-zinc-950 text-white"
+                              : "border-gray-200 text-gray-600 hover:border-gray-400"
+                          }`}
+                        >
+                          {u}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* QTY */}
+                <div>
+                  <p className="text-xs font-bold text-zinc-950 mb-2 uppercase tracking-wide">
+                    Jumlah
+                  </p>
+                  <div className="flex items-center gap-3">
+                    <button
+                      onClick={() => setPickerQty((q) => Math.max(1, q - 1))}
+                      className="w-9 h-9 rounded-full border border-gray-200 flex items-center justify-center hover:bg-stone-100 transition-colors"
+                    >
+                      <Minus size={14} />
+                    </button>
+                    <span className="w-8 text-center text-base font-extrabold text-zinc-950">
+                      {pickerQty}
+                    </span>
+                    <button
+                      onClick={() => setPickerQty((q) => q + 1)}
+                      className="w-9 h-9 rounded-full border border-gray-200 flex items-center justify-center hover:bg-stone-100 transition-colors"
+                    >
+                      <Plus size={14} />
+                    </button>
+                    {hargaSatuan > 0 && (
+                      <span className="text-sm font-bold text-blue-600 ml-2">
+                        = {formatRupiah(hargaTotal)}
+                      </span>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* ── Tombol Aksi ── */}
+              <div className="p-4 sm:p-6 border-t border-gray-100 space-y-2.5">
+                {isActive ? (
+                  <>
+                    <button
+                      onClick={handleAddToCart}
+                      disabled={addedFeedback}
+                      className={`w-full flex items-center justify-center gap-2 py-3 rounded-xl font-bold text-sm transition-all ${
+                        addedFeedback
+                          ? "bg-green-600 text-white"
+                          : "bg-zinc-950 hover:opacity-80 text-white"
+                      }`}
+                    >
+                      {addedFeedback ? (
+                        <>
+                          <Check size={16} />
+                          Ditambahkan ke Keranjang!
+                        </>
+                      ) : (
+                        <>
+                          <ShoppingCart size={16} />
+                          Tambah ke Keranjang
+                        </>
+                      )}
+                    </button>
+                    <Link
+                      href={withSlug("/po/order")}
+                      className="w-full flex items-center justify-center gap-2 py-3 rounded-xl font-bold text-sm border border-gray-200 text-gray-600 hover:border-zinc-950 hover:text-zinc-950 transition-all"
+                    >
+                      <Pencil size={14} />
+                      {cartCount > 0
+                        ? `Lihat Keranjang (${cartCount} item)`
+                        : "Langsung ke Form Pemesanan"}
+                    </Link>
+                  </>
                 ) : (
                   <button
                     disabled
-                    className="w-full flex items-center justify-center gap-2 bg-zinc-200 text-zinc-400 px-5 py-3 sm:py-3.5 rounded-xl font-bold text-sm cursor-not-allowed"
+                    className="w-full flex items-center justify-center gap-2 bg-zinc-200 text-zinc-400 px-5 py-3 rounded-xl font-bold text-sm cursor-not-allowed"
                   >
                     PO Ditutup
                   </button>

@@ -8,16 +8,13 @@ import {
   getAllPOProducts,
   submitOrder,
 } from "@/lib/po/admin";
-import { formatRupiah, calculateItemPrice } from "@/lib/po/pricing";
+import { formatRupiah } from "@/lib/po/pricing";
 import { POSetting, POProduct } from "@/types/po";
 import {
   Package,
   ArrowLeft,
   User,
-  Shirt,
   ShoppingBag,
-  Plus,
-  Trash,
   Send,
   Check,
   Copy,
@@ -25,23 +22,35 @@ import {
   Landmark,
   MessageCircle,
   Loader2,
+  Trash2,
+  ShoppingCart,
+  LayoutGrid,
 } from "lucide-react";
+import type { CartItemSession } from "@/app/po/[slug]/page"; // sesuaikan path import
 
-type CartItem = {
-  product: POProduct;
-  ukuran: string;
-  lengan: string;
-  warna: string;
-  qty: number;
-  harga_satuan: number;
-  subtotal: number;
-};
+const CART_KEY = "po_cart";
+
+function loadCart(): CartItemSession[] {
+  if (typeof window === "undefined") return [];
+  try {
+    return JSON.parse(sessionStorage.getItem(CART_KEY) || "[]");
+  } catch {
+    return [];
+  }
+}
+
+function saveCart(items: CartItemSession[]) {
+  sessionStorage.setItem(CART_KEY, JSON.stringify(items));
+}
+
+function clearCart() {
+  sessionStorage.removeItem(CART_KEY);
+}
 
 // ── Komponen utama dipisah agar useSearchParams bisa dibungkus Suspense ──
 function OrderFormContent() {
   const searchParams = useSearchParams();
   const slug = searchParams.get("slug");
-
   const katalogHref = slug ? `/po/${slug}` : "/po";
 
   const [setting, setSetting] = useState<POSetting | null>(null);
@@ -53,24 +62,21 @@ function OrderFormContent() {
   const [metodeKirim, setMetodeKirim] = useState("Diambil");
   const [alamat, setAlamat] = useState("");
 
-  const [selectedProductId, setSelectedProductId] = useState<string>("");
-  const [varian, setVarian] = useState({
-    ukuran: "-",
-    lengan: "-",
-    warna: "-",
-  });
-  const [qty, setQty] = useState<number | "">(0);
-
-  const [cart, setCart] = useState<CartItem[]>([]);
+  const [cart, setCart] = useState<CartItemSession[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const [successData, setSuccessData] = useState<{
     kodePO: string;
     total: number;
   } | null>(null);
-
   const [copied, setCopied] = useState(false);
 
   useEffect(() => {
+    // Simpan slug jika ada di URL
+    if (slug) sessionStorage.setItem("po_slug", slug);
+
+    // Load keranjang dari sessionStorage
+    setCart(loadCart());
+
     async function load() {
       const set = await getPOSettingAdmin();
       const prods = await getAllPOProducts();
@@ -79,80 +85,14 @@ function OrderFormContent() {
       setLoading(false);
     }
     load();
-  }, []);
+  }, [slug]);
 
-  const selectedProduct = products.find((p) => p.id === selectedProductId);
-
-  const hitungHarga = () => {
-    if (!selectedProduct || !setting)
-      return { dasar: 0, lengan: 0, size: 0, final: 0 };
-
-    const settings = {
-      sleeveSurcharge: setting.sleeve_surcharge ?? 0,
-      xxlSurcharge: setting.xxl_surcharge ?? 0,
-      sweaterXxlSurcharge: setting.sweater_xxl_surcharge ?? 0,
-    };
-
-    const final = calculateItemPrice(
-      selectedProduct.base_price,
-      varian.ukuran,
-      varian.lengan,
-      selectedProduct,
-      settings,
-    );
-
-    const dasar = selectedProduct.base_price;
-
-    // Breakdown untuk UI — ikuti logika yang sama dengan calculateItemPrice
-    const lengan =
-      selectedProduct.enable_sleeve_surcharge &&
-      varian.lengan.toLowerCase().includes("panjang")
-        ? settings.sleeveSurcharge
-        : 0;
-
-    const size = final - dasar - lengan;
-
-    return { dasar, lengan, size, final };
-  };
-
-  const hargaPreview = hitungHarga();
-  const validQty = typeof qty === "number" ? qty : 0;
   const grandTotal = cart.reduce((sum, item) => sum + item.subtotal, 0);
 
-  const handleProductChange = (id: string) => {
-    setSelectedProductId(id);
-    const prod = products.find((p) => p.id === id);
-    if (prod) {
-      setVarian({
-        ukuran: prod.available_sizes[0] || "-",
-        lengan: prod.sleeve_types[0] || "-",
-        warna: prod.colors[0] || "-",
-      });
-    }
-    setQty(0);
-  };
-
-  const addToCart = () => {
-    if (!selectedProduct || validQty <= 0) {
-      alert("Silakan pilih produk dan pastikan jumlah lebih dari 0.");
-      return;
-    }
-    const item: CartItem = {
-      product: selectedProduct,
-      ukuran: varian.ukuran,
-      lengan: varian.lengan,
-      warna: varian.warna,
-      qty: validQty,
-      harga_satuan: hargaPreview.final,
-      subtotal: hargaPreview.final * validQty,
-    };
-    setCart([...cart, item]);
-    setSelectedProductId("");
-    setQty(0);
-  };
-
-  const removeFromCart = (index: number) => {
-    setCart(cart.filter((_, i) => i !== index));
+  const removeFromCart = (cart_id: string) => {
+    const updated = cart.filter((i) => i.cart_id !== cart_id);
+    setCart(updated);
+    saveCart(updated);
   };
 
   const submitOrderHandler = async () => {
@@ -165,7 +105,7 @@ function OrderFormContent() {
       return;
     }
     if (cart.length === 0) {
-      alert("Pesanan masih kosong! Tambahkan produk terlebih dahulu.");
+      alert("Keranjang kosong! Tambahkan produk dari katalog terlebih dahulu.");
       return;
     }
 
@@ -178,8 +118,8 @@ function OrderFormContent() {
       delivery_method: metodeKirim as "Diambil" | "Dikirim",
       shipping_address: alamat,
       order_items: cart.map((item) => ({
-        product_id: item.product.id,
-        product_name: item.product.name,
+        product_id: item.product_id,
+        product_name: item.product_name,
         warna: item.warna,
         lengan: item.lengan,
         ukuran: item.ukuran,
@@ -197,6 +137,10 @@ function OrderFormContent() {
         setSubmitting(false);
         return;
       }
+
+      // Bersihkan keranjang setelah berhasil
+      clearCart();
+      setCart([]);
 
       setSubmitting(false);
       setSuccessData({
@@ -229,7 +173,7 @@ function OrderFormContent() {
     const daftarBarang = cart
       .map(
         (item, i) =>
-          `${i + 1}. ${item.product.name} (${item.ukuran}, ${item.lengan}, ${item.warna})\n    ${item.qty}pcs x ${formatRupiah(item.harga_satuan)} = ${formatRupiah(item.subtotal)}`,
+          `${i + 1}. ${item.product_name} (${item.ukuran}, ${item.lengan}, ${item.warna})\n    ${item.qty}pcs x ${formatRupiah(item.harga_satuan)} = ${formatRupiah(item.subtotal)}`,
       )
       .join("\n");
 
@@ -344,7 +288,7 @@ Mohon info langkah pembayarannya.`;
             <a
               href={getWhatsAppLink()}
               target="_blank"
-              className="w-full flex items-center justify-center gap-2 bg-[#25D366] hover:bg-[#20ba59] text-white py-3.5 rounded-xl font-extrabold text-[15px] transition-colors"
+              className="w-full flex items-center justify-center gap-2 bg-[#25D366] hover:bg-[#20ba59] text-white py-3.5 rounded-xl font-extrabold text-[15px] transition-colors mb-3"
             >
               <MessageCircle size={20} />
               Konfirmasi via WhatsApp
@@ -352,7 +296,7 @@ Mohon info langkah pembayarannya.`;
 
             <Link
               href={katalogHref}
-              className="w-full flex items-center justify-center gap-2 mt-3 text-gray-500 hover:text-zinc-950 py-2 text-sm font-semibold transition-colors"
+              className="w-full flex items-center justify-center gap-2 mt-2 text-gray-500 hover:text-zinc-950 py-2 text-sm font-semibold transition-colors"
             >
               <ArrowLeft size={16} />
               Kembali ke Katalog
@@ -362,7 +306,7 @@ Mohon info langkah pembayarannya.`;
       ) : (
         /* ========================== FORM STATE ========================== */
         <div className="animate-in fade-in duration-300">
-          <div className="bg-zinc-950 text-white px-5 md:px-10 py-8 md:py-12 relative overflow-hidden">
+          <div className="bg-zinc-950 text-white px-5 md:px-10 py-8 md:py-10 relative overflow-hidden">
             <div
               className="absolute inset-0 pointer-events-none opacity-80"
               style={{
@@ -375,64 +319,114 @@ Mohon info langkah pembayarannya.`;
                 <div className="w-1.5 h-1.5 rounded-full bg-green-400" />
                 Pre-Order Aktif
               </div>
-              <h1 className="text-2xl md:text-3xl font-extrabold tracking-tight mb-2">
-                Isi <em className="not-italic text-white/40">detail</em> pesanan
+              <h1 className="text-2xl md:text-3xl font-extrabold tracking-tight mb-1">
+                Lengkapi <em className="not-italic text-white/40">data diri</em>{" "}
                 kamu
               </h1>
               <p className="text-sm text-white/55">
-                Tambahkan produk ke pesanan, lalu kirim konfirmasi via WhatsApp.
+                Keranjang sudah terisi dari katalog. Tinggal isi biodata dan
+                kirim pesanan.
               </p>
             </div>
           </div>
 
-          <div className="bg-white border-b border-gray-200 px-5 md:px-10">
-            <div className="max-w-2xl mx-auto flex items-center py-3.5">
-              <div className="flex items-center gap-2 text-[13px] font-semibold text-zinc-950 shrink-0">
-                <span className="w-5 h-5 rounded-full bg-zinc-950 text-white text-[11px] font-extrabold flex items-center justify-center">
-                  1
-                </span>
-                Data Diri
-              </div>
-              <div className="flex-1 h-px bg-gray-200 mx-3" />
-              <div
-                className={`flex items-center gap-2 text-[13px] font-semibold shrink-0 ${
-                  cart.length > 0 ? "text-green-600" : "text-gray-400"
-                }`}
-              >
-                <span
-                  className={`w-5 h-5 rounded-full text-[11px] font-extrabold flex items-center justify-center ${
-                    cart.length > 0
-                      ? "bg-green-600 text-white"
-                      : "bg-gray-100 text-gray-400"
-                  }`}
+          <div className="max-w-2xl mx-auto px-5 py-8 md:py-10 space-y-4">
+            {/* ── Keranjang kosong — arahkan ke katalog ── */}
+            {cart.length === 0 && (
+              <div className="bg-white border border-gray-200 rounded-2xl p-8 text-center">
+                <ShoppingCart
+                  size={40}
+                  className="mx-auto mb-3 text-gray-300"
+                />
+                <p className="font-bold text-zinc-950 mb-1">
+                  Keranjang masih kosong
+                </p>
+                <p className="text-sm text-gray-400 mb-5">
+                  Pilih produk dari katalog terlebih dahulu, lalu tambahkan ke
+                  keranjang.
+                </p>
+                <Link
+                  href={katalogHref}
+                  className="inline-flex items-center gap-2 bg-zinc-950 text-white px-6 py-2.5 rounded-full text-sm font-bold hover:opacity-80 transition-opacity"
                 >
-                  2
-                </span>
-                Pilih Produk
+                  <LayoutGrid size={15} />
+                  Kembali ke Katalog
+                </Link>
               </div>
-              <div className="flex-1 h-px bg-gray-200 mx-3" />
-              <div
-                className={`flex items-center gap-2 text-[13px] font-semibold shrink-0 ${
-                  cart.length > 0 ? "text-zinc-950" : "text-gray-400"
-                }`}
-              >
-                <span
-                  className={`w-5 h-5 rounded-full text-[11px] font-extrabold flex items-center justify-center ${
-                    cart.length > 0
-                      ? "bg-zinc-950 text-white"
-                      : "bg-gray-100 text-gray-400"
-                  }`}
-                >
-                  3
-                </span>
-                Konfirmasi
-              </div>
-            </div>
-          </div>
+            )}
 
-          <div className="max-w-2xl mx-auto px-5 py-8 md:py-12">
-            {/* CARD 1: Data Diri */}
-            <div className="bg-white border border-gray-200 rounded-xl md:rounded-2xl p-5 md:p-7 mb-4">
+            {/* CARD 1: Ringkasan Keranjang */}
+            {cart.length > 0 && (
+              <div className="bg-white border border-gray-200 rounded-xl md:rounded-2xl p-5 md:p-7">
+                <h2 className="text-[11px] font-bold tracking-widest uppercase text-gray-400 mb-4 flex items-center gap-2">
+                  <ShoppingBag size={14} /> Ringkasan Pesanan
+                </h2>
+
+                <div className="space-y-2.5 mb-4">
+                  {cart.map((item) => (
+                    <div
+                      key={item.cart_id}
+                      className="flex items-start gap-3 p-3 bg-stone-50 rounded-xl border border-gray-100 group"
+                    >
+                      <div className="flex-1 min-w-0">
+                        <p className="font-bold text-sm text-zinc-950 truncate">
+                          {item.product_name}
+                        </p>
+                        <div className="flex flex-wrap gap-1 mt-1">
+                          {item.ukuran !== "-" && (
+                            <span className="text-[11px] font-semibold bg-white border border-gray-200 text-gray-500 px-2 py-0.5 rounded-full">
+                              {item.ukuran}
+                            </span>
+                          )}
+                          {item.lengan !== "-" && (
+                            <span className="text-[11px] font-semibold bg-white border border-gray-200 text-gray-500 px-2 py-0.5 rounded-full">
+                              {item.lengan}
+                            </span>
+                          )}
+                          {item.warna !== "-" && (
+                            <span className="text-[11px] font-semibold bg-white border border-gray-200 text-gray-500 px-2 py-0.5 rounded-full">
+                              {item.warna}
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-xs text-gray-500 mt-1.5">
+                          {item.qty} pcs × {formatRupiah(item.harga_satuan)}{" "}
+                          <strong className="text-blue-700">
+                            = {formatRupiah(item.subtotal)}
+                          </strong>
+                        </p>
+                      </div>
+                      <button
+                        onClick={() => removeFromCart(item.cart_id)}
+                        className="w-7 h-7 rounded-full border border-gray-200 flex items-center justify-center text-gray-300 hover:border-red-300 hover:text-red-500 hover:bg-red-50 transition-colors flex-shrink-0 mt-0.5"
+                      >
+                        <Trash2 size={13} />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="flex justify-between items-center pt-3 border-t border-gray-100">
+                  <div>
+                    <span className="text-[11px] font-bold text-gray-400 uppercase tracking-wider">
+                      Total Bayar
+                    </span>
+                    <Link
+                      href={katalogHref}
+                      className="block text-xs text-blue-600 hover:underline font-semibold mt-0.5"
+                    >
+                      + Tambah produk lain
+                    </Link>
+                  </div>
+                  <span className="text-xl font-extrabold text-green-600">
+                    {formatRupiah(grandTotal)}
+                  </span>
+                </div>
+              </div>
+            )}
+
+            {/* CARD 2: Data Diri */}
+            <div className="bg-white border border-gray-200 rounded-xl md:rounded-2xl p-5 md:p-7">
               <h2 className="text-[11px] font-bold tracking-widest uppercase text-gray-400 mb-4 flex items-center gap-2">
                 <User size={14} /> Data Pemesan
               </h2>
@@ -496,224 +490,24 @@ Mohon info langkah pembayarannya.`;
               )}
             </div>
 
-            {/* CARD 2: Pilih Produk */}
-            <div className="bg-white border border-gray-200 rounded-xl md:rounded-2xl p-5 md:p-7 mb-4">
-              <h2 className="text-[11px] font-bold tracking-widest uppercase text-gray-400 mb-4 flex items-center gap-2">
-                <Shirt size={14} /> Tambah Produk ke Pesanan
-              </h2>
-
-              <div className="mb-4">
-                <label className="block text-xs font-bold text-zinc-950 mb-1.5">
-                  Pilih Produk
-                </label>
-                <select
-                  value={selectedProductId}
-                  onChange={(e) => handleProductChange(e.target.value)}
-                  className="w-full px-3.5 py-2.5 border border-gray-200 rounded-lg text-sm text-zinc-950 bg-white outline-none focus:border-zinc-950 focus:ring-4 focus:ring-zinc-950/5 transition-all"
-                >
-                  <option value="">-- Pilih Barang --</option>
-                  {products.map((p) => (
-                    <option key={p.id} value={p.id}>
-                      {p.name}
-                    </option>
-                  ))}
-                </select>
+            {/* Info rekening */}
+            {setting?.bank_account_info && (
+              <div className="flex items-center gap-3 bg-white border border-gray-200 rounded-xl p-4 text-gray-600 text-sm">
+                <Landmark size={18} className="text-gray-400 shrink-0" />
+                <span>
+                  Pembayaran via transfer ke:{" "}
+                  <strong className="text-zinc-950">
+                    {setting.bank_account_info}
+                  </strong>
+                </span>
               </div>
+            )}
 
-              {selectedProduct && (
-                <div className="animate-in fade-in duration-200">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4 mt-1">
-                    {selectedProduct.available_sizes.length > 0 && (
-                      <div>
-                        <label className="block text-xs font-bold text-zinc-950 mb-1.5">
-                          Pilih Ukuran
-                        </label>
-                        <select
-                          value={varian.ukuran}
-                          onChange={(e) =>
-                            setVarian({ ...varian, ukuran: e.target.value })
-                          }
-                          className="w-full px-3.5 py-2.5 border border-gray-200 rounded-lg text-sm text-zinc-950 bg-white outline-none focus:border-zinc-950 focus:ring-4 focus:ring-zinc-950/5 transition-all"
-                        >
-                          {selectedProduct.available_sizes.map((s) => (
-                            <option key={s} value={s}>
-                              {s}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-                    )}
-                    {selectedProduct.sleeve_types.length > 0 && (
-                      <div>
-                        <label className="block text-xs font-bold text-zinc-950 mb-1.5">
-                          Pilih Jenis Lengan
-                        </label>
-                        <select
-                          value={varian.lengan}
-                          onChange={(e) =>
-                            setVarian({ ...varian, lengan: e.target.value })
-                          }
-                          className="w-full px-3.5 py-2.5 border border-gray-200 rounded-lg text-sm text-zinc-950 bg-white outline-none focus:border-zinc-950 focus:ring-4 focus:ring-zinc-950/5 transition-all"
-                        >
-                          {selectedProduct.sleeve_types.map((s) => (
-                            <option key={s} value={s}>
-                              {s}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-                    )}
-                    {selectedProduct.colors.length > 0 && (
-                      <div>
-                        <label className="block text-xs font-bold text-zinc-950 mb-1.5">
-                          Pilih Warna
-                        </label>
-                        <select
-                          value={varian.warna}
-                          onChange={(e) =>
-                            setVarian({ ...varian, warna: e.target.value })
-                          }
-                          className="w-full px-3.5 py-2.5 border border-gray-200 rounded-lg text-sm text-zinc-950 bg-white outline-none focus:border-zinc-950 focus:ring-4 focus:ring-zinc-950/5 transition-all"
-                        >
-                          {selectedProduct.colors.map((c) => (
-                            <option key={c} value={c}>
-                              {c}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-                    )}
-                  </div>
-
-                  <div className="mb-4">
-                    <label className="block text-xs font-bold text-zinc-950 mb-1.5">
-                      Jumlah (QTY)
-                    </label>
-                    <input
-                      type="number"
-                      min={0}
-                      value={qty}
-                      onChange={(e) =>
-                        setQty(
-                          e.target.value === "" ? "" : Number(e.target.value),
-                        )
-                      }
-                      className="w-full md:max-w-[160px] px-3.5 py-2.5 border border-gray-200 rounded-lg text-sm text-zinc-950 bg-white outline-none focus:border-zinc-950 focus:ring-4 focus:ring-zinc-950/5 transition-all"
-                    />
-                  </div>
-
-                  {validQty > 0 && (
-                    <div className="bg-indigo-50 border border-indigo-200 border-dashed rounded-lg p-3.5 md:p-4 text-sm text-gray-600 leading-relaxed mb-4">
-                      <strong className="text-zinc-950 block mb-1">
-                        Rincian Harga Satuan
-                      </strong>
-                      Harga Dasar: {formatRupiah(hargaPreview.dasar)}
-                      {hargaPreview.lengan > 0 && (
-                        <>
-                          <br />
-                          Tambahan Lengan: +{formatRupiah(hargaPreview.lengan)}
-                        </>
-                      )}
-                      {hargaPreview.size > 0 && (
-                        <>
-                          <br />
-                          Tambahan Ukuran: +{formatRupiah(hargaPreview.size)}
-                        </>
-                      )}
-                      <hr className="border-indigo-200 my-2" />
-                      Harga Satuan:{" "}
-                      <strong className="text-zinc-950">
-                        {formatRupiah(hargaPreview.final)}
-                      </strong>
-                      <br />
-                      <span className="text-blue-700 font-extrabold text-[15px] mt-1 block">
-                        Total ({validQty} pcs):{" "}
-                        {formatRupiah(hargaPreview.final * validQty)}
-                      </span>
-                    </div>
-                  )}
-
-                  <button
-                    onClick={addToCart}
-                    className="w-full bg-zinc-950 text-white py-3 rounded-lg text-sm font-bold flex justify-center items-center gap-2 hover:opacity-85 transition-opacity"
-                  >
-                    <Plus size={16} />
-                    Tambahkan ke Pesanan
-                  </button>
-                </div>
-              )}
-            </div>
-
-            {/* CARD 3: Keranjang */}
-            <div className="bg-white border border-gray-200 rounded-xl md:rounded-2xl p-5 md:p-7 mb-4">
-              <h2 className="text-[11px] font-bold tracking-widest uppercase text-gray-400 mb-4 flex items-center gap-2">
-                <ShoppingBag size={14} /> Daftar Pesanan Anda
-              </h2>
-
-              {cart.length === 0 ? (
-                <div className="text-center py-8 text-gray-400 text-sm">
-                  <ShoppingBag size={32} className="mx-auto mb-2 opacity-50" />
-                  Belum ada barang yang ditambahkan.
-                </div>
-              ) : (
-                <div>
-                  {cart.map((item, index) => (
-                    <div
-                      key={index}
-                      className="border border-gray-200 rounded-lg p-3.5 mb-2.5 bg-stone-50 relative group"
-                    >
-                      <button
-                        onClick={() => removeFromCart(index)}
-                        className="absolute top-3 right-3 w-7 h-7 rounded-full border border-gray-200 flex items-center justify-center text-gray-400 hover:border-red-300 hover:text-red-600 hover:bg-red-50 transition-colors"
-                      >
-                        <Trash size={14} />
-                      </button>
-                      <div className="font-bold text-[15px] text-zinc-950 mb-1 pr-10">
-                        {item.product.name}
-                      </div>
-                      <div className="flex flex-wrap gap-1.5 mb-1.5">
-                        {item.ukuran !== "-" && (
-                          <span className="bg-white border border-gray-200 rounded-full px-2 py-0.5 text-[11px] font-semibold text-gray-500">
-                            {item.ukuran}
-                          </span>
-                        )}
-                        {item.lengan !== "-" && (
-                          <span className="bg-white border border-gray-200 rounded-full px-2 py-0.5 text-[11px] font-semibold text-gray-500">
-                            {item.lengan}
-                          </span>
-                        )}
-                        {item.warna !== "-" && (
-                          <span className="bg-white border border-gray-200 rounded-full px-2 py-0.5 text-[11px] font-semibold text-gray-500">
-                            {item.warna}
-                          </span>
-                        )}
-                      </div>
-                      <div className="text-sm text-gray-500">
-                        {item.qty} pcs × {formatRupiah(item.harga_satuan)} ={" "}
-                        <strong className="text-blue-700">
-                          {formatRupiah(item.subtotal)}
-                        </strong>
-                      </div>
-                    </div>
-                  ))}
-
-                  <div className="flex justify-between items-center pt-3 mt-3 border-t border-gray-200">
-                    <span className="text-[13px] font-bold text-gray-400 uppercase tracking-wider">
-                      Total Bayar
-                    </span>
-                    <span className="text-xl font-extrabold text-green-600">
-                      {formatRupiah(grandTotal)}
-                    </span>
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {/* Submit Button */}
+            {/* Submit */}
             <button
               onClick={submitOrderHandler}
               disabled={submitting || cart.length === 0}
-              className="w-full bg-zinc-950 text-white py-3.5 rounded-lg text-[15px] font-extrabold flex justify-center items-center gap-2 hover:opacity-85 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+              className="w-full bg-zinc-950 text-white py-3.5 rounded-xl text-[15px] font-extrabold flex justify-center items-center gap-2 hover:opacity-85 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
             >
               {submitting ? (
                 <>
@@ -723,7 +517,7 @@ Mohon info langkah pembayarannya.`;
               ) : (
                 <>
                   <Send size={18} />
-                  Proses Semua Pesanan
+                  Proses Pesanan
                 </>
               )}
             </button>
@@ -734,7 +528,6 @@ Mohon info langkah pembayarannya.`;
   );
 }
 
-// ── Export default: bungkus dengan Suspense ──
 export default function OrderFormPage() {
   return (
     <Suspense
