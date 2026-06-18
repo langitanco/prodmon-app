@@ -15,6 +15,7 @@ import {
   Copy,
   ExternalLink,
   CalendarDays,
+  Package,
 } from "lucide-react";
 
 export default function POOverview() {
@@ -23,6 +24,7 @@ export default function POOverview() {
     totalPublic: 0,
     totalReseller: 0,
     totalAmount: 0,
+    totalProducts: 0,
   });
   const [setting, setSetting] = useState<POSetting | null>(null);
   const [loading, setLoading] = useState(true);
@@ -38,8 +40,14 @@ export default function POOverview() {
     load();
   }, []);
 
+  const currentSlug = setting?.url_slug || "katalog";
+  const poUrl =
+    typeof window !== "undefined"
+      ? `${window.location.origin}/po/${currentSlug}`
+      : `/po/${currentSlug}`;
+
   function handleCopy() {
-    navigator.clipboard.writeText(`${window.location.origin}/po`);
+    navigator.clipboard.writeText(poUrl);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   }
@@ -51,9 +59,6 @@ export default function POOverview() {
         <span className="text-sm">Memuat data...</span>
       </div>
     );
-
-  const poUrl =
-    typeof window !== "undefined" ? `${window.location.origin}/po` : "/po";
 
   return (
     <div className="space-y-6">
@@ -95,17 +100,17 @@ export default function POOverview() {
         </div>
 
         {setting?.periode_mulai && (
-          <div className="hidden sm:flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400">
-            <CalendarDays size={13} />
+          <div className="hidden sm:flex items-center gap-1.5 text-xs font-semibold text-slate-500 dark:text-slate-400">
+            <CalendarDays size={14} />
             <span>
-              {setting.periode_mulai} — {setting.periode_selesai}
+              {setting.periode_mulai} — {setting.periode_selesai || "Selesai"}
             </span>
           </div>
         )}
       </div>
 
       {/* ── Stats Grid ────────────────────────────────────────────── */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
         {[
           {
             label: "Total Pesanan",
@@ -113,6 +118,13 @@ export default function POOverview() {
             icon: ShoppingBag,
             color: "text-blue-600 dark:text-blue-400",
             bg: "bg-blue-50 dark:bg-blue-900/20",
+          },
+          {
+            label: "Total Produk",
+            value: stats.totalProducts || 0,
+            icon: Package,
+            color: "text-indigo-600 dark:text-indigo-400",
+            bg: "bg-indigo-50 dark:bg-indigo-900/20",
           },
           {
             label: "Publik",
@@ -138,7 +150,7 @@ export default function POOverview() {
         ].map((s) => (
           <div
             key={s.label}
-            className="bg-slate-50 dark:bg-slate-800/40 border border-slate-200 dark:border-slate-700/50 rounded-2xl p-4"
+            className="bg-slate-50 dark:bg-slate-800/40 border border-slate-200 dark:border-slate-700/50 rounded-2xl p-4 flex flex-col"
           >
             <div
               className={`w-8 h-8 ${s.bg} rounded-lg flex items-center justify-center mb-3`}
@@ -148,7 +160,7 @@ export default function POOverview() {
             <p className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-1">
               {s.label}
             </p>
-            <p className="text-xl font-extrabold text-slate-900 dark:text-white leading-none">
+            <p className="text-xl font-extrabold text-slate-900 dark:text-white leading-none mt-auto">
               {s.value}
             </p>
           </div>
@@ -160,29 +172,31 @@ export default function POOverview() {
         <p className="text-[10px] text-slate-400 dark:text-slate-500 mb-3 font-extrabold uppercase tracking-widest flex items-center gap-2">
           <LinkIcon size={11} /> Link Katalog Publik
         </p>
-        <div className="flex gap-2 items-center">
-          <code className="text-sm bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2.5 flex-1 font-mono text-slate-600 dark:text-slate-300 truncate">
+        <div className="flex gap-2 items-center flex-wrap md:flex-nowrap">
+          <code className="text-sm bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2.5 w-full md:flex-1 font-mono text-slate-600 dark:text-slate-300 truncate">
             {poUrl}
           </code>
-          <button
-            onClick={handleCopy}
-            className={`flex items-center gap-1.5 text-xs font-bold border px-4 py-2.5 rounded-xl transition-colors whitespace-nowrap
-              ${
-                copied
-                  ? "bg-emerald-50 dark:bg-emerald-900/30 border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-400"
-                  : "bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700"
-              }`}
-          >
-            <Copy size={13} />
-            {copied ? "Tersalin!" : "Salin"}
-          </button>
-          <a
-            href="/po"
-            target="_blank"
-            className="flex items-center gap-1.5 text-xs font-bold border border-slate-200 dark:border-slate-700 px-4 py-2.5 rounded-xl bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 transition-colors"
-          >
-            <ExternalLink size={13} /> Buka
-          </a>
+          <div className="flex gap-2 w-full md:w-auto">
+            <button
+              onClick={handleCopy}
+              className={`flex-1 md:flex-none flex items-center justify-center gap-1.5 text-xs font-bold border px-4 py-2.5 rounded-xl transition-colors whitespace-nowrap
+                ${
+                  copied
+                    ? "bg-emerald-50 dark:bg-emerald-900/30 border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-400"
+                    : "bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700"
+                }`}
+            >
+              <Copy size={13} />
+              {copied ? "Tersalin!" : "Salin"}
+            </button>
+            <a
+              href={`/po/${currentSlug}`}
+              target="_blank"
+              className="flex-1 md:flex-none flex items-center justify-center gap-1.5 text-xs font-bold border border-slate-200 dark:border-slate-700 px-4 py-2.5 rounded-xl bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 transition-colors"
+            >
+              <ExternalLink size={13} /> Buka
+            </a>
+          </div>
         </div>
       </div>
     </div>

@@ -2,11 +2,17 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { loginReseller } from "@/lib/po/supabase";
 
 export default function ResellerLoginPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const slug = searchParams.get("slug");
+
+  // Tombol "Kembali ke Katalog" kembali ke slug yang sama (kalau ada)
+  const katalogHref = slug ? `/po/${slug}` : "/po";
+
   const [kode, setKode] = useState("");
   const [pin, setPin] = useState("");
   const [error, setError] = useState("");
@@ -29,7 +35,10 @@ export default function ResellerLoginPage() {
     }
 
     sessionStorage.setItem("po_reseller", JSON.stringify(result.reseller));
-    router.push("/po/reseller/portal");
+    // Bawa slug ke portal reseller supaya konsisten dengan event/link asal
+    router.push(
+      slug ? `/po/reseller/portal?slug=${slug}` : "/po/reseller/portal",
+    );
   }
 
   return (
@@ -40,7 +49,7 @@ export default function ResellerLoginPage() {
           Portal Reseller
         </div>
         <a
-          href="/po"
+          href={katalogHref}
           className="text-[12.5px] text-[#9ca3af] hover:text-[#0e0e0e] font-semibold transition-colors"
         >
           Kembali ke Katalog

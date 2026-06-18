@@ -2,15 +2,21 @@
 
 export interface POSetting {
   id: string;
-  is_active: boolean;
-  title: string;
-  periode_mulai: string | null;
-  periode_selesai: string | null;
+  penyelenggara_po: string;
+  title?: string;              // <-- TAMBAHKAN INI
+  bank_account_info?: string;
+  wa_admin_phone: string;
   sleeve_surcharge: number;
   xxl_surcharge: number;
-  wa_admin_phone: string | null;
-  bank_account_info: string | null;
-  updated_at: string;
+  is_active: boolean;
+  
+  // TAMBAHKAN 2 BARIS INI:
+  periode_mulai?: string;
+  periode_selesai?: string;
+  
+  created_at?: string;
+  updated_at?: string;
+  url_slug?: string;
 }
 
 export interface POProduct {
@@ -22,9 +28,16 @@ export interface POProduct {
   sleeve_types: string[];
   colors: string[];
   image_urls: string[];
-  description: string | null;
+  description?: string;
   is_active: boolean;
   sort_order: number;
+  
+  // DUA BARIS INI WAJIB ADA:
+  enable_sleeve_surcharge?: boolean;
+  enable_xxl_surcharge?: boolean;
+  
+  created_at?: string;
+  updated_at?: string;
 }
 
 export interface POReseller {

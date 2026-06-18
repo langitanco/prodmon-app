@@ -1,3 +1,4 @@
+// app/components/po/POProductList.tsx
 "use client";
 
 import { useEffect, useState } from "react";
@@ -24,6 +25,8 @@ const EMPTY_PRODUCT: Omit<POProduct, "id"> = {
   description: "",
   is_active: true,
   sort_order: 0,
+  enable_sleeve_surcharge: false,
+  enable_xxl_surcharge: false,
 };
 
 function arrayToStr(arr: string[]) {
@@ -36,7 +39,6 @@ function strToArray(str: string) {
     .filter(Boolean);
 }
 
-/* ── Reusable field wrapper ── */
 function Field({
   label,
   hint,
@@ -72,7 +74,6 @@ export default function POProductList() {
   const [form, setForm] = useState<Omit<POProduct, "id">>(EMPTY_PRODUCT);
   const [saving, setSaving] = useState(false);
 
-  // State khusus untuk upload foto baru
   const [newFiles, setNewFiles] = useState<File[]>([]);
   const [previewUrls, setPreviewUrls] = useState<string[]>([]);
 
@@ -108,25 +109,20 @@ export default function POProductList() {
       description: p.description || "",
       is_active: p.is_active,
       sort_order: p.sort_order,
+      enable_sleeve_surcharge: p.enable_sleeve_surcharge ?? false,
+      enable_xxl_surcharge: p.enable_xxl_surcharge ?? false,
     });
     setNewFiles([]);
     setPreviewUrls([]);
     setShowForm(true);
   }
 
-  /* ── Handlers Upload Foto ── */
   function handleFileSelect(e: React.ChangeEvent<HTMLInputElement>) {
     if (!e.target.files) return;
     const files = Array.from(e.target.files);
-
-    // Tambah ke list file
     setNewFiles((prev) => [...prev, ...files]);
-
-    // Buat URL sementara untuk preview
     const urls = files.map((f) => URL.createObjectURL(f));
     setPreviewUrls((prev) => [...prev, ...urls]);
-
-    // Reset input agar bisa pilih file yang sama jika dihapus lalu dipilih lagi
     e.target.value = "";
   }
 
@@ -142,23 +138,20 @@ export default function POProductList() {
     setNewFiles(updatedFiles);
 
     const updatedPreviews = [...previewUrls];
-    URL.revokeObjectURL(updatedPreviews[index]); // Bersihkan memori
+    URL.revokeObjectURL(updatedPreviews[index]);
     updatedPreviews.splice(index, 1);
     setPreviewUrls(updatedPreviews);
   }
 
-  /* ── Handler Simpan Data ── */
   async function handleSave() {
     if (!form.name || !form.product_code || form.base_price <= 0) {
       alert("Nama, kode produk, dan harga wajib diisi.");
       return;
     }
     setSaving(true);
-
     const supabase = createClient();
 
     try {
-      // 1. Upload file baru ke Supabase Storage (Pastikan Anda punya bucket bernama "po_assets" atau sesuaikan namanya)
       const uploadedUrls: string[] = [];
 
       for (const file of newFiles) {
@@ -166,7 +159,6 @@ export default function POProductList() {
         const fileName = `${Date.now()}-${Math.random().toString(36).substring(2)}.${fileExt}`;
         const filePath = `products/${fileName}`;
 
-        // Ubah "po_assets" sesuai dengan nama bucket Supabase Anda
         const { data, error } = await supabase.storage
           .from("po_assets")
           .upload(filePath, file);
@@ -182,13 +174,11 @@ export default function POProductList() {
         }
       }
 
-      // 2. Gabungkan URL lama yang tersisa dengan URL baru yang sukses diupload
       const finalData = {
         ...form,
         image_urls: [...form.image_urls, ...uploadedUrls],
       };
 
-      // 3. Simpan ke Database
       if (editTarget) {
         await updatePOProduct(editTarget.id, finalData);
       } else {
@@ -226,7 +216,6 @@ export default function POProductList() {
       </div>
     );
 
-  /* ── View Form ──────────────────────────────────────────────────── */
   if (showForm) {
     return (
       <div className="w-full max-w-4xl mx-auto space-y-6 animate-in fade-in duration-200">
@@ -281,7 +270,6 @@ export default function POProductList() {
                 className={inputCls}
               />
             </Field>
-
             <Field label="Harga Dasar (Rp) *">
               <input
                 type="number"
@@ -315,7 +303,6 @@ export default function POProductList() {
                 className={inputCls}
               />
             </Field>
-
             <Field label="Jenis Lengan" hint="(pisah koma)">
               <input
                 type="text"
@@ -327,7 +314,6 @@ export default function POProductList() {
                 className={inputCls}
               />
             </Field>
-
             <Field label="Warna Tersedia" hint="(pisah koma)">
               <input
                 type="text"
@@ -341,7 +327,6 @@ export default function POProductList() {
             </Field>
           </div>
 
-          {/* ── SEKSI UNGGAH FOTO ── */}
           <Field label="Foto Produk" hint="(Bisa upload lebih dari 1)">
             <div className="relative border-2 border-dashed border-slate-300 dark:border-slate-700 rounded-xl p-6 flex flex-col items-center justify-center text-center hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors group">
               <UploadCloud className="w-8 h-8 text-slate-400 mb-2 group-hover:text-blue-500 transition-colors" />
@@ -351,7 +336,6 @@ export default function POProductList() {
               <p className="text-xs text-slate-400 mt-1">
                 Format JPG, PNG (Direkomendasikan max 2MB)
               </p>
-
               <input
                 type="file"
                 multiple
@@ -361,10 +345,8 @@ export default function POProductList() {
               />
             </div>
 
-            {/* Grid Thumbnail Preview */}
             {(form.image_urls.length > 0 || previewUrls.length > 0) && (
               <div className="flex flex-wrap gap-3 mt-4">
-                {/* Foto yang sudah tersimpan */}
                 {form.image_urls.map((url, i) => (
                   <div key={`old-${i}`} className="relative w-20 h-20 group">
                     <img
@@ -380,8 +362,6 @@ export default function POProductList() {
                     </button>
                   </div>
                 ))}
-
-                {/* Foto baru yang akan diupload */}
                 {previewUrls.map((url, i) => (
                   <div key={`new-${i}`} className="relative w-20 h-20 group">
                     <img
@@ -416,19 +396,57 @@ export default function POProductList() {
             />
           </Field>
 
+          {/* Pengaturan Penyesuaian Harga */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4 border-t border-slate-100 dark:border-slate-800">
+            <label className="flex items-center gap-3 cursor-pointer p-3 border border-slate-200 dark:border-slate-700 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors">
+              <input
+                type="checkbox"
+                checked={form.enable_sleeve_surcharge}
+                onChange={(e) =>
+                  setForm({
+                    ...form,
+                    enable_sleeve_surcharge: e.target.checked,
+                  })
+                }
+                className="w-5 h-5 rounded text-blue-600 focus:ring-blue-500"
+              />
+              <div className="flex flex-col">
+                <span className="text-sm font-bold text-slate-800 dark:text-slate-200">
+                  Tambahan Lengan Panjang
+                </span>
+                <span className="text-[11px] text-slate-500">
+                  Sesuaikan harga jika ada opsi lengan panjang
+                </span>
+              </div>
+            </label>
+
+            <label className="flex items-center gap-3 cursor-pointer p-3 border border-slate-200 dark:border-slate-700 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors">
+              <input
+                type="checkbox"
+                checked={form.enable_xxl_surcharge}
+                onChange={(e) =>
+                  setForm({ ...form, enable_xxl_surcharge: e.target.checked })
+                }
+                className="w-5 h-5 rounded text-blue-600 focus:ring-blue-500"
+              />
+              <div className="flex flex-col">
+                <span className="text-sm font-bold text-slate-800 dark:text-slate-200">
+                  Tambahan Size Jumbo
+                </span>
+                <span className="text-[11px] text-slate-500">
+                  Sesuaikan harga untuk ukuran XXL atau lebih
+                </span>
+              </div>
+            </label>
+          </div>
+
           <label className="flex items-center gap-3 cursor-pointer select-none pt-2">
             <div
               onClick={() => setForm({ ...form, is_active: !form.is_active })}
-              className={`relative w-10 h-5 rounded-full transition-colors cursor-pointer ${
-                form.is_active
-                  ? "bg-blue-600"
-                  : "bg-slate-300 dark:bg-slate-600"
-              }`}
+              className={`relative w-10 h-5 rounded-full transition-colors cursor-pointer ${form.is_active ? "bg-blue-600" : "bg-slate-300 dark:bg-slate-600"}`}
             >
               <span
-                className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${
-                  form.is_active ? "translate-x-5" : "translate-x-0.5"
-                }`}
+                className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${form.is_active ? "translate-x-5" : "translate-x-0.5"}`}
               />
             </div>
             <span className="text-sm text-slate-700 dark:text-slate-300 font-medium">
@@ -451,8 +469,8 @@ export default function POProductList() {
           >
             {saving ? (
               <>
-                <div className="w-4 h-4 border-2 border-white/20 border-t-white rounded-full animate-spin" />
-                Mengunggah & Menyimpan...
+                <div className="w-4 h-4 border-2 border-white/20 border-t-white rounded-full animate-spin" />{" "}
+                Menyimpan...
               </>
             ) : editTarget ? (
               "Simpan Perubahan"
@@ -465,7 +483,6 @@ export default function POProductList() {
     );
   }
 
-  /* ── View List ─────────────────────────────────────────────── */
   return (
     <div className="w-full max-w-4xl mx-auto space-y-4 animate-in fade-in duration-200">
       <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3">
@@ -496,12 +513,7 @@ export default function POProductList() {
           {products.map((p) => (
             <div
               key={p.id}
-              className={`border rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center gap-4 transition-colors
-                ${
-                  !p.is_active
-                    ? "opacity-60 bg-slate-50 dark:bg-slate-800/30 border-slate-200 dark:border-slate-700"
-                    : "bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600"
-                }`}
+              className={`border rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center gap-4 transition-colors ${!p.is_active ? "opacity-60 bg-slate-50 dark:bg-slate-800/30 border-slate-200 dark:border-slate-700" : "bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600"}`}
             >
               <div className="flex items-start gap-4 flex-1 min-w-0">
                 {p.image_urls[0] ? (
@@ -518,7 +530,6 @@ export default function POProductList() {
                     />
                   </div>
                 )}
-
                 <div className="flex-1 min-w-0 pt-0.5">
                   <div className="flex items-center gap-2 flex-wrap">
                     <p className="font-bold text-sm text-slate-800 dark:text-slate-200">
@@ -537,12 +548,11 @@ export default function POProductList() {
                     {formatRupiah(p.base_price)}
                   </p>
                   <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 truncate">
-                    {p.available_sizes.join(", ")}
+                    {p.available_sizes.join(", ")}{" "}
                     {p.colors.length > 0 && ` · ${p.colors.join(", ")}`}
                   </p>
                 </div>
               </div>
-
               <div className="grid grid-cols-3 sm:flex gap-2 sm:gap-1.5 flex-shrink-0 w-full sm:w-auto mt-2 sm:mt-0 pt-3 sm:pt-0 border-t sm:border-0 border-slate-100 dark:border-slate-800">
                 <button
                   onClick={() => handleToggle(p.id, p.is_active)}

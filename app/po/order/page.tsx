@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 // Sesuaikan path import submitOrder dengan lokasi file Anda (bisa dari '@/lib/po/supabase' atau '@/lib/po/admin')
 import {
   getPOSettingAdmin,
@@ -38,6 +39,12 @@ type CartItem = {
 };
 
 export default function OrderFormPage() {
+  const searchParams = useSearchParams();
+  const slug = searchParams.get("slug");
+
+  // Helper: tombol "Katalog" kembali ke slug yang sama (kalau ada), fallback ke /po
+  const katalogHref = slug ? `/po/${slug}` : "/po";
+
   const [setting, setSetting] = useState<POSetting | null>(null);
   const [products, setProducts] = useState<POProduct[]>([]);
   const [loading, setLoading] = useState(true);
@@ -270,7 +277,7 @@ Mohon info langkah pembayarannya.`;
           <span>Form Pemesanan PO</span>
         </div>
         <Link
-          href="/po"
+          href={katalogHref}
           className="flex items-center gap-1.5 text-xs font-semibold text-gray-500 border border-gray-200 px-3.5 py-1.5 rounded-full hover:border-gray-300 hover:text-zinc-950 transition-colors"
         >
           <ArrowLeft size={14} />
@@ -353,6 +360,14 @@ Mohon info langkah pembayarannya.`;
               <MessageCircle size={20} />
               Konfirmasi via WhatsApp
             </a>
+
+            <Link
+              href={katalogHref}
+              className="w-full flex items-center justify-center gap-2 mt-3 text-gray-500 hover:text-zinc-950 py-2 text-sm font-semibold transition-colors"
+            >
+              <ArrowLeft size={16} />
+              Kembali ke Katalog
+            </Link>
           </div>
         </div>
       ) : (

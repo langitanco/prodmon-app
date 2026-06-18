@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { useParams } from "next/navigation";
 import { getPOSettingAdmin, getAllPOProducts } from "@/lib/po/admin";
 import { formatRupiah } from "@/lib/po/pricing";
 import { POSetting, POProduct } from "@/types/po";
@@ -24,6 +25,12 @@ import {
 } from "lucide-react";
 
 export default function CatalogPage() {
+  const params = useParams();
+  const slug = params?.slug as string;
+
+  // Helper: tambahkan slug sebagai query param ke link tujuan
+  const withSlug = (path: string) => (slug ? `${path}?slug=${slug}` : path);
+
   const [setting, setSetting] = useState<POSetting | null>(null);
   const [products, setProducts] = useState<POProduct[]>([]);
   const [loading, setLoading] = useState(true);
@@ -40,12 +47,10 @@ export default function CatalogPage() {
   useEffect(() => {
     async function loadData() {
       setLoading(true);
-      // Fetch setting dan product (gunakan fungsi yang sudah ada)
       const set = await getPOSettingAdmin();
       const prods = await getAllPOProducts();
 
       setSetting(set);
-      // Hanya tampilkan produk yang aktif di katalog
       setProducts(prods.filter((p) => p.is_active));
       setLoading(false);
     }
@@ -115,7 +120,7 @@ export default function CatalogPage() {
             {periode}
           </span>
           <Link
-            href="/po/reseller"
+            href={withSlug("/po/reseller")}
             className="hidden sm:flex items-center gap-1.5 bg-transparent text-zinc-950 border border-gray-300 px-4 py-2 rounded-full text-xs font-bold hover:bg-stone-100 hover:border-zinc-950 transition-all"
           >
             <Users size={14} />
@@ -123,7 +128,7 @@ export default function CatalogPage() {
           </Link>
           {isActive ? (
             <Link
-              href="/po/order"
+              href={withSlug("/po/order")}
               className="flex items-center gap-1.5 bg-zinc-950 text-white px-4 py-2 rounded-full text-xs font-bold hover:opacity-80 transition-opacity"
             >
               <ArrowRight size={14} />
@@ -144,7 +149,6 @@ export default function CatalogPage() {
 
       {/* ── HERO ── */}
       <section className="bg-zinc-950 text-white px-5 md:px-10 lg:px-16 py-16 md:py-24 relative overflow-hidden">
-        {/* Texture/Gradient background */}
         <div
           className="absolute inset-0 pointer-events-none opacity-80"
           style={{
@@ -187,7 +191,7 @@ export default function CatalogPage() {
             </button>
             {isActive && (
               <Link
-                href="/po/order"
+                href={withSlug("/po/order")}
                 className="inline-flex items-center gap-2 bg-transparent border border-white/25 text-white/85 px-6 py-3 rounded-full font-bold text-sm hover:border-white/55 hover:text-white transition-all"
               >
                 <Pencil size={16} />
@@ -338,7 +342,7 @@ export default function CatalogPage() {
         </p>
         {isActive ? (
           <Link
-            href="/po/order"
+            href={withSlug("/po/order")}
             className="inline-flex items-center gap-2 bg-white text-zinc-950 px-8 py-3.5 rounded-full font-extrabold text-sm hover:opacity-90 transition-opacity"
           >
             <ArrowRight size={16} />
@@ -379,10 +383,9 @@ export default function CatalogPage() {
                 src={selectedProduct.image_urls[imageIndex] || ""}
                 alt={selectedProduct.name}
                 className="w-full h-full object-cover animate-in fade-in duration-300"
-                key={imageIndex} // Trigger re-render animation
+                key={imageIndex}
               />
 
-              {/* Navigation Slider */}
               {selectedProduct.image_urls.length > 1 && (
                 <>
                   <button
@@ -413,7 +416,6 @@ export default function CatalogPage() {
                 </>
               )}
 
-              {/* Close Button Mobile (Floating over image) */}
               <button
                 onClick={closeModal}
                 className="sm:hidden absolute top-3 right-3 bg-white/90 text-zinc-950 w-8 h-8 rounded-full flex items-center justify-center z-10 shadow-sm"
@@ -448,7 +450,6 @@ export default function CatalogPage() {
               </div>
 
               <div className="flex flex-col gap-1 sm:gap-0 sm:mb-6">
-                {/* Row: Ukuran */}
                 <div className="flex sm:items-start gap-3 py-1 sm:py-2.5 sm:border-b sm:border-gray-100 text-[13px] sm:text-sm">
                   <span className="text-gray-400 font-medium w-16 sm:w-24 shrink-0">
                     Ukuran
@@ -467,7 +468,6 @@ export default function CatalogPage() {
                   </div>
                 </div>
 
-                {/* Row: Warna */}
                 <div className="flex sm:items-start gap-3 py-1 sm:py-2.5 sm:border-b sm:border-gray-100 text-[13px] sm:text-sm">
                   <span className="text-gray-400 font-medium w-16 sm:w-24 shrink-0">
                     Warna
@@ -486,7 +486,6 @@ export default function CatalogPage() {
                   </div>
                 </div>
 
-                {/* Row: Lengan */}
                 <div className="flex sm:items-start gap-3 py-1 sm:py-2.5 sm:border-b sm:border-gray-100 text-[13px] sm:text-sm">
                   <span className="text-gray-400 font-medium w-16 sm:w-24 shrink-0">
                     Lengan
@@ -509,7 +508,7 @@ export default function CatalogPage() {
               <div className="mt-4 sm:mt-auto pt-2">
                 {isActive ? (
                   <Link
-                    href="/po/order"
+                    href={withSlug("/po/order")}
                     className="w-full flex items-center justify-center gap-2 bg-zinc-950 text-white px-5 py-3 sm:py-3.5 rounded-xl font-bold text-sm hover:opacity-80 transition-opacity"
                   >
                     <Pencil size={16} />

@@ -1,38 +1,41 @@
 // lib/po/pricing.ts
+import { POProduct } from "@/types/po";
 
-interface PricingSettings {
+export interface PricingSettings {
   sleeveSurcharge: number;
   xxlSurcharge: number;
 }
 
 /**
- * Hitung harga satuan berdasarkan varian.
- * Dipakai di frontend (preview) DAN saat insert ke DB.
+ * Hitung harga satuan berdasarkan varian dan aturan produk.
  */
 export function calculateItemPrice(
   basePrice: number,
   size: string,
   sleeveType: string,
+  product: POProduct | { enable_sleeve_surcharge?: boolean; enable_xxl_surcharge?: boolean },
   settings: PricingSettings
 ): number {
   let additionalSleeve = 0;
   let additionalSize = 0;
 
-  // Tambahan lengan panjang
-  if (sleeveType.toLowerCase().includes('panjang')) {
+  // Tambahan lengan panjang (jika diaktifkan di produk)
+  if (product.enable_sleeve_surcharge && sleeveType.toLowerCase().includes('panjang')) {
     additionalSleeve = settings.sleeveSurcharge;
   }
 
-  // Tambahan ukuran XXL+
-  const upperSize = size.toUpperCase();
-  if (upperSize.includes('L') && upperSize !== 'L' && upperSize !== 'XL') {
-    const match2 = upperSize.match(/^(\d+)XL$/);
-    if (match2) {
-      const num = parseInt(match2[1], 10);
-      if (num >= 2) additionalSize = settings.xxlSurcharge * (num - 1);
-    } else {
-      const xCount = (upperSize.match(/X/g) || []).length;
-      if (xCount >= 2) additionalSize = settings.xxlSurcharge * (xCount - 1);
+  // Tambahan ukuran XXL+ (jika diaktifkan di produk)
+  if (product.enable_xxl_surcharge) {
+    const upperSize = size.toUpperCase();
+    if (upperSize.includes('L') && upperSize !== 'L' && upperSize !== 'XL') {
+      const match2 = upperSize.match(/^(\d+)XL$/);
+      if (match2) {
+        const num = parseInt(match2[1], 10);
+        if (num >= 2) additionalSize = settings.xxlSurcharge * (num - 1);
+      } else {
+        const xCount = (upperSize.match(/X/g) || []).length;
+        if (xCount >= 2) additionalSize = settings.xxlSurcharge * (xCount - 1);
+      }
     }
   }
 

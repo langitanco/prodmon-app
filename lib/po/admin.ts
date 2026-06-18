@@ -8,9 +8,14 @@ import { POSetting, POProduct, POOrder, POResellerFull } from '@/types/po';
 // SETTING
 // ─────────────────────────────────────────────
 
-export async function getPOSettingAdmin(): Promise<POSetting | null> {
+export async function getPOSettingAdmin() {
   const supabase = createClient();
-  const { data } = await supabase.from('po_setting').select('*').single();
+  const { data, error } = await supabase
+    .from('po_setting')
+    .select('*') // Pastikan menggunakan '*' atau eksplisit memanggil 'url_slug'
+    .single();
+
+  if (error) return null;
   return data;
 }
 
@@ -217,18 +222,31 @@ export async function getPOStats(): Promise<{
   totalPublic: number;
   totalReseller: number;
   totalAmount: number;
+  totalProducts: number;
 }> {
   const supabase = createClient();
   const { data } = await supabase
     .from('po_orders')
     .select('customer_type, total_amount');
 
-  if (!data) return { totalOrders: 0, totalPublic: 0, totalReseller: 0, totalAmount: 0 };
+  if (!data) return { 
+    totalOrders: 0, 
+    totalPublic: 0, 
+    totalReseller: 0, 
+    totalAmount: 0,
+    totalProducts: 0 
+  };
+
+  const { count: totalProducts } = await supabase
+    .from('po_products')
+    .select('*', { count: 'exact', head: true })
+    .eq('is_active', true); // Hitung produk yang aktif saja
 
   return {
     totalOrders: data.length,
     totalPublic: data.filter((o) => o.customer_type === 'PUBLIC').length,
     totalReseller: data.filter((o) => o.customer_type === 'RESELLER').length,
     totalAmount: data.reduce((sum, o) => sum + (o.total_amount || 0), 0),
+    totalProducts: totalProducts || 0,
   };
 }

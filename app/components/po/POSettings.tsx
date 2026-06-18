@@ -16,6 +16,7 @@ import {
   CheckCircle2,
   XCircle,
   Save,
+  Link as LinkIcon,
 } from "lucide-react";
 
 /* ── Reusable field wrapper ──────────────────────────────────────── */
@@ -65,6 +66,7 @@ export default function POSettings() {
   const [form, setForm] = useState({
     is_active: false,
     title: "",
+    url_slug: "",
     periode_mulai: "",
     periode_selesai: "",
     sleeve_surcharge: 0,
@@ -80,7 +82,8 @@ export default function POSettings() {
         setSetting(data);
         setForm({
           is_active: data.is_active,
-          title: data.title,
+          title: data.title || "",
+          url_slug: data.url_slug || "",
           periode_mulai: data.periode_mulai || "",
           periode_selesai: data.periode_selesai || "",
           sleeve_surcharge: data.sleeve_surcharge,
@@ -97,13 +100,16 @@ export default function POSettings() {
   async function handleSave() {
     if (!setting) return;
     setSaving(true);
+
+    // Kirim update sesuai dengan parameter yang diharapkan updatePOSetting
     const result = await updatePOSetting(setting.id, {
       ...form,
-      periode_mulai: form.periode_mulai || null,
-      periode_selesai: form.periode_selesai || null,
-      wa_admin_phone: form.wa_admin_phone || null,
-      bank_account_info: form.bank_account_info || null,
+      periode_mulai: form.periode_mulai || undefined,
+      periode_selesai: form.periode_selesai || undefined,
+      wa_admin_phone: form.wa_admin_phone || undefined,
+      bank_account_info: form.bank_account_info || undefined,
     });
+
     setSaving(false);
     if (result.success) {
       alert("Pengaturan berhasil disimpan.");
@@ -112,7 +118,6 @@ export default function POSettings() {
     }
   }
 
-  /* ── States ───────────────────────────────────────────────────── */
   if (loading) {
     return (
       <div className="flex items-center gap-3 py-8 text-slate-400 dark:text-slate-500">
@@ -131,16 +136,11 @@ export default function POSettings() {
     );
   }
 
-  /* ── Form ─────────────────────────────────────────────────────── */
   return (
     <div className="w-full max-w-4xl mx-auto space-y-5 md:space-y-6 animate-in fade-in duration-200">
       {/* ── Status Toggle ─────────────────────────────────────────── */}
       <div
-        className={`flex items-center justify-between gap-4 rounded-2xl border-2 p-5 transition-colors ${
-          form.is_active
-            ? "border-emerald-200 dark:border-emerald-900/50 bg-emerald-50/50 dark:bg-emerald-950/20"
-            : "border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/30"
-        }`}
+        className={`flex items-center justify-between gap-4 rounded-2xl border-2 p-5 transition-colors ${form.is_active ? "border-emerald-200 dark:border-emerald-900/50 bg-emerald-50/50 dark:bg-emerald-950/20" : "border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/30"}`}
       >
         <div className="flex items-center gap-3">
           {form.is_active ? (
@@ -162,7 +162,6 @@ export default function POSettings() {
             </p>
           </div>
         </div>
-
         <button
           onClick={() => setForm({ ...form, is_active: !form.is_active })}
           className="flex-shrink-0 transition-colors"
@@ -179,18 +178,43 @@ export default function POSettings() {
         </button>
       </div>
 
-      {/* ── Informasi Kampanye ─────────────────────────────────────── */}
       <SectionHeading>Informasi Kampanye</SectionHeading>
-
-      <Field label="Judul PO" icon={Tag}>
-        <input
-          type="text"
-          value={form.title}
-          onChange={(e) => setForm({ ...form, title: e.target.value })}
-          placeholder="PO Kaos Langitan Vol. 1"
-          className={INPUT}
-        />
-      </Field>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 md:gap-5">
+        <Field label="Judul PO" icon={Tag}>
+          <input
+            type="text"
+            value={form.title}
+            onChange={(e) => setForm({ ...form, title: e.target.value })}
+            placeholder="PO Kaos Langitan Vol. 1"
+            className={INPUT}
+          />
+        </Field>
+        <Field
+          label="Nama Link Katalog"
+          icon={LinkIcon}
+          hint="Contoh hasil: website.com/po/katalog-merch"
+        >
+          <div className="flex items-center">
+            <span className="px-3 py-2.5 bg-slate-100 dark:bg-slate-800/80 border border-r-0 border-slate-200 dark:border-slate-700 rounded-l-xl text-slate-500 text-sm font-mono">
+              /po/
+            </span>
+            <input
+              type="text"
+              value={form.url_slug}
+              onChange={(e) =>
+                setForm({
+                  ...form,
+                  url_slug: e.target.value
+                    .toLowerCase()
+                    .replace(/[^a-z0-9-]/g, "-"),
+                })
+              }
+              className={INPUT + " rounded-l-none"}
+              placeholder="katalog-merch"
+            />
+          </div>
+        </Field>
+      </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 md:gap-5">
         <Field label="Tanggal Mulai" icon={CalendarDays}>
@@ -215,18 +239,14 @@ export default function POSettings() {
         </Field>
       </div>
 
-      {/* ── Harga Tambahan ────────────────────────────────────────── */}
       <SectionHeading>Harga Tambahan</SectionHeading>
-
       <div className="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-5">
         <Field
           label="Tambahan Lengan Panjang (Rp)"
           icon={CirclePlus}
           hint={
             form.sleeve_surcharge > 0
-              ? `+${formatRupiah(
-                  form.sleeve_surcharge,
-                )} untuk pilihan lengan panjang`
+              ? `+${formatRupiah(form.sleeve_surcharge)} untuk pilihan lengan panjang`
               : undefined
           }
         >
@@ -239,16 +259,14 @@ export default function POSettings() {
             className={INPUT}
           />
         </Field>
-
         <Field
           label="Tambahan per Tingkat XXL (Rp)"
           icon={CirclePlus}
           hint={
             form.xxl_surcharge > 0 ? (
               <span>
-                2XL +{formatRupiah(form.xxl_surcharge)}&nbsp;&nbsp;·&nbsp;&nbsp;
-                3XL +{formatRupiah(form.xxl_surcharge * 2)}
-                &nbsp;&nbsp;·&nbsp;&nbsp;dst.
+                2XL +{formatRupiah(form.xxl_surcharge)}&nbsp;·&nbsp;3XL +
+                {formatRupiah(form.xxl_surcharge * 2)}&nbsp;dst.
               </span>
             ) : undefined
           }
@@ -264,14 +282,12 @@ export default function POSettings() {
         </Field>
       </div>
 
-      {/* ── Kontak & Pembayaran ───────────────────────────────────── */}
       <SectionHeading>Kontak &amp; Pembayaran</SectionHeading>
-
       <div className="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-5">
         <Field
           label="No. WhatsApp Admin"
           icon={Phone}
-          hint="Awali dengan 62, bukan 0. Contoh: 628123456789"
+          hint="Awali dengan 62, bukan 0."
         >
           <input
             type="text"
@@ -283,7 +299,6 @@ export default function POSettings() {
             className={INPUT}
           />
         </Field>
-
         <Field label="Info Rekening Transfer" icon={Landmark}>
           <textarea
             value={form.bank_account_info}
@@ -297,21 +312,17 @@ export default function POSettings() {
         </Field>
       </div>
 
-      {/* ── Save ─────────────────────────────────────────────────── */}
       <button
         onClick={handleSave}
         disabled={saving}
         className="w-full flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white py-3 rounded-xl font-bold text-sm disabled:opacity-40 transition-colors md:w-auto md:px-8 md:ml-auto"
       >
-        <Save size={14} />
-        {saving ? "Menyimpan..." : "Simpan Semua Pengaturan"}
+        <Save size={14} /> {saving ? "Menyimpan..." : "Simpan Semua Pengaturan"}
       </button>
 
-      {/* Timestamp */}
       <div className="flex items-center justify-center gap-1.5 text-xs text-slate-400 dark:text-slate-500 md:justify-end">
-        <Clock size={11} />
-        Terakhir diperbarui:{" "}
-        {new Date(setting.updated_at).toLocaleString("id-ID")}
+        <Clock size={11} /> Terakhir diperbarui:{" "}
+        {new Date(setting.updated_at || new Date()).toLocaleString("id-ID")}
       </div>
     </div>
   );
