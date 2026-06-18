@@ -1,9 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, Suspense } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-// Sesuaikan path import submitOrder dengan lokasi file Anda (bisa dari '@/lib/po/supabase' atau '@/lib/po/admin')
 import {
   getPOSettingAdmin,
   getAllPOProducts,
@@ -38,24 +37,22 @@ type CartItem = {
   subtotal: number;
 };
 
-export default function OrderFormPage() {
+// ── Komponen utama dipisah agar useSearchParams bisa dibungkus Suspense ──
+function OrderFormContent() {
   const searchParams = useSearchParams();
   const slug = searchParams.get("slug");
 
-  // Helper: tombol "Katalog" kembali ke slug yang sama (kalau ada), fallback ke /po
   const katalogHref = slug ? `/po/${slug}` : "/po";
 
   const [setting, setSetting] = useState<POSetting | null>(null);
   const [products, setProducts] = useState<POProduct[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // Form Data
   const [nama, setNama] = useState("");
   const [whatsapp, setWhatsapp] = useState("");
   const [metodeKirim, setMetodeKirim] = useState("Diambil");
   const [alamat, setAlamat] = useState("");
 
-  // Product Selection
   const [selectedProductId, setSelectedProductId] = useState<string>("");
   const [varian, setVarian] = useState({
     ukuran: "-",
@@ -64,7 +61,6 @@ export default function OrderFormPage() {
   });
   const [qty, setQty] = useState<number | "">(0);
 
-  // Cart & Submission
   const [cart, setCart] = useState<CartItem[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const [successData, setSuccessData] = useState<{
@@ -72,7 +68,6 @@ export default function OrderFormPage() {
     total: number;
   } | null>(null);
 
-  // Copy State
   const [copied, setCopied] = useState(false);
 
   useEffect(() => {
@@ -88,7 +83,6 @@ export default function OrderFormPage() {
 
   const selectedProduct = products.find((p) => p.id === selectedProductId);
 
-  /* ── HARGA CALCULATION ── */
   const hitungHarga = () => {
     if (!selectedProduct || !setting)
       return { dasar: 0, lengan: 0, size: 0, final: 0 };
@@ -97,12 +91,10 @@ export default function OrderFormPage() {
     let lengan = 0;
     let size = 0;
 
-    // Surcharge lengan
     if (varian.lengan.toLowerCase().includes("panjang")) {
       lengan = setting.sleeve_surcharge || 0;
     }
 
-    // Surcharge ukuran (XXL, 3XL, dst)
     const uk = varian.ukuran.toUpperCase();
     if (uk.includes("L") && uk !== "L" && uk !== "XL") {
       let multiplier = 0;
@@ -123,7 +115,6 @@ export default function OrderFormPage() {
   const validQty = typeof qty === "number" ? qty : 0;
   const grandTotal = cart.reduce((sum, item) => sum + item.subtotal, 0);
 
-  /* ── HANDLERS ── */
   const handleProductChange = (id: string) => {
     setSelectedProductId(id);
     const prod = products.find((p) => p.id === id);
@@ -160,7 +151,6 @@ export default function OrderFormPage() {
     setCart(cart.filter((_, i) => i !== index));
   };
 
-  /* ── SUBMIT KE SUPABASE ── */
   const submitOrderHandler = async () => {
     if (!nama || !whatsapp) {
       alert("Mohon lengkapi Nama dan No. WhatsApp.");
@@ -177,7 +167,6 @@ export default function OrderFormPage() {
 
     setSubmitting(true);
 
-    // Siapkan Payload sesuai definisi POOrderPayload
     const payload = {
       customer_type: "PUBLIC" as const,
       customer_name: nama,
@@ -197,7 +186,6 @@ export default function OrderFormPage() {
     };
 
     try {
-      // Panggil fungsi submitOrder yang akan menyimpan data dan memanggil RPC generate_po_number
       const result = await submitOrder(payload, setting!, products);
 
       if (!result.success) {
@@ -207,7 +195,6 @@ export default function OrderFormPage() {
       }
 
       setSubmitting(false);
-      // Tampilkan kode PO yang dikembalikan oleh database
       setSuccessData({
         kodePO: result.po_number || "ERROR",
         total: grandTotal,
@@ -227,7 +214,6 @@ export default function OrderFormPage() {
     setTimeout(() => setCopied(false), 2000);
   };
 
-  /* ── RENDER WHATSAPP URL ── */
   const getWhatsAppLink = () => {
     if (!successData || !setting) return "#";
 
@@ -254,7 +240,6 @@ ${daftarBarang}
 
 Mohon info langkah pembayarannya.`;
 
-    // Pastikan nomor diawali '62' dan hapus karakter non-angka
     const waNumber =
       setting.wa_admin_phone?.replace(/\D/g, "") || "628123456789";
     return `https://wa.me/${waNumber}?text=${encodeURIComponent(text)}`;
@@ -373,7 +358,6 @@ Mohon info langkah pembayarannya.`;
       ) : (
         /* ========================== FORM STATE ========================== */
         <div className="animate-in fade-in duration-300">
-          {/* Hero Mini */}
           <div className="bg-zinc-950 text-white px-5 md:px-10 py-8 md:py-12 relative overflow-hidden">
             <div
               className="absolute inset-0 pointer-events-none opacity-80"
@@ -397,7 +381,6 @@ Mohon info langkah pembayarannya.`;
             </div>
           </div>
 
-          {/* Steps Indicator */}
           <div className="bg-white border-b border-gray-200 px-5 md:px-10">
             <div className="max-w-2xl mx-auto flex items-center py-3.5">
               <div className="flex items-center gap-2 text-[13px] font-semibold text-zinc-950 shrink-0">
@@ -443,7 +426,6 @@ Mohon info langkah pembayarannya.`;
             </div>
           </div>
 
-          {/* Form Wrap */}
           <div className="max-w-2xl mx-auto px-5 py-8 md:py-12">
             {/* CARD 1: Data Diri */}
             <div className="bg-white border border-gray-200 rounded-xl md:rounded-2xl p-5 md:p-7 mb-4">
@@ -745,5 +727,20 @@ Mohon info langkah pembayarannya.`;
         </div>
       )}
     </div>
+  );
+}
+
+// ── Export default: bungkus dengan Suspense ──
+export default function OrderFormPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen bg-stone-100 flex items-center justify-center">
+          <Loader2 className="animate-spin text-zinc-400" size={32} />
+        </div>
+      }
+    >
+      <OrderFormContent />
+    </Suspense>
   );
 }
