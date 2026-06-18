@@ -1,16 +1,14 @@
-// app/po/reseller/page.tsx
 "use client";
 
-import { useState } from "react";
+import { Suspense, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { loginReseller } from "@/lib/po/supabase";
 
-export default function ResellerLoginPage() {
+function ResellerLoginContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const slug = searchParams.get("slug");
 
-  // Tombol "Kembali ke Katalog" kembali ke slug yang sama (kalau ada)
   const katalogHref = slug ? `/po/${slug}` : "/po";
 
   const [kode, setKode] = useState("");
@@ -35,7 +33,6 @@ export default function ResellerLoginPage() {
     }
 
     sessionStorage.setItem("po_reseller", JSON.stringify(result.reseller));
-    // Bawa slug ke portal reseller supaya konsisten dengan event/link asal
     router.push(
       slug ? `/po/reseller/portal?slug=${slug}` : "/po/reseller/portal",
     );
@@ -43,7 +40,6 @@ export default function ResellerLoginPage() {
 
   return (
     <div className="min-h-screen bg-[#f5f5f4] text-[#0e0e0e] font-sans flex flex-col">
-      {/* Header */}
       <header className="bg-white border-b border-[#e5e7eb] px-4 md:px-12 h-[58px] flex items-center justify-between sticky top-0 z-50">
         <div className="text-[15px] font-extrabold tracking-tight flex items-center gap-2">
           Portal Reseller
@@ -56,7 +52,6 @@ export default function ResellerLoginPage() {
         </a>
       </header>
 
-      {/* Hero Mini */}
       <div className="bg-[#0e0e0e] text-white px-4 py-8 md:py-11 md:px-12 relative overflow-hidden">
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_80%_50%,_#1f2937_0%,_transparent_55%)] pointer-events-none"></div>
         <div className="relative z-10 max-w-[600px] mx-auto md:mx-0">
@@ -74,7 +69,6 @@ export default function ResellerLoginPage() {
         </div>
       </div>
 
-      {/* Form Login */}
       <div className="max-w-[420px] w-full mx-auto mt-9 px-4 pb-20 flex-1">
         <div className="bg-white border border-[#e5e7eb] rounded-[12px] overflow-hidden">
           <div className="p-4 md:p-5">
@@ -138,5 +132,13 @@ export default function ResellerLoginPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function ResellerLoginPage() {
+  return (
+    <Suspense fallback={null}>
+      <ResellerLoginContent />
+    </Suspense>
   );
 }
