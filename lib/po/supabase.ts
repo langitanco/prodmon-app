@@ -61,8 +61,9 @@ export async function submitOrder(
 
   // Hitung ulang total (validasi harga dari server)
   const pricingSettings = {
-    sleeveSurcharge: setting.sleeve_surcharge,
-    xxlSurcharge: setting.xxl_surcharge,
+    sleeveSurcharge: setting.sleeve_surcharge ?? 0,
+    xxlSurcharge: setting.xxl_surcharge ?? 0,
+    sweaterXxlSurcharge: setting.sweater_xxl_surcharge ?? 0,  // ← tambah ini
   };
 
   let totalAmount = 0;

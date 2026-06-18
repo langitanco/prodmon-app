@@ -3,17 +3,15 @@
 export interface POSetting {
   id: string;
   penyelenggara_po: string;
-  title?: string;              // <-- TAMBAHKAN INI
+  title?: string;
   bank_account_info?: string;
   wa_admin_phone: string;
   sleeve_surcharge: number;
   xxl_surcharge: number;
+  sweater_xxl_surcharge: number;   // ← pastikan ini ADA (bukan optional)
   is_active: boolean;
-  
-  // TAMBAHKAN 2 BARIS INI:
   periode_mulai?: string;
   periode_selesai?: string;
-  
   created_at?: string;
   updated_at?: string;
   url_slug?: string;
@@ -31,11 +29,9 @@ export interface POProduct {
   description?: string;
   is_active: boolean;
   sort_order: number;
-  
-  // DUA BARIS INI WAJIB ADA:
-  enable_sleeve_surcharge?: boolean;
-  enable_xxl_surcharge?: boolean;
-  
+  enable_sleeve_surcharge: boolean;        // ← hapus ? (non-optional)
+  enable_xxl_surcharge: boolean;           // ← hapus ? (non-optional)
+  enable_sweater_xxl_surcharge: boolean;   // ← hapus ? dan pastikan ada
   created_at?: string;
   updated_at?: string;
 }
