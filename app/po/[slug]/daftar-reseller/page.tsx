@@ -188,12 +188,18 @@ export default function DaftarResellerPage({ slug }: Props) {
               <input
                 type="text"
                 value={form.panggilan}
-                onChange={(e) =>
-                  setForm({ ...form, panggilan: e.target.value })
-                }
-                placeholder="Username login"
-                className="w-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3.5 py-2.5 text-sm text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400 transition-all"
+                onChange={(e) => {
+                  // PERBAIKAN: Otomatis huruf besar & hilangkan spasi
+                  const value = e.target.value.toUpperCase().replace(/\s/g, "");
+                  setForm({ ...form, panggilan: value });
+                }}
+                placeholder="USERNAME" // placeholder diubah agar relevan
+                className="w-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3.5 py-2.5 text-sm font-mono text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400 transition-all"
               />
+              {/* Tambahan hint agar user lebih paham */}
+              <p className="text-[10px] text-slate-400 mt-1.5 leading-relaxed">
+                Tanpa spasi. Dipakai sebagai username login.
+              </p>
             </div>
           </div>
 

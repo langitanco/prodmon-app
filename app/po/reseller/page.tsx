@@ -88,7 +88,7 @@ function ResellerLoginContent() {
             <div className="space-y-3.5">
               <div>
                 <label className="block text-[12.5px] font-bold text-[#0e0e0e] mb-1.5">
-                  Kode Reseller
+                  Username
                 </label>
                 <input
                   type="text"
@@ -98,7 +98,7 @@ function ResellerLoginContent() {
                     e.key === "Enter" &&
                     document.getElementById("pin-input")?.focus()
                   }
-                  placeholder="Contoh: RES-001"
+                  placeholder="Username Anda"
                   className="w-full px-3 py-2.5 border border-[#e5e7eb] rounded-[8px] text-[14px] text-[#0e0e0e] outline-none focus:border-[#0e0e0e] focus:shadow-[0_0_0_3px_rgba(14,14,14,0.07)] transition-all bg-white uppercase"
                 />
               </div>
