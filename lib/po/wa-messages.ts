@@ -39,11 +39,11 @@ export function buildRegistrationMessage(data: {
 Assalamu'alaikum Admin Langitan.co,
 Saya ingin mengajukan diri sebagai reseller dengan data berikut:
 
-👤 *Nama:* ${data.nama}
-🏷 *Username:* ${data.panggilan}
-📱 *WhatsApp:* ${data.whatsapp}
-📍 *Alamat:* ${data.alamat}
-🔑 *PIN:* ${data.pin}
+> *Nama:* ${data.nama}
+> *Username:* ${data.panggilan}
+> *WhatsApp:* ${data.whatsapp}
+> *Alamat:* ${data.alamat}
+> *PIN:* ${data.pin}
 
 Mohon bantuannya untuk proses aktivasi akun. Terima kasih.
 _Wassalamu'alaikum._`;
@@ -64,10 +64,10 @@ Selamat! Pendaftaran Anda telah kami setujui. Sekarang Anda sudah bisa mengakses
 🔗 ${portalUrl}
 
 *Detail Akun Anda:*
-👤 Username: ${reseller.kode}
-🔑 PIN: ${reseller.pin_hash}
+> Username: ${reseller.kode}
+> PIN: ${reseller.pin_hash}
 
-⚠️ *Penting:* Mohon pelajari dan patuhi syarat & ketentuan yang berlaku demi kenyamanan bersama.
+> *Penting:* Mohon pelajari dan patuhi syarat & ketentuan yang berlaku demi kenyamanan bersama.
 
 Terima kasih,
 *Langitan.co*`;
@@ -82,5 +82,5 @@ export const SYARAT_DAN_KETENTUAN = [
   'Tidak diperkenankan untuk menjual dengan harga lebih tinggi atau lebih rendah dari harga tertera',
   'Segala pengiriman dan packing ditanggung oleh reseller',
   'Apabila dikehendaki pengiriman dan packing dari distributor (Langitan.co), maka akan dikenai admin pengiriman dan packing sebesar 5.000',
-  'Dilarang me redesign ulang poster yang sudah diberikan dengan desain sendiri',
+  'Dilarang meredesign ulang poster yang sudah diberikan dengan desain sendiri',
 ];
