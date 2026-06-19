@@ -7,6 +7,8 @@ import {
   updateReseller,
   toggleResellerActive,
   deleteReseller,
+  confirmReseller,
+  getPOSettingAdmin,
 } from "@/lib/po/admin";
 import { POResellerFull } from "@/types/po";
 import {
@@ -22,7 +24,10 @@ import {
   Hash,
   Lock,
   Store,
+  Clock,
+  MessageCircleMore,
 } from "lucide-react";
+import { buildConfirmationMessage, buildWaLink } from "@/lib/po/wa-messages";
 
 const EMPTY_FORM = { kode: "", pin_hash: "", nama: "", whatsapp: "", kota: "" };
 
@@ -34,8 +39,16 @@ export default function POResellerList() {
   const [form, setForm] = useState(EMPTY_FORM);
   const [saving, setSaving] = useState(false);
 
+  // ── State baru untuk tab & konfirmasi ──────────────────────────
+  const [tab, setTab] = useState<"aktif" | "pending">("aktif");
+  const [urlSlug, setUrlSlug] = useState<string>("");
+  const [confirmingId, setConfirmingId] = useState<string | null>(null);
+
   useEffect(() => {
     load();
+    getPOSettingAdmin().then((s) => {
+      if (s?.url_slug) setUrlSlug(s.url_slug);
+    });
   }, []);
 
   async function load() {
@@ -109,6 +122,35 @@ export default function POResellerList() {
     await deleteReseller(id);
     setResellers((prev) => prev.filter((r) => r.id !== id));
   }
+
+  // ── Konfirmasi pendaftar pending ──────────────────────────────
+  async function handleConfirm(r: POResellerFull) {
+    setConfirmingId(r.id);
+
+    const portalUrl = urlSlug
+      ? `${window.location.origin}/po/reseller`
+      : window.location.origin;
+
+    const message = buildConfirmationMessage(r, portalUrl);
+    const waLink = buildWaLink(r.whatsapp || "", message);
+
+    await confirmReseller(r.id);
+
+    setResellers((prev) =>
+      prev.map((x) =>
+        x.id === r.id ? { ...x, status: "confirmed", is_active: true } : x,
+      ),
+    );
+    setConfirmingId(null);
+
+    window.open(waLink, "_blank");
+  }
+
+  // ── Filter berdasarkan tab aktif ──────────────────────────────
+  const filteredResellers = resellers.filter((r) =>
+    tab === "pending" ? r.status === "pending" : r.status !== "pending",
+  );
+  const pendingCount = resellers.filter((r) => r.status === "pending").length;
 
   /* ── Loading ──────────────────────────────────────────────────── */
   if (loading) {
@@ -186,7 +228,7 @@ export default function POResellerList() {
             />
           </div>
 
-          {/* Nama (Full width on Desktop) */}
+          {/* Nama */}
           <div className="md:col-span-2">
             <label className="flex items-center gap-1.5 text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide mb-1.5">
               <Store size={11} />
@@ -260,33 +302,71 @@ export default function POResellerList() {
   /* ── List ─────────────────────────────────────────────────────── */
   return (
     <div className="w-full max-w-5xl mx-auto space-y-4 animate-in fade-in duration-200">
+      {/* Tab switcher */}
+      <div className="flex gap-1.5 p-1 bg-slate-100 dark:bg-slate-800/60 rounded-xl w-fit">
+        <button
+          onClick={() => setTab("aktif")}
+          className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-colors ${
+            tab === "aktif"
+              ? "bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-sm"
+              : "text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200"
+          }`}
+        >
+          Reseller Aktif
+        </button>
+        <button
+          onClick={() => setTab("pending")}
+          className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-bold transition-colors ${
+            tab === "pending"
+              ? "bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-sm"
+              : "text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200"
+          }`}
+        >
+          Pendaftar Baru
+          {pendingCount > 0 && (
+            <span className="bg-amber-500 text-white text-[10px] font-extrabold w-5 h-5 flex items-center justify-center rounded-full leading-none">
+              {pendingCount}
+            </span>
+          )}
+        </button>
+      </div>
+
       {/* Header */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
         <div className="flex items-center gap-2">
           <span className="text-sm font-semibold text-slate-500 dark:text-slate-400">
-            {resellers.length} reseller terdaftar
+            {filteredResellers.length}{" "}
+            {tab === "pending" ? "pendaftar menunggu" : "reseller terdaftar"}
           </span>
         </div>
-        <button
-          onClick={openCreate}
-          className="w-full sm:w-auto flex justify-center items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold px-4 py-2 rounded-xl transition-colors"
-        >
-          <Plus size={14} />
-          Tambah Reseller
-        </button>
+        {tab === "aktif" && (
+          <button
+            onClick={openCreate}
+            className="w-full sm:w-auto flex justify-center items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold px-4 py-2 rounded-xl transition-colors"
+          >
+            <Plus size={14} />
+            Tambah Reseller
+          </button>
+        )}
       </div>
 
       {/* Empty state */}
-      {resellers.length === 0 ? (
+      {filteredResellers.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-16 gap-3 text-slate-400 dark:text-slate-600">
           <Users size={32} strokeWidth={1.5} />
-          <p className="text-sm font-medium">Belum ada reseller.</p>
-          <button
-            onClick={openCreate}
-            className="text-sm text-blue-600 dark:text-blue-400 font-semibold hover:underline"
-          >
-            Tambah reseller pertama
-          </button>
+          <p className="text-sm font-medium">
+            {tab === "pending"
+              ? "Tidak ada pendaftar baru."
+              : "Belum ada reseller."}
+          </p>
+          {tab === "aktif" && (
+            <button
+              onClick={openCreate}
+              className="text-sm text-blue-600 dark:text-blue-400 font-semibold hover:underline"
+            >
+              Tambah reseller pertama
+            </button>
+          )}
         </div>
       ) : (
         <div className="border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden overflow-x-auto">
@@ -294,13 +374,13 @@ export default function POResellerList() {
             <thead>
               <tr className="bg-slate-50 dark:bg-slate-800/50 border-b border-slate-200 dark:border-slate-800">
                 <th className="text-left px-4 py-3 text-[10px] font-extrabold uppercase tracking-[0.12em] text-slate-400 dark:text-slate-500">
-                  Kode
+                  {tab === "pending" ? "Username" : "Kode"}
                 </th>
                 <th className="text-left px-4 py-3 text-[10px] font-extrabold uppercase tracking-[0.12em] text-slate-400 dark:text-slate-500">
-                  Reseller
+                  {tab === "pending" ? "Nama Lengkap" : "Reseller"}
                 </th>
                 <th className="text-left px-4 py-3 text-[10px] font-extrabold uppercase tracking-[0.12em] text-slate-400 dark:text-slate-500 hidden md:table-cell">
-                  Kota
+                  {tab === "pending" ? "Alamat" : "Kota"}
                 </th>
                 <th className="text-center px-4 py-3 text-[10px] font-extrabold uppercase tracking-[0.12em] text-slate-400 dark:text-slate-500">
                   Status
@@ -309,14 +389,14 @@ export default function POResellerList() {
               </tr>
             </thead>
             <tbody>
-              {resellers.map((r) => (
+              {filteredResellers.map((r) => (
                 <tr
                   key={r.id}
                   className={`border-b border-slate-100 dark:border-slate-800 last:border-b-0 transition-opacity ${
-                    !r.is_active ? "opacity-50" : ""
+                    !r.is_active && r.status !== "pending" ? "opacity-50" : ""
                   }`}
                 >
-                  {/* Kode */}
+                  {/* Kode / Username */}
                   <td className="px-4 py-3.5">
                     <span className="font-mono font-bold text-xs bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 px-2 py-0.5 rounded-lg">
                       {r.kode}
@@ -336,9 +416,19 @@ export default function POResellerList() {
                     )}
                   </td>
 
-                  {/* Kota */}
+                  {/* Kota / Alamat */}
                   <td className="px-4 py-3.5 hidden md:table-cell">
-                    {r.kota ? (
+                    {tab === "pending" ? (
+                      r.alamat ? (
+                        <span className="text-sm text-slate-500 dark:text-slate-400 line-clamp-2">
+                          {r.alamat}
+                        </span>
+                      ) : (
+                        <span className="text-slate-300 dark:text-slate-600">
+                          —
+                        </span>
+                      )
+                    ) : r.kota ? (
                       <span className="flex items-center gap-1 text-sm text-slate-500 dark:text-slate-400">
                         <MapPin size={11} />
                         {r.kota}
@@ -352,50 +442,81 @@ export default function POResellerList() {
 
                   {/* Status */}
                   <td className="px-4 py-3.5 text-center">
-                    <span
-                      className={`inline-flex items-center gap-1 text-xs font-bold px-2.5 py-1 rounded-lg ${
-                        r.is_active
-                          ? "bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400"
-                          : "bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-500"
-                      }`}
-                    >
-                      {r.is_active ? (
-                        <UserCheck size={11} />
-                      ) : (
-                        <UserX size={11} />
-                      )}
-                      {r.is_active ? "Aktif" : "Nonaktif"}
-                    </span>
+                    {r.status === "pending" ? (
+                      <span className="inline-flex items-center gap-1 text-xs font-bold px-2.5 py-1 rounded-lg bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-400">
+                        <Clock size={11} />
+                        Menunggu
+                      </span>
+                    ) : (
+                      <span
+                        className={`inline-flex items-center gap-1 text-xs font-bold px-2.5 py-1 rounded-lg ${
+                          r.is_active
+                            ? "bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400"
+                            : "bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-500"
+                        }`}
+                      >
+                        {r.is_active ? (
+                          <UserCheck size={11} />
+                        ) : (
+                          <UserX size={11} />
+                        )}
+                        {r.is_active ? "Aktif" : "Nonaktif"}
+                      </span>
+                    )}
                   </td>
 
                   {/* Actions */}
                   <td className="px-4 py-3.5">
                     <div className="flex gap-1 justify-end">
-                      <button
-                        onClick={() => handleToggle(r.id, r.is_active)}
-                        title={r.is_active ? "Nonaktifkan" : "Aktifkan"}
-                        className="p-1.5 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
-                      >
-                        {r.is_active ? (
-                          <UserX size={13} />
-                        ) : (
-                          <UserCheck size={13} />
-                        )}
-                      </button>
-                      <button
-                        onClick={() => openEdit(r)}
-                        title="Edit"
-                        className="p-1.5 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
-                      >
-                        <Pencil size={13} />
-                      </button>
-                      <button
-                        onClick={() => handleDelete(r.id, r.nama)}
-                        title="Hapus"
-                        className="p-1.5 border border-red-200 dark:border-red-900/50 rounded-lg text-red-400 hover:text-red-600 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors"
-                      >
-                        <Trash2 size={13} />
-                      </button>
+                      {r.status === "pending" ? (
+                        <>
+                          <button
+                            onClick={() => handleConfirm(r)}
+                            disabled={confirmingId === r.id}
+                            className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white text-xs font-bold rounded-lg transition-colors"
+                          >
+                            <MessageCircleMore size={12} />
+                            {confirmingId === r.id
+                              ? "Memproses..."
+                              : "Konfirmasi WA"}
+                          </button>
+                          <button
+                            onClick={() => handleDelete(r.id, r.nama)}
+                            title="Tolak pendaftaran"
+                            className="p-1.5 border border-red-200 dark:border-red-900/50 rounded-lg text-red-400 hover:text-red-600 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors"
+                          >
+                            <Trash2 size={13} />
+                          </button>
+                        </>
+                      ) : (
+                        <>
+                          <button
+                            onClick={() => handleToggle(r.id, r.is_active)}
+                            title={r.is_active ? "Nonaktifkan" : "Aktifkan"}
+                            className="p-1.5 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
+                          >
+                            {r.is_active ? (
+                              <UserX size={13} />
+                            ) : (
+                              <UserCheck size={13} />
+                            )}
+                          </button>
+                          <button
+                            onClick={() => openEdit(r)}
+                            title="Edit"
+                            className="p-1.5 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
+                          >
+                            <Pencil size={13} />
+                          </button>
+                          <button
+                            onClick={() => handleDelete(r.id, r.nama)}
+                            title="Hapus"
+                            className="p-1.5 border border-red-200 dark:border-red-900/50 rounded-lg text-red-400 hover:text-red-600 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors"
+                          >
+                            <Trash2 size={13} />
+                          </button>
+                        </>
+                      )}
                     </div>
                   </td>
                 </tr>

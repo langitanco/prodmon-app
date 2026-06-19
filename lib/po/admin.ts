@@ -96,6 +96,28 @@ export async function getAllResellers(): Promise<POResellerFull[]> {
   return data || [];
 }
 
+export async function getPendingResellers(): Promise<POResellerFull[]> {
+  const supabase = createClient();
+  const { data } = await supabase
+    .from('po_resellers')
+    .select('*')
+    .eq('status', 'pending')
+    .order('created_at', { ascending: false });
+  return data || [];
+}
+ 
+export async function confirmReseller(
+  id: string
+): Promise<{ success: boolean; error?: string }> {
+  const supabase = createClient();
+  const { error } = await supabase
+    .from('po_resellers')
+    .update({ status: 'confirmed', is_active: true })
+    .eq('id', id);
+  if (error) return { success: false, error: error.message };
+  return { success: true };
+}
+
 export async function createReseller(
   reseller: { kode: string; pin_hash: string; nama: string; whatsapp?: string; kota?: string }
 ): Promise<{ success: boolean; error?: string }> {

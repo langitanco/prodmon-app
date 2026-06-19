@@ -106,6 +106,8 @@ export interface POResellerFull {
   kota: string | null;
   is_active: boolean;
   created_at: string;
+  alamat: string | null;
+  status: 'pending' | 'confirmed';
 }
 
 export interface POProductFull extends POProduct {
