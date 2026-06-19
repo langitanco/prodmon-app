@@ -82,7 +82,7 @@ export function OrderCart({
       {/* Catatan Pengiriman */}
       <div className="bg-white border border-[#e5e7eb] rounded-[12px] p-[14px] md:p-[20px]">
         <div className="text-[11px] font-bold tracking-[0.1em] uppercase text-[#9ca3af] mb-[14px]">
-          Catatan Pengiriman
+          Catatan Pesanan
         </div>
         <textarea
           value={catatan}
@@ -156,13 +156,6 @@ export function OrderCart({
             ? "Simpan Perubahan"
             : "Kirim Semua Pesanan"}
       </button>
-
-      <a
-        href={katalogHref}
-        className="w-full flex items-center justify-center text-[#9ca3af] hover:text-[#0e0e0e] py-1 text-[12.8px] font-semibold transition-colors"
-      >
-        ← Kembali ke Katalog
-      </a>
     </div>
   );
 }

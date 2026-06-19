@@ -47,12 +47,6 @@ function ResellerLoginContent() {
         <div className="text-[15px] font-extrabold tracking-tight flex items-center gap-2">
           Portal Reseller
         </div>
-        <a
-          href={katalogHref}
-          className="text-[12.5px] text-[#9ca3af] hover:text-[#0e0e0e] font-semibold transition-colors"
-        >
-          Kembali ke Katalog
-        </a>
       </header>
 
       <div className="bg-[#0e0e0e] text-white px-4 py-8 md:py-11 md:px-12 relative overflow-hidden">
@@ -67,7 +61,8 @@ function ResellerLoginContent() {
             <em className="not-italic text-white/40">Reseller</em>
           </h1>
           <p className="text-[13.6px] text-white/55">
-            Masuk dengan kode dan PIN reseller Anda untuk mulai input pesanan.
+            Masuk dengan Username dan PIN/sandi reseller Anda untuk mulai input
+            pesanan.
           </p>
         </div>
       </div>
@@ -104,7 +99,7 @@ function ResellerLoginContent() {
               </div>
               <div>
                 <label className="block text-[12.5px] font-bold text-[#0e0e0e] mb-1.5">
-                  PIN
+                  PIN/Sandi
                 </label>
                 <input
                   id="pin-input"
@@ -112,7 +107,7 @@ function ResellerLoginContent() {
                   value={pin}
                   onChange={(e) => setPin(e.target.value)}
                   onKeyDown={(e) => e.key === "Enter" && handleLogin()}
-                  placeholder="Masukkan PIN Anda"
+                  placeholder="Masukkan PIN/Sandi Anda"
                   className="w-full px-3 py-2.5 border border-[#e5e7eb] rounded-[8px] text-[14px] text-[#0e0e0e] outline-none focus:border-[#0e0e0e] focus:shadow-[0_0_0_3px_rgba(14,14,14,0.07)] transition-all bg-white tracking-widest"
                 />
               </div>

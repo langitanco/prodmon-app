@@ -189,14 +189,14 @@ export function EditOrderModal({
           {/* ── Catatan ── */}
           <div>
             <label className="block text-[12px] font-bold text-[#4b5563] mb-[6px] uppercase tracking-[0.06em]">
-              Catatan Pengiriman
+              Catatan Pesanan
             </label>
             <textarea
               value={catatan}
               onChange={(e) => onCatatanChange(e.target.value)}
               rows={2}
               placeholder="Opsional: alamat atau instruksi khusus..."
-              className="w-full px-[12px] py-[9px] border border-[#e5e7eb] rounded-[8px] text-[13.6px] outline-none focus:border-[#0e0e0e] focus:shadow-[0_0_0_3px_rgba(14,14,14,0.07)] transition-all resize-none"
+              className="w-full px-[12px] py-[9px] border border-[#e5e7eb] rounded-[8px] text-[13.6px] text-[#111827] bg-[#f9fafb] outline-none focus:border-[#0e0e0e] focus:shadow-[0_0_0_3px_rgba(14,14,14,0.07)] transition-all resize-none"
             />
           </div>
 

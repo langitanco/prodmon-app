@@ -16,6 +16,8 @@ import {
   ExternalLink,
   CalendarDays,
   Package,
+  UserPlus,
+  UserCog,
 } from "lucide-react";
 
 export default function POOverview() {
@@ -28,7 +30,7 @@ export default function POOverview() {
   });
   const [setting, setSetting] = useState<POSetting | null>(null);
   const [loading, setLoading] = useState(true);
-  const [copied, setCopied] = useState(false);
+  const [copiedKey, setCopiedKey] = useState<string | null>(null);
 
   useEffect(() => {
     async function load() {
@@ -41,15 +43,36 @@ export default function POOverview() {
   }, []);
 
   const currentSlug = setting?.url_slug || "katalog";
-  const poUrl =
-    typeof window !== "undefined"
-      ? `${window.location.origin}/po/${currentSlug}`
-      : `/po/${currentSlug}`;
+  const origin = typeof window !== "undefined" ? window.location.origin : "";
 
-  function handleCopy() {
-    navigator.clipboard.writeText(poUrl);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+  const links = [
+    {
+      key: "katalog",
+      label: "Link Katalog Publik",
+      icon: LinkIcon,
+      href: `/po/${currentSlug}`,
+      url: `${origin}/po/${currentSlug}`,
+    },
+    {
+      key: "portal-reseller",
+      label: "Link Portal Reseller",
+      icon: UserCog,
+      href: `/po/reseller`,
+      url: `${origin}/po/reseller`,
+    },
+    {
+      key: "daftar-reseller",
+      label: "Link Pendaftaran Reseller",
+      icon: UserPlus,
+      href: `/po/${currentSlug}/daftar-reseller`,
+      url: `${origin}/po/${currentSlug}/daftar-reseller`,
+    },
+  ];
+
+  function handleCopy(key: string, url: string) {
+    navigator.clipboard.writeText(url);
+    setCopiedKey(key);
+    setTimeout(() => setCopiedKey(null), 2000);
   }
 
   if (loading)
@@ -167,37 +190,44 @@ export default function POOverview() {
         ))}
       </div>
 
-      {/* ── Public Link ───────────────────────────────────────────── */}
-      <div className="bg-slate-50 dark:bg-slate-800/40 border border-slate-200 dark:border-slate-700 rounded-2xl p-4">
-        <p className="text-[10px] text-slate-400 dark:text-slate-500 mb-3 font-extrabold uppercase tracking-widest flex items-center gap-2">
-          <LinkIcon size={11} /> Link Katalog Publik
-        </p>
-        <div className="flex gap-2 items-center flex-wrap md:flex-nowrap">
-          <code className="text-sm bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2.5 w-full md:flex-1 font-mono text-slate-600 dark:text-slate-300 truncate">
-            {poUrl}
-          </code>
-          <div className="flex gap-2 w-full md:w-auto">
-            <button
-              onClick={handleCopy}
-              className={`flex-1 md:flex-none flex items-center justify-center gap-1.5 text-xs font-bold border px-4 py-2.5 rounded-xl transition-colors whitespace-nowrap
-                ${
-                  copied
-                    ? "bg-emerald-50 dark:bg-emerald-900/30 border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-400"
-                    : "bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700"
-                }`}
-            >
-              <Copy size={13} />
-              {copied ? "Tersalin!" : "Salin"}
-            </button>
-            <a
-              href={`/po/${currentSlug}`}
-              target="_blank"
-              className="flex-1 md:flex-none flex items-center justify-center gap-1.5 text-xs font-bold border border-slate-200 dark:border-slate-700 px-4 py-2.5 rounded-xl bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 transition-colors"
-            >
-              <ExternalLink size={13} /> Buka
-            </a>
+      {/* ── Quick Links ───────────────────────────────────────────── */}
+      <div className="space-y-3">
+        {links.map((link) => (
+          <div
+            key={link.key}
+            className="bg-slate-50 dark:bg-slate-800/40 border border-slate-200 dark:border-slate-700 rounded-2xl p-4"
+          >
+            <p className="text-[10px] text-slate-400 dark:text-slate-500 mb-3 font-extrabold uppercase tracking-widest flex items-center gap-2">
+              <link.icon size={11} /> {link.label}
+            </p>
+            <div className="flex gap-2 items-center flex-wrap md:flex-nowrap">
+              <code className="text-sm bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2.5 w-full md:flex-1 font-mono text-slate-600 dark:text-slate-300 truncate">
+                {link.url}
+              </code>
+              <div className="flex gap-2 w-full md:w-auto">
+                <button
+                  onClick={() => handleCopy(link.key, link.url)}
+                  className={`flex-1 md:flex-none flex items-center justify-center gap-1.5 text-xs font-bold border px-4 py-2.5 rounded-xl transition-colors whitespace-nowrap
+                    ${
+                      copiedKey === link.key
+                        ? "bg-emerald-50 dark:bg-emerald-900/30 border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-400"
+                        : "bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700"
+                    }`}
+                >
+                  <Copy size={13} />
+                  {copiedKey === link.key ? "Tersalin!" : "Salin"}
+                </button>
+                <a
+                  href={link.href}
+                  target="_blank"
+                  className="flex-1 md:flex-none flex items-center justify-center gap-1.5 text-xs font-bold border border-slate-200 dark:border-slate-700 px-4 py-2.5 rounded-xl bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 transition-colors"
+                >
+                  <ExternalLink size={13} /> Buka
+                </a>
+              </div>
+            </div>
           </div>
-        </div>
+        ))}
       </div>
     </div>
   );

@@ -220,7 +220,7 @@ export default function DaftarResellerPage({ slug }: Props) {
             </div>
             <div>
               <label className="flex items-center gap-1.5 text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide mb-1.5">
-                <Lock size={11} /> PIN Login{" "}
+                <Lock size={11} /> PIN/Sandi Login{" "}
                 <span className="text-blue-500">*</span>
               </label>
               <input
