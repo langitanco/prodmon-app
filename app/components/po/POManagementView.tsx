@@ -6,15 +6,23 @@ import POOrderList from "./POOrderList";
 import POProductList from "./POProductList";
 import POResellerList from "./POResellerList";
 import POSettings from "./POSettings";
+import PORekapList from "./PORekapList";
 import {
   LayoutDashboard,
   ShoppingBag,
   Package,
   Users,
   Settings2,
+  ClipboardPaste,
 } from "lucide-react";
 
-type POTab = "overview" | "orders" | "products" | "resellers" | "settings";
+type POTab =
+  | "overview"
+  | "orders"
+  | "products"
+  | "resellers"
+  | "settings"
+  | "rekap";
 
 const tabs: { id: POTab; label: string; icon: React.ElementType }[] = [
   { id: "overview", label: "Overview", icon: LayoutDashboard },
@@ -22,6 +30,7 @@ const tabs: { id: POTab; label: string; icon: React.ElementType }[] = [
   { id: "products", label: "Produk", icon: Package },
   { id: "resellers", label: "Reseller", icon: Users },
   { id: "settings", label: "Pengaturan", icon: Settings2 },
+  { id: "rekap", label: "Rekap", icon: ClipboardPaste },
 ];
 
 export default function POManagementView() {
@@ -84,6 +93,7 @@ export default function POManagementView() {
         {activeTab === "products" && <POProductList />}
         {activeTab === "resellers" && <POResellerList />}
         {activeTab === "settings" && <POSettings />}
+        {activeTab === "rekap" && <PORekapList />}
       </div>
     </div>
   );

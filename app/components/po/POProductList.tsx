@@ -17,6 +17,7 @@ import { createClient } from "@/lib/supabase/client";
 const EMPTY_PRODUCT: Omit<POProduct, "id"> = {
   product_code: "",
   name: "",
+  category: "dewasa",
   base_price: 0,
   available_sizes: [],
   sleeve_types: [],
@@ -115,6 +116,7 @@ export default function POProductList() {
     setForm({
       product_code: p.product_code,
       name: p.name,
+      category: p.category ?? "dewasa",
       base_price: p.base_price,
       available_sizes: p.available_sizes,
       sleeve_types: p.sleeve_types,
@@ -274,6 +276,33 @@ export default function POProductList() {
               />
             </Field>
           </div>
+
+          <Field label="Kategori Produk *">
+            <div className="grid grid-cols-2 gap-3">
+              <button
+                type="button"
+                onClick={() => setForm({ ...form, category: "dewasa" })}
+                className={`flex items-center justify-center gap-2 py-2.5 rounded-xl border text-sm font-bold transition-all ${
+                  form.category === "dewasa"
+                    ? "border-blue-600 bg-blue-50 dark:bg-blue-500/10 text-blue-600 dark:text-blue-400"
+                    : "border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400 hover:border-slate-300 dark:hover:border-slate-600"
+                }`}
+              >
+                Dewasa
+              </button>
+              <button
+                type="button"
+                onClick={() => setForm({ ...form, category: "kids" })}
+                className={`flex items-center justify-center gap-2 py-2.5 rounded-xl border text-sm font-bold transition-all ${
+                  form.category === "kids"
+                    ? "border-blue-600 bg-blue-50 dark:bg-blue-500/10 text-blue-600 dark:text-blue-400"
+                    : "border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400 hover:border-slate-300 dark:hover:border-slate-600"
+                }`}
+              >
+                Kids
+              </button>
+            </div>
+          </Field>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <Field label="Nama Produk *">
@@ -574,6 +603,15 @@ export default function POProductList() {
                     </p>
                     <span className="text-[10px] font-mono font-bold text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded">
                       {p.product_code}
+                    </span>
+                    <span
+                      className={`text-[10px] font-bold px-2 py-0.5 rounded-lg ${
+                        p.category === "kids"
+                          ? "bg-pink-100 dark:bg-pink-500/10 text-pink-600 dark:text-pink-400"
+                          : "bg-indigo-100 dark:bg-indigo-500/10 text-indigo-600 dark:text-indigo-400"
+                      }`}
+                    >
+                      {p.category === "kids" ? "Kids" : "Dewasa"}
                     </span>
                     {!p.is_active && (
                       <span className="text-[10px] font-bold bg-slate-200 dark:bg-slate-800 text-slate-500 dark:text-slate-400 px-2 py-0.5 rounded-lg">

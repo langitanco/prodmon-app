@@ -35,9 +35,7 @@ export default function ResellerPortalPage() {
 
     const stored = sessionStorage.getItem("po_reseller");
     if (!stored) {
-      router.replace(
-        savedSlug ? `/po/reseller?slug=${savedSlug}` : "/po/reseller",
-      );
+      router.replace(savedSlug ? `/po/reseller?slug=${savedSlug}` : "/po/reseller");
       return;
     }
     setReseller(JSON.parse(stored));
@@ -244,11 +242,11 @@ export default function ResellerPortalPage() {
   const cartTotal = cart.reduce((s, i) => s + i.subtotal, 0);
 
   function handleLogout() {
-    if (!confirm("Yakin ingin keluar? Keranjang belum dikirim akan hilang."))
-      return;
-    sessionStorage.removeItem("po_reseller");
-    router.push(slug ? `/po/reseller?slug=${slug}` : "/po/reseller");
-  }
+  if (!confirm("Yakin ingin keluar? Keranjang belum dikirim akan hilang."))
+    return;
+  sessionStorage.removeItem("po_reseller");
+  router.push(slug ? `/po/reseller?slug=${slug}` : "/po/reseller");
+}
 
   // ── SUKSES STATE ──
   if (poNumber) {

@@ -12,6 +12,7 @@ import {
   Trash2,
   ChevronRight,
   Package,
+  Download,
 } from "lucide-react";
 
 export default function POOrderList() {
@@ -23,6 +24,7 @@ export default function POOrderList() {
     "ALL",
   );
   const [search, setSearch] = useState("");
+  const [exporting, setExporting] = useState(false);
 
   useEffect(() => {
     load();
@@ -60,6 +62,130 @@ export default function POOrderList() {
       o.customer_name.toLowerCase().includes(search.toLowerCase());
     return matchType && matchSearch;
   });
+
+  /* ── Export Excel (sesuai data yang sedang ter-filter) ──────── */
+  async function handleExportExcel() {
+    if (filtered.length === 0) {
+      alert("Tidak ada data untuk diexport.");
+      return;
+    }
+    setExporting(true);
+    try {
+      const XLSX = await import("xlsx");
+
+      // ── Sheet 1: Rekap per item (1 baris = 1 item produk) ──
+      const itemRows: Record<string, any>[] = [];
+      filtered.forEach((order) => {
+        order.order_items.forEach((item) => {
+          itemRows.push({
+            "Kode PO": order.po_number,
+            Tipe: order.customer_type,
+            Reseller: order.po_resellers
+              ? `${order.po_resellers.nama} (${order.po_resellers.kode})`
+              : "-",
+            Pelanggan: order.customer_name,
+            WhatsApp: order.customer_wa,
+            "Metode Kirim": order.delivery_method,
+            Alamat: order.shipping_address || "-",
+            Produk: item.product_name,
+            Warna: item.warna,
+            Lengan: item.lengan,
+            Ukuran: item.ukuran,
+            Qty: item.qty,
+            "Harga Satuan": item.harga_satuan,
+            Subtotal: item.subtotal,
+            Catatan: order.notes || "-",
+            Tanggal: new Date(order.created_at).toLocaleString("id-ID", {
+              day: "numeric",
+              month: "short",
+              year: "numeric",
+              hour: "2-digit",
+              minute: "2-digit",
+            }),
+          });
+        });
+      });
+
+      // ── Sheet 2: Rekap per pesanan (1 baris = 1 PO) ──
+      const orderRows = filtered.map((order) => ({
+        "Kode PO": order.po_number,
+        Tipe: order.customer_type,
+        Reseller: order.po_resellers
+          ? `${order.po_resellers.nama} (${order.po_resellers.kode})`
+          : "-",
+        Pelanggan: order.customer_name,
+        WhatsApp: order.customer_wa,
+        "Metode Kirim": order.delivery_method,
+        Alamat: order.shipping_address || "-",
+        "Jumlah Item": order.order_items.reduce((s, i) => s + i.qty, 0),
+        "Total (Rp)": order.total_amount,
+        Catatan: order.notes || "-",
+        Tanggal: new Date(order.created_at).toLocaleString("id-ID", {
+          day: "numeric",
+          month: "short",
+          year: "numeric",
+          hour: "2-digit",
+          minute: "2-digit",
+        }),
+      }));
+
+      const wb = XLSX.utils.book_new();
+
+      const wsOrders = XLSX.utils.json_to_sheet(orderRows);
+      wsOrders["!cols"] = [
+        { wch: 14 }, // Kode PO
+        { wch: 10 }, // Tipe
+        { wch: 22 }, // Reseller
+        { wch: 20 }, // Pelanggan
+        { wch: 16 }, // WhatsApp
+        { wch: 12 }, // Metode Kirim
+        { wch: 28 }, // Alamat
+        { wch: 12 }, // Jumlah Item
+        { wch: 14 }, // Total
+        { wch: 24 }, // Catatan
+        { wch: 18 }, // Tanggal
+      ];
+      XLSX.utils.book_append_sheet(wb, wsOrders, "Rekap Pesanan");
+
+      const wsItems = XLSX.utils.json_to_sheet(itemRows);
+      wsItems["!cols"] = [
+        { wch: 14 }, // Kode PO
+        { wch: 10 }, // Tipe
+        { wch: 22 }, // Reseller
+        { wch: 20 }, // Pelanggan
+        { wch: 16 }, // WhatsApp
+        { wch: 12 }, // Metode Kirim
+        { wch: 28 }, // Alamat
+        { wch: 22 }, // Produk
+        { wch: 12 }, // Warna
+        { wch: 10 }, // Lengan
+        { wch: 10 }, // Ukuran
+        { wch: 8 }, // Qty
+        { wch: 14 }, // Harga Satuan
+        { wch: 14 }, // Subtotal
+        { wch: 24 }, // Catatan
+        { wch: 18 }, // Tanggal
+      ];
+      XLSX.utils.book_append_sheet(wb, wsItems, "Detail Item");
+
+      const tanggalFile = new Date().toISOString().slice(0, 10);
+      const labelFilter =
+        filterType === "ALL"
+          ? "Semua"
+          : filterType === "PUBLIC"
+            ? "Public"
+            : "Reseller";
+
+      XLSX.writeFile(wb, `Rekap-PO-${labelFilter}-${tanggalFile}.xlsx`);
+    } catch (err) {
+      console.error(err);
+      alert(
+        "Gagal membuat file Excel. Pastikan package 'xlsx' sudah terinstall.",
+      );
+    } finally {
+      setExporting(false);
+    }
+  }
 
   /* ── Loading ───────────────────────────────────────────────── */
   if (loading)
@@ -305,6 +431,15 @@ export default function POOrderList() {
           >
             <RefreshCw size={14} className={refreshing ? "animate-spin" : ""} />
             Refresh
+          </button>
+
+          <button
+            onClick={handleExportExcel}
+            disabled={exporting || filtered.length === 0}
+            className="w-full sm:w-auto flex justify-center items-center gap-2 text-sm px-5 py-3 bg-emerald-600 hover:bg-emerald-700 disabled:bg-emerald-400 text-white rounded-xl font-bold transition-colors"
+          >
+            <Download size={14} className={exporting ? "animate-bounce" : ""} />
+            {exporting ? "Membuat..." : "Download Excel"}
           </button>
         </div>
       </div>

@@ -17,10 +17,13 @@ export interface POSetting {
   url_slug?: string;
 }
 
+export type POProductCategory = 'dewasa' | 'kids';
+
 export interface POProduct {
   id: string;
   product_code: string;
   name: string;
+  category: POProductCategory;
   base_price: number;
   available_sizes: string[];
   sleeve_types: string[];

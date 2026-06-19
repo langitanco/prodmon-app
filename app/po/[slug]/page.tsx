@@ -26,6 +26,8 @@ import {
   Plus,
   Minus,
   Check,
+  Baby,
+  PersonStanding,
 } from "lucide-react";
 
 // ── Tipe keranjang yang disimpan di sessionStorage ──
@@ -40,6 +42,8 @@ export type CartItemSession = {
   harga_satuan: number;
   subtotal: number;
 };
+
+type CategoryFilter = "dewasa" | "kids";
 
 const CART_KEY = "po_cart";
 
@@ -65,6 +69,10 @@ export default function CatalogPage() {
   const [setting, setSetting] = useState<POSetting | null>(null);
   const [products, setProducts] = useState<POProduct[]>([]);
   const [loading, setLoading] = useState(true);
+
+  // Filter kategori katalog (Dewasa / Kids)
+  const [activeCategory, setActiveCategory] =
+    useState<CategoryFilter>("dewasa");
 
   // Modal states
   const [selectedProduct, setSelectedProduct] = useState<POProduct | null>(
@@ -117,6 +125,15 @@ export default function CatalogPage() {
   const brandName = setting?.title || "Katalog PO";
   const periode = `${setting?.periode_mulai || "-"} — ${setting?.periode_selesai || "-"}`;
   const cartCount = cart.reduce((s, i) => s + i.qty, 0);
+
+  // Produk yang sesuai filter kategori aktif
+  const filteredProducts = products.filter(
+    (p) => (p.category ?? "dewasa") === activeCategory,
+  );
+  const dewasaCount = products.filter(
+    (p) => (p.category ?? "dewasa") === "dewasa",
+  ).length;
+  const kidsCount = products.filter((p) => p.category === "kids").length;
 
   /* ── Modal Handlers ── */
   const openModal = (product: POProduct) => {
@@ -321,7 +338,7 @@ export default function CatalogPage() {
         id="sec-catalog"
         className="max-w-7xl mx-auto px-5 md:px-10 lg:px-16 py-12 md:py-16 scroll-mt-10"
       >
-        <div className="flex flex-wrap items-end justify-between gap-4 mb-7">
+        <div className="flex flex-wrap items-end justify-between gap-4 mb-6">
           <div>
             <h2 className="text-2xl md:text-3xl font-extrabold tracking-tight">
               Katalog Produk
@@ -331,8 +348,52 @@ export default function CatalogPage() {
             </p>
           </div>
           <span className="text-xs font-bold text-gray-400 bg-gray-200/50 px-3 py-1 rounded-full">
-            {products.length} produk
+            {filteredProducts.length} produk
           </span>
+        </div>
+
+        {/* Tab Pemisah Kategori: Dewasa / Kids */}
+        <div className="flex items-center gap-2 mb-8 bg-white border border-gray-200 rounded-full p-1.5 w-fit">
+          <button
+            onClick={() => setActiveCategory("dewasa")}
+            className={`flex items-center gap-2 px-4 sm:px-5 py-2 rounded-full text-xs sm:text-sm font-bold transition-all ${
+              activeCategory === "dewasa"
+                ? "bg-zinc-950 text-white"
+                : "text-gray-400 hover:text-zinc-950"
+            }`}
+          >
+            <PersonStanding size={15} />
+            Dewasa
+            <span
+              className={`text-[10px] font-extrabold px-1.5 py-0.5 rounded-full ${
+                activeCategory === "dewasa"
+                  ? "bg-white/20 text-white"
+                  : "bg-stone-100 text-gray-400"
+              }`}
+            >
+              {dewasaCount}
+            </span>
+          </button>
+          <button
+            onClick={() => setActiveCategory("kids")}
+            className={`flex items-center gap-2 px-4 sm:px-5 py-2 rounded-full text-xs sm:text-sm font-bold transition-all ${
+              activeCategory === "kids"
+                ? "bg-zinc-950 text-white"
+                : "text-gray-400 hover:text-zinc-950"
+            }`}
+          >
+            <Baby size={15} />
+            Kids
+            <span
+              className={`text-[10px] font-extrabold px-1.5 py-0.5 rounded-full ${
+                activeCategory === "kids"
+                  ? "bg-white/20 text-white"
+                  : "bg-stone-100 text-gray-400"
+              }`}
+            >
+              {kidsCount}
+            </span>
+          </button>
         </div>
 
         {/* Status Banner */}
@@ -365,13 +426,20 @@ export default function CatalogPage() {
               <div className="w-8 h-8 border-[3px] border-gray-200 border-t-zinc-950 rounded-full animate-spin mx-auto mb-3" />
               <p>Memuat produk...</p>
             </div>
-          ) : products.length === 0 ? (
+          ) : filteredProducts.length === 0 ? (
             <div className="col-span-full text-center py-16 text-gray-400 text-sm">
-              <Package size={32} className="mx-auto mb-3 opacity-50" />
-              <p>Belum ada produk aktif di katalog.</p>
+              {activeCategory === "kids" ? (
+                <Baby size={32} className="mx-auto mb-3 opacity-50" />
+              ) : (
+                <Package size={32} className="mx-auto mb-3 opacity-50" />
+              )}
+              <p>
+                Belum ada produk {activeCategory === "kids" ? "kids" : "dewasa"}{" "}
+                di katalog.
+              </p>
             </div>
           ) : (
-            products.map((p) => (
+            filteredProducts.map((p) => (
               <div
                 key={p.id}
                 onClick={() => openModal(p)}
