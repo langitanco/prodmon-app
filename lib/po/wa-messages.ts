@@ -25,7 +25,7 @@ export function buildWaLink(phone: string, message: string): string {
 }
 
 /**
- * Pesan dari calon reseller -> admin, setelah submit form pendaftaran.
+ * Pesan dari calon reseller -> admin
  */
 export function buildRegistrationMessage(data: {
   nama: string;
@@ -34,37 +34,43 @@ export function buildRegistrationMessage(data: {
   alamat: string;
   pin: string;
 }): string {
-  return `Assalamu'alaikum Admin *Langitan.co*
-Saya sudah mendaftar sebagai Reseller dengan data sebagai berikut:
-Nama lengkap: ${data.nama}
-Nama panggilan: ${data.panggilan}
-Nomor WA: ${data.whatsapp}
-Alamat Lengkap: ${data.alamat}
-Pin Untuk Login: ${data.pin}
-Mohon segera dikonfirmasi, terima kasih
-🙏🏻🙏🏻🙏🏻`;
+  return `*PENDAFTARAN RESELLER BARU*
+
+Assalamu'alaikum Admin Langitan.co,
+Saya ingin mengajukan diri sebagai reseller dengan data berikut:
+
+👤 *Nama:* ${data.nama}
+🏷 *Username:* ${data.panggilan}
+📱 *WhatsApp:* ${data.whatsapp}
+📍 *Alamat:* ${data.alamat}
+🔑 *PIN:* ${data.pin}
+
+Mohon bantuannya untuk proses aktivasi akun. Terima kasih.
+_Wassalamu'alaikum._`;
 }
 
 /**
- * Pesan dari admin -> reseller, dikirim saat admin klik "Konfirmasi WA"
- * di tab pendaftar pending.
- *
- * @param reseller   Data reseller dari po_resellers (sudah berstatus pending)
- * @param portalUrl  Link portal reseller, dibentuk dari po_setting.url_slug
+ * Pesan dari admin -> reseller
  */
 export function buildConfirmationMessage(
   reseller: POResellerFull,
   portalUrl: string
 ): string {
-  return `Wa'alikum Salam 😊🙏🏻
-Terima kasih sudah mendaftar sebagai reseller, berikut akses link nya: ${portalUrl}
-Akses masuknya adalah:
-Username: ${reseller.kode}
-Pin: ${reseller.pin_hash}
-Kami mohon untuk memahami dengan betul syarat dan ketentuan yang berlaku untuk reseller PO Spesial Haul Langitan ke-56
-Terima kasih
-*Langitan.co*
-🙏🏻🙏🏻🙏🏻`;
+  return `*KONFIRMASI PENDAFTARAN RESELLER*
+
+Wa'alaikumussalam Wr. Wb.
+Selamat! Pendaftaran Anda telah kami setujui. Sekarang Anda sudah bisa mengakses portal reseller di:
+
+🔗 ${portalUrl}
+
+*Detail Akun Anda:*
+👤 Username: ${reseller.kode}
+🔑 PIN: ${reseller.pin_hash}
+
+⚠️ *Penting:* Mohon pelajari dan patuhi syarat & ketentuan yang berlaku demi kenyamanan bersama.
+
+Terima kasih,
+*Langitan.co*`;
 }
 
 /**
