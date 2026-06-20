@@ -25,8 +25,10 @@ import {
   Trash2,
   ShoppingCart,
   LayoutGrid,
+  QrCode,
+  Download,
 } from "lucide-react";
-import type { CartItemSession } from "@/app/po/[slug]/page"; // sesuaikan path import
+import type { CartItemSession } from "@/app/po/[slug]/page";
 
 const CART_KEY = "po_cart";
 
@@ -47,7 +49,6 @@ function clearCart() {
   sessionStorage.removeItem(CART_KEY);
 }
 
-// ── Komponen utama dipisah agar useSearchParams bisa dibungkus Suspense ──
 function OrderFormContent() {
   const searchParams = useSearchParams();
   const slug = searchParams.get("slug");
@@ -70,11 +71,13 @@ function OrderFormContent() {
   } | null>(null);
   const [copied, setCopied] = useState(false);
 
-  useEffect(() => {
-    // Simpan slug jika ada di URL
-    if (slug) sessionStorage.setItem("po_slug", slug);
+  // ✅ State baru untuk handle download QRIS
+  const [downloading, setDownloading] = useState(false);
+  const [downloadNotif, setDownloadNotif] = useState(false);
+  const [downloadError, setDownloadError] = useState(false);
 
-    // Load keranjang dari sessionStorage
+  useEffect(() => {
+    if (slug) sessionStorage.setItem("po_slug", slug);
     setCart(loadCart());
 
     async function load() {
@@ -138,10 +141,8 @@ function OrderFormContent() {
         return;
       }
 
-      // Bersihkan keranjang setelah berhasil
       clearCart();
       setCart([]);
-
       setSubmitting(false);
       setSuccessData({
         kodePO: result.po_number || "ERROR",
@@ -160,6 +161,44 @@ function OrderFormContent() {
     navigator.clipboard.writeText(successData.kodePO);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
+  };
+
+  // ✅ Fungsi baru: download QRIS via blob, bukan buka tab baru
+  const downloadQris = async () => {
+    if (!setting?.qris_image_url) return;
+
+    setDownloading(true);
+    setDownloadError(false);
+
+    try {
+      const response = await fetch(setting.qris_image_url);
+
+      if (!response.ok) {
+        throw new Error(`Gagal mengambil gambar (status ${response.status})`);
+      }
+
+      const blob = await response.blob();
+      const blobUrl = URL.createObjectURL(blob);
+
+      const link = document.createElement("a");
+      link.href = blobUrl;
+      link.download = "QRIS-Payment.png";
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+
+      // Bersihkan object URL setelah dipakai
+      URL.revokeObjectURL(blobUrl);
+
+      setDownloadNotif(true);
+      setTimeout(() => setDownloadNotif(false), 3500);
+    } catch (error) {
+      console.error("Download QRIS error:", error);
+      setDownloadError(true);
+      setTimeout(() => setDownloadError(false), 3500);
+    } finally {
+      setDownloading(false);
+    }
   };
 
   const getWhatsAppLink = () => {
@@ -241,6 +280,7 @@ Mohon info langkah pembayarannya.`;
           </div>
 
           <div className="max-w-xl mx-auto px-5 py-8 md:py-10">
+            {/* Kode PO */}
             <div className="bg-white border border-gray-200 rounded-2xl p-6 text-center mb-4">
               <p className="text-[11px] font-bold tracking-widest uppercase text-gray-400 mb-2">
                 Kode Pemesanan Anda
@@ -261,6 +301,7 @@ Mohon info langkah pembayarannya.`;
               </button>
             </div>
 
+            {/* Warning simpan kode */}
             <div className="flex items-start gap-2.5 bg-amber-50 border border-amber-200 rounded-xl p-3.5 mb-4 text-amber-800 text-sm font-semibold">
               <AlertTriangle
                 size={18}
@@ -272,8 +313,9 @@ Mohon info langkah pembayarannya.`;
               </p>
             </div>
 
+            {/* Info rekening */}
             {setting?.bank_account_info && (
-              <div className="flex items-center gap-3 bg-stone-100 border border-gray-200 rounded-xl p-3.5 mb-5 text-gray-600 text-sm">
+              <div className="flex items-center gap-3 bg-stone-100 border border-gray-200 rounded-xl p-3.5 mb-4 text-gray-600 text-sm">
                 <Landmark size={20} className="text-gray-400 shrink-0" />
                 <span>
                   Transfer ke: <strong>{setting.bank_account_info}</strong>
@@ -281,6 +323,54 @@ Mohon info langkah pembayarannya.`;
               </div>
             )}
 
+            {/* ✅ QRIS — hanya muncul jika qris_image_url ada di settings */}
+            {setting?.qris_image_url && (
+              <div className="bg-white border border-gray-200 rounded-2xl p-6 text-center mb-4">
+                <p className="text-[11px] font-bold tracking-widest uppercase text-gray-400 mb-3 flex items-center justify-center gap-1.5">
+                  <QrCode size={13} />
+                  Scan QRIS untuk Bayar
+                </p>
+                <div className="w-52 h-52 mx-auto rounded-xl overflow-hidden border border-gray-100 bg-white mb-4">
+                  <img
+                    src={setting.qris_image_url}
+                    alt="QRIS Payment"
+                    className="w-full h-full object-contain p-1"
+                  />
+                </div>
+
+                {/* ✅ Tombol download diganti jadi button + fetch blob */}
+                <button
+                  onClick={downloadQris}
+                  disabled={downloading}
+                  className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-stone-100 border border-gray-200 text-gray-600 text-xs font-bold hover:bg-gray-200 hover:text-zinc-950 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                >
+                  {downloading ? (
+                    <Loader2 size={13} className="animate-spin" />
+                  ) : (
+                    <Download size={13} />
+                  )}
+                  {downloading ? "Mengunduh..." : "Download QRIS"}
+                </button>
+
+                {/* ✅ Notifikasi sukses */}
+                {downloadNotif && (
+                  <p className="text-xs text-green-600 font-semibold mt-3 flex items-center justify-center gap-1.5 animate-in fade-in duration-200">
+                    <Check size={13} />
+                    Berhasil diunduh, silakan cek folder Download kamu
+                  </p>
+                )}
+
+                {/* ✅ Notifikasi error */}
+                {downloadError && (
+                  <p className="text-xs text-red-600 font-semibold mt-3 flex items-center justify-center gap-1.5 animate-in fade-in duration-200">
+                    <AlertTriangle size={13} />
+                    Gagal mengunduh QRIS. Coba lagi.
+                  </p>
+                )}
+              </div>
+            )}
+
+            {/* Tombol WhatsApp */}
             <p className="text-sm text-gray-500 text-center mb-3">
               Klik tombol di bawah untuk kirim rincian pesanan ke WhatsApp
               Admin.
@@ -288,6 +378,7 @@ Mohon info langkah pembayarannya.`;
             <a
               href={getWhatsAppLink()}
               target="_blank"
+              rel="noopener noreferrer"
               className="w-full flex items-center justify-center gap-2 bg-[#25D366] hover:bg-[#20ba59] text-white py-3.5 rounded-xl font-extrabold text-[15px] transition-colors mb-3"
             >
               <MessageCircle size={20} />
@@ -331,7 +422,7 @@ Mohon info langkah pembayarannya.`;
           </div>
 
           <div className="max-w-2xl mx-auto px-5 py-8 md:py-10 space-y-4">
-            {/* ── Keranjang kosong — arahkan ke katalog ── */}
+            {/* Keranjang kosong */}
             {cart.length === 0 && (
               <div className="bg-white border border-gray-200 rounded-2xl p-8 text-center">
                 <ShoppingCart

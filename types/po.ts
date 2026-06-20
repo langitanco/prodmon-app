@@ -15,6 +15,7 @@ export interface POSetting {
   created_at?: string;
   updated_at?: string;
   url_slug?: string;
+  qris_image_url?: string | null;
 }
 
 export type POProductCategory = 'dewasa' | 'kids';

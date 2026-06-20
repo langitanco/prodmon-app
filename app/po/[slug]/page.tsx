@@ -445,7 +445,8 @@ export default function CatalogPage() {
                 onClick={() => openModal(p)}
                 className="bg-white border border-gray-200 rounded-xl md:rounded-2xl overflow-hidden cursor-pointer flex flex-col transition-all duration-200 hover:border-gray-300 hover:-translate-y-1 group"
               >
-                <div className="w-full aspect-[4/3] bg-slate-100 relative overflow-hidden shrink-0">
+                {/* ✅ Aspect ratio diubah dari 4/3 → 4/5 agar sesuai rasio asli foto produk (portrait), supaya object-cover tidak memotong bagian penting gambar di semua ukuran layar */}
+                <div className="w-full aspect-[4/5] bg-slate-100 relative overflow-hidden shrink-0">
                   {p.image_urls[0] ? (
                     <img
                       src={p.image_urls[0]}
@@ -552,8 +553,9 @@ export default function CatalogPage() {
             onClick={(e) => e.stopPropagation()}
           >
             {/* ── Sisi Foto ── */}
+            {/* ✅ Aspect ratio mobile diubah dari 4/3 → 4/5 agar konsisten dengan rasio asli foto produk. Di desktop (sm:) tetap pakai min-h dengan object-cover, karena modal landscape punya ruang vertikal lebih fleksibel mengikuti tinggi konten */}
             <div
-              className="w-full sm:flex-[1.2] bg-slate-100 relative overflow-hidden flex items-center justify-center aspect-[4/3] sm:aspect-auto sm:min-h-[420px] select-none"
+              className="w-full sm:flex-[1.2] bg-slate-100 relative overflow-hidden flex items-center justify-center aspect-[4/5] sm:aspect-auto sm:min-h-[480px] select-none"
               onTouchStart={(e) => setTouchStart(e.touches[0].clientX)}
               onTouchEnd={handleTouchEnd}
             >
@@ -561,7 +563,7 @@ export default function CatalogPage() {
                 <img
                   src={selectedProduct.image_urls[imageIndex]}
                   alt={selectedProduct.name}
-                  className="w-full h-full object-cover animate-in fade-in duration-300"
+                  className="w-full h-full object-contain animate-in fade-in duration-300"
                   key={imageIndex}
                 />
               ) : (
@@ -611,7 +613,7 @@ export default function CatalogPage() {
             {/* ── Sisi Info + Picker ── */}
             <div className="flex-1 flex flex-col overflow-y-auto">
               {/* Header info sisi kanan */}
-              <div className="p-4 sm:p-6 border-b border-gray-100">
+              <div className="p-3 sm:p-6 border-b border-gray-100">
                 <div className="hidden sm:flex items-center justify-between mb-2">
                   <span className="text-[11px] font-bold tracking-widest uppercase text-gray-400">
                     Pre-Order
@@ -623,29 +625,121 @@ export default function CatalogPage() {
                     <X size={16} />
                   </button>
                 </div>
-                <h2 className="text-[17px] sm:text-xl font-extrabold leading-tight text-zinc-950 mb-1">
+                <h2 className="text-[15px] sm:text-xl font-extrabold leading-tight text-zinc-950 mb-1">
                   {selectedProduct.name}
                 </h2>
-                <p className="text-lg sm:text-xl font-extrabold text-zinc-950">
+                <p className="text-base sm:text-xl font-extrabold text-zinc-950">
                   {formatRupiah(selectedProduct.base_price)}
                   {hargaSatuan > selectedProduct.base_price && (
-                    <span className="ml-2 text-sm font-semibold text-blue-600">
+                    <span className="ml-2 text-xs sm:text-sm font-semibold text-blue-600">
                       → {formatRupiah(hargaSatuan)} (varian dipilih)
                     </span>
                   )}
                 </p>
                 {selectedProduct.description && (
-                  <p className="text-xs text-gray-500 mt-2 leading-relaxed">
+                  <p className="text-[11px] sm:text-xs text-gray-500 mt-1.5 sm:mt-2 leading-relaxed">
                     {selectedProduct.description}
                   </p>
                 )}
               </div>
 
               {/* ── VARIAN PICKER ── */}
-              <div className="p-4 sm:p-6 flex-1 space-y-4">
+              <div className="p-3 sm:p-6 flex-1 space-y-2.5 sm:space-y-4">
+                {/* ═══ MOBILE: Warna / Lengan / Ukuran sebagai dropdown dalam satu baris ═══ */}
+                {(selectedProduct.colors.length > 0 ||
+                  selectedProduct.sleeve_types.length > 0 ||
+                  selectedProduct.available_sizes.length > 0) && (
+                  <div className="sm:hidden grid grid-cols-3 gap-2">
+                    {/* Warna */}
+                    {selectedProduct.colors.length > 0 && (
+                      <div>
+                        <label className="block text-[10px] font-bold text-zinc-950 mb-1 uppercase tracking-wide">
+                          Warna
+                        </label>
+                        <select
+                          value={pickerWarna}
+                          onChange={(e) => setPickerWarna(e.target.value)}
+                          className="w-full px-2 py-1.5 rounded-lg border border-gray-200 text-xs font-semibold text-zinc-950 bg-white outline-none focus:border-zinc-950 transition-colors appearance-none"
+                          style={{
+                            backgroundImage:
+                              "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='%239ca3af'%3E%3Cpath fill-rule='evenodd' d='M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z' clip-rule='evenodd'/%3E%3C/svg%3E\")",
+                            backgroundRepeat: "no-repeat",
+                            backgroundPosition: "right 0.4rem center",
+                            backgroundSize: "1.1em",
+                            paddingRight: "1.75rem",
+                          }}
+                        >
+                          {selectedProduct.colors.map((w) => (
+                            <option key={w} value={w}>
+                              {w}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    )}
+
+                    {/* Lengan */}
+                    {selectedProduct.sleeve_types.length > 0 && (
+                      <div>
+                        <label className="block text-[10px] font-bold text-zinc-950 mb-1 uppercase tracking-wide">
+                          Lengan
+                        </label>
+                        <select
+                          value={pickerLengan}
+                          onChange={(e) => setPickerLengan(e.target.value)}
+                          className="w-full px-2 py-1.5 rounded-lg border border-gray-200 text-xs font-semibold text-zinc-950 bg-white outline-none focus:border-zinc-950 transition-colors appearance-none"
+                          style={{
+                            backgroundImage:
+                              "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='%239ca3af'%3E%3Cpath fill-rule='evenodd' d='M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z' clip-rule='evenodd'/%3E%3C/svg%3E\")",
+                            backgroundRepeat: "no-repeat",
+                            backgroundPosition: "right 0.4rem center",
+                            backgroundSize: "1.1em",
+                            paddingRight: "1.75rem",
+                          }}
+                        >
+                          {selectedProduct.sleeve_types.map((l) => (
+                            <option key={l} value={l}>
+                              {l}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    )}
+
+                    {/* Ukuran */}
+                    {selectedProduct.available_sizes.length > 0 && (
+                      <div>
+                        <label className="block text-[10px] font-bold text-zinc-950 mb-1 uppercase tracking-wide">
+                          Ukuran
+                        </label>
+                        <select
+                          value={pickerUkuran}
+                          onChange={(e) => setPickerUkuran(e.target.value)}
+                          className="w-full px-2 py-1.5 rounded-lg border border-gray-200 text-xs font-bold text-zinc-950 bg-white outline-none focus:border-zinc-950 transition-colors appearance-none"
+                          style={{
+                            backgroundImage:
+                              "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='%239ca3af'%3E%3Cpath fill-rule='evenodd' d='M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z' clip-rule='evenodd'/%3E%3C/svg%3E\")",
+                            backgroundRepeat: "no-repeat",
+                            backgroundPosition: "right 0.4rem center",
+                            backgroundSize: "1.1em",
+                            paddingRight: "1.75rem",
+                          }}
+                        >
+                          {selectedProduct.available_sizes.map((u) => (
+                            <option key={u} value={u}>
+                              {u}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* ═══ DESKTOP: Warna / Lengan / Ukuran sebagai button-group (pilihan visual) ═══ */}
                 {/* Warna */}
                 {selectedProduct.colors.length > 0 && (
-                  <div>
+                  <div className="hidden sm:block">
                     <p className="text-xs font-bold text-zinc-950 mb-2 uppercase tracking-wide">
                       Warna{" "}
                       <span className="font-semibold text-gray-400 normal-case tracking-normal">
@@ -672,7 +766,7 @@ export default function CatalogPage() {
 
                 {/* Lengan */}
                 {selectedProduct.sleeve_types.length > 0 && (
-                  <div>
+                  <div className="hidden sm:block">
                     <p className="text-xs font-bold text-zinc-950 mb-2 uppercase tracking-wide">
                       Lengan{" "}
                       <span className="font-semibold text-gray-400 normal-case tracking-normal">
@@ -699,7 +793,7 @@ export default function CatalogPage() {
 
                 {/* Ukuran */}
                 {selectedProduct.available_sizes.length > 0 && (
-                  <div>
+                  <div className="hidden sm:block">
                     <p className="text-xs font-bold text-zinc-950 mb-2 uppercase tracking-wide">
                       Ukuran{" "}
                       <span className="font-semibold text-gray-400 normal-case tracking-normal">
@@ -726,27 +820,27 @@ export default function CatalogPage() {
 
                 {/* QTY */}
                 <div>
-                  <p className="text-xs font-bold text-zinc-950 mb-2 uppercase tracking-wide">
+                  <p className="text-[11px] sm:text-xs font-bold text-zinc-950 mb-1.5 sm:mb-2 uppercase tracking-wide">
                     Jumlah
                   </p>
-                  <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-2 sm:gap-3">
                     <button
                       onClick={() => setPickerQty((q) => Math.max(1, q - 1))}
-                      className="w-9 h-9 rounded-full border border-gray-200 flex items-center justify-center hover:bg-stone-100 transition-colors"
+                      className="w-8 h-8 sm:w-9 sm:h-9 rounded-full border border-gray-200 flex items-center justify-center hover:bg-stone-100 transition-colors"
                     >
-                      <Minus size={14} />
+                      <Minus size={13} />
                     </button>
-                    <span className="w-8 text-center text-base font-extrabold text-zinc-950">
+                    <span className="w-7 sm:w-8 text-center text-sm sm:text-base font-extrabold text-zinc-950">
                       {pickerQty}
                     </span>
                     <button
                       onClick={() => setPickerQty((q) => q + 1)}
-                      className="w-9 h-9 rounded-full border border-gray-200 flex items-center justify-center hover:bg-stone-100 transition-colors"
+                      className="w-8 h-8 sm:w-9 sm:h-9 rounded-full border border-gray-200 flex items-center justify-center hover:bg-stone-100 transition-colors"
                     >
-                      <Plus size={14} />
+                      <Plus size={13} />
                     </button>
                     {hargaSatuan > 0 && (
-                      <span className="text-sm font-bold text-blue-600 ml-2">
+                      <span className="text-xs sm:text-sm font-bold text-blue-600 ml-1.5 sm:ml-2">
                         = {formatRupiah(hargaTotal)}
                       </span>
                     )}
@@ -755,13 +849,13 @@ export default function CatalogPage() {
               </div>
 
               {/* ── Tombol Aksi ── */}
-              <div className="p-4 sm:p-6 border-t border-gray-100 space-y-2.5">
+              <div className="p-3 sm:p-6 border-t border-gray-100 space-y-2 sm:space-y-2.5">
                 {isActive ? (
                   <>
                     <button
                       onClick={handleAddToCart}
                       disabled={addedFeedback}
-                      className={`w-full flex items-center justify-center gap-2 py-3 rounded-xl font-bold text-sm transition-all ${
+                      className={`w-full flex items-center justify-center gap-2 py-2.5 sm:py-3 rounded-xl font-bold text-xs sm:text-sm transition-all ${
                         addedFeedback
                           ? "bg-green-600 text-white"
                           : "bg-zinc-950 hover:opacity-80 text-white"
@@ -781,7 +875,7 @@ export default function CatalogPage() {
                     </button>
                     <Link
                       href={withSlug("/po/order")}
-                      className="w-full flex items-center justify-center gap-2 py-3 rounded-xl font-bold text-sm border border-gray-200 text-gray-600 hover:border-zinc-950 hover:text-zinc-950 transition-all"
+                      className="w-full flex items-center justify-center gap-2 py-2.5 sm:py-3 rounded-xl font-bold text-xs sm:text-sm border border-gray-200 text-gray-600 hover:border-zinc-950 hover:text-zinc-950 transition-all"
                     >
                       <Pencil size={14} />
                       {cartCount > 0
@@ -792,7 +886,7 @@ export default function CatalogPage() {
                 ) : (
                   <button
                     disabled
-                    className="w-full flex items-center justify-center gap-2 bg-zinc-200 text-zinc-400 px-5 py-3 rounded-xl font-bold text-sm cursor-not-allowed"
+                    className="w-full flex items-center justify-center gap-2 bg-zinc-200 text-zinc-400 px-5 py-2.5 sm:py-3 rounded-xl font-bold text-xs sm:text-sm cursor-not-allowed"
                   >
                     PO Ditutup
                   </button>
