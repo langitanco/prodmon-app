@@ -114,3 +114,28 @@ export interface POResellerFull {
 export interface POProductFull extends POProduct {
   // sudah lengkap di POProduct, alias ini untuk kejelasan di admin context
 }
+
+// ─── Tambahkan ke types/po.ts ───
+
+export type PaymentStatus = 'BELUM_BAYAR' | 'DP' | 'LUNAS';
+
+// Update interface POOrder yang sudah ada, tambahkan 3 field ini:
+export interface POOrder {
+  id: string;
+  po_number: string;
+  customer_type: 'PUBLIC' | 'RESELLER';
+  reseller_id: string | null;
+  customer_name: string;
+  customer_wa: string;
+  delivery_method: 'Diambil' | 'Dikirim';
+  shipping_address: string | null;
+  order_items: POOrderItem[];
+  notes: string | null;
+  total_amount: number;
+  created_at: string;
+  po_resellers?: { nama: string; kode: string } | null;
+  // ── Field baru ──
+  payment_status: PaymentStatus;
+  paid_amount: number;
+  payment_updated_at: string | null;
+}

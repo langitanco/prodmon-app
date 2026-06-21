@@ -3,7 +3,8 @@
 // Dipakai di halaman pendaftaran publik (user -> admin)
 // dan di admin panel (admin -> reseller saat konfirmasi)
 
-import { POResellerFull } from '@/types/po';
+import { POResellerFull, POOrder } from '@/types/po';
+import { formatRupiah } from '@/lib/po/pricing';
 
 /**
  * Normalisasi nomor WA ke format 62xxx (tanpa +, tanpa 0 di depan)
@@ -84,3 +85,53 @@ export const SYARAT_DAN_KETENTUAN = [
   'Apabila dikehendaki pengiriman dan packing dari distributor (Langitan.co), maka akan dikenai admin pengiriman dan packing sebesar 5.000',
   'Dilarang meredesign ulang poster yang sudah diberikan dengan desain sendiri',
 ];
+
+/**
+ * Label status pembayaran untuk ditampilkan di pesan WA.
+ * Sengaja didefinisikan di sini (bukan import dari komponen) supaya
+ * file ini tidak bergantung ke UI/komponen React.
+ */
+const PAYMENT_STATUS_LABEL: Record<string, string> = {
+  BELUM_BAYAR: 'Belum Bayar',
+  DP: 'DP',
+  LUNAS: 'Lunas',
+};
+ 
+/**
+ * Pesan konfirmasi rincian pesanan dari admin -> customer/reseller.
+ * Dipakai saat admin klik "Hubungi via WhatsApp" di detail pesanan,
+ * untuk memastikan rincian pesanan sudah sesuai dengan keinginan customer.
+ */
+export function buildOrderConfirmationMessage(order: POOrder): string {
+  const daftarBarang = order.order_items
+    .map(
+      (item, i) =>
+        `${i + 1}. ${item.product_name} (${item.ukuran}, ${item.lengan}, ${item.warna})\n    ${item.qty}pcs x ${formatRupiah(item.harga_satuan)} = ${formatRupiah(item.subtotal)}`
+    )
+    .join('\n');
+ 
+  const statusLabel = PAYMENT_STATUS_LABEL[order.payment_status] ?? order.payment_status;
+  let infoStatus = `*Status Pembayaran:* ${statusLabel}`;
+  if (order.payment_status === 'DP') {
+    const sisa = Math.max(0, order.total_amount - (order.paid_amount || 0));
+    infoStatus += `\n*Sudah Dibayar:* ${formatRupiah(order.paid_amount || 0)}\n*Sisa Tagihan:* ${formatRupiah(sisa)}`;
+  }
+ 
+  let infoPengiriman = `*Metode Pengambilan:* ${order.delivery_method}`;
+  if (order.delivery_method === 'Dikirim' && order.shipping_address) {
+    infoPengiriman += `\n*Alamat Pengiriman:* ${order.shipping_address}`;
+  }
+ 
+  return `Halo ${order.customer_name}, kami ingin mengonfirmasi pesanan PO Anda.
+ 
+*Kode PO:* ${order.po_number}
+${infoPengiriman}
+ 
+*Daftar Pesanan:*
+${daftarBarang}
+*Total Tagihan:* *${formatRupiah(order.total_amount)}*
+ 
+${infoStatus}
+ 
+Mohon konfirmasi apakah rincian pesanan di atas sudah sesuai. Terima kasih.`;
+}

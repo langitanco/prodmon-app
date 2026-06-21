@@ -8,6 +8,7 @@ import {
   updatePOProduct,
   deletePOProduct,
   togglePOProductActive,
+  deleteProductImages, // ← tambahkan ini
 } from "@/lib/po/admin";
 import { formatRupiah } from "@/lib/po/pricing";
 import { POProduct } from "@/types/po";
@@ -77,6 +78,7 @@ export default function POProductList() {
   const [saving, setSaving] = useState(false);
 
   const [newFiles, setNewFiles] = useState<File[]>([]);
+  const [pendingDeleteUrls, setPendingDeleteUrls] = useState<string[]>([]);
   const [previewUrls, setPreviewUrls] = useState<string[]>([]);
 
   const [rawSizes, setRawSizes] = useState("");
@@ -108,6 +110,7 @@ export default function POProductList() {
     setForm(EMPTY_PRODUCT);
     setNewFiles([]);
     setPreviewUrls([]);
+    setPendingDeleteUrls([]); // ← tambahkan ini
     setShowForm(true);
   }
 
@@ -131,6 +134,7 @@ export default function POProductList() {
     });
     setNewFiles([]);
     setPreviewUrls([]);
+    setPendingDeleteUrls([]); // ← tambahkan ini
     setShowForm(true);
   }
 
@@ -144,9 +148,15 @@ export default function POProductList() {
   }
 
   function removeOldImage(index: number) {
+    const urlToDelete = form.image_urls[index];
     const updated = [...form.image_urls];
     updated.splice(index, 1);
     setForm({ ...form, image_urls: updated });
+
+    // Tandai untuk dihapus nanti, BUKAN dihapus sekarang.
+    // Kalau user klik "Batal", daftar ini akan dibuang begitu saja
+    // dan file di storage tetap aman karena tidak pernah dieksekusi.
+    setPendingDeleteUrls((prev) => [...prev, urlToDelete]);
   }
 
   function removeNewImage(index: number) {
@@ -202,6 +212,12 @@ export default function POProductList() {
         await createPOProduct(finalData);
       }
 
+      // Baru sekarang, SETELAH save ke database berhasil,
+      // benar-benar hapus file-file lama yang ditandai dari storage.
+      if (pendingDeleteUrls.length > 0) {
+        await deleteProductImages(pendingDeleteUrls);
+      }
+
       setShowForm(false);
       load();
     } catch (err) {
@@ -237,7 +253,10 @@ export default function POProductList() {
     return (
       <div className="w-full max-w-4xl mx-auto space-y-6 animate-in fade-in duration-200">
         <button
-          onClick={() => setShowForm(false)}
+          onClick={() => {
+            setPendingDeleteUrls([]);
+            setShowForm(false);
+          }}
           className="flex items-center gap-2 text-sm font-semibold text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-white transition-colors"
         >
           <ArrowLeft size={15} /> Kembali
@@ -523,7 +542,10 @@ export default function POProductList() {
 
         <div className="flex flex-col-reverse md:flex-row gap-3 pt-4 border-t border-slate-100 dark:border-slate-800">
           <button
-            onClick={() => setShowForm(false)}
+            onClick={() => {
+              setPendingDeleteUrls([]);
+              setShowForm(false);
+            }}
             className="w-full md:w-auto px-6 py-3 border border-slate-200 dark:border-slate-700 rounded-xl text-sm font-semibold text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
           >
             Batal

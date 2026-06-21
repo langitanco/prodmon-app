@@ -1,9 +1,21 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { getAllPOOrders, deletePOOrder } from "@/lib/po/admin";
+import POOrderEditForm from "./POOrderEditForm";
+
+import {
+  getAllPOOrders,
+  deletePOOrder,
+  updatePaymentStatus,
+  getAllPOProducts,
+  getPOSettingAdmin,
+} from "@/lib/po/admin";
 import { formatRupiah } from "@/lib/po/pricing";
-import { POOrder } from "@/types/po";
+import { POOrder, PaymentStatus, POProduct, POSetting } from "@/types/po";
+import {
+  buildWaLink,
+  buildOrderConfirmationMessage,
+} from "@/lib/po/wa-messages";
 import {
   Search,
   RefreshCw,
@@ -13,14 +25,164 @@ import {
   ChevronRight,
   Package,
   Download,
+  CheckCircle2,
+  CircleDollarSign,
+  XCircle,
+  Pencil,
+  ChevronDown,
 } from "lucide-react";
+
+/* ── Konfigurasi tampilan status pembayaran ─────────────────── */
+const PAYMENT_CONFIG: Record<
+  PaymentStatus,
+  {
+    label: string;
+    icon: typeof CheckCircle2;
+    className: string;
+    iconClass: string;
+  }
+> = {
+  BELUM_BAYAR: {
+    label: "Belum Bayar",
+    icon: XCircle,
+    className: "bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400",
+    iconClass: "text-red-600 dark:text-red-400",
+  },
+  DP: {
+    label: "DP",
+    icon: CircleDollarSign,
+    className:
+      "bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400",
+    iconClass: "text-amber-600 dark:text-amber-400",
+  },
+  LUNAS: {
+    label: "Lunas",
+    icon: CheckCircle2,
+    className:
+      "bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400",
+    iconClass: "text-emerald-600 dark:text-emerald-400",
+  },
+};
+
+const PAYMENT_OPTIONS: PaymentStatus[] = ["BELUM_BAYAR", "DP", "LUNAS"];
+
+/* ── Dropdown badge untuk ubah status pembayaran ────────────── */
+function PaymentStatusBadge({
+  order,
+  onChange,
+}: {
+  order: POOrder;
+  onChange: (id: string, status: PaymentStatus, paidAmount?: number) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [showDpInput, setShowDpInput] = useState(false);
+  const [dpValue, setDpValue] = useState(order.paid_amount?.toString() || "");
+
+  const config =
+    PAYMENT_CONFIG[order.payment_status] ?? PAYMENT_CONFIG.BELUM_BAYAR;
+  const Icon = config.icon;
+
+  function handleSelect(status: PaymentStatus) {
+    if (status === "DP") {
+      setShowDpInput(true);
+      setOpen(false);
+      return;
+    }
+    onChange(order.id, status);
+    setOpen(false);
+  }
+
+  function handleConfirmDp() {
+    const amount = parseFloat(dpValue) || 0;
+    onChange(order.id, "DP", amount);
+    setShowDpInput(false);
+  }
+
+  if (showDpInput) {
+    return (
+      <div
+        className="flex items-center gap-1.5"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <input
+          type="number"
+          autoFocus
+          placeholder="Nominal DP"
+          value={dpValue}
+          onChange={(e) => setDpValue(e.target.value)}
+          onKeyDown={(e) => e.key === "Enter" && handleConfirmDp()}
+          className="w-24 text-xs px-2 py-1 border border-amber-300 dark:border-amber-700 rounded-md bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-1 focus:ring-amber-400"
+        />
+        <button
+          onClick={handleConfirmDp}
+          className="text-[10px] font-bold px-2 py-1 bg-amber-500 hover:bg-amber-600 text-white rounded-md"
+        >
+          OK
+        </button>
+        <button
+          onClick={() => setShowDpInput(false)}
+          className="text-[10px] font-bold px-2 py-1 text-slate-400 hover:text-slate-600"
+        >
+          Batal
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="relative inline-block" onClick={(e) => e.stopPropagation()}>
+      <button
+        onClick={() => setOpen((v) => !v)}
+        className={`inline-flex items-center gap-1 text-[10px] font-extrabold px-2.5 py-1 rounded-lg ${config.className} hover:opacity-80 transition-opacity`}
+      >
+        <Icon size={11} />
+        {config.label}
+        {order.payment_status === "DP" && order.paid_amount > 0 && (
+          <span className="opacity-75">
+            · {formatRupiah(order.paid_amount)}
+          </span>
+        )}
+        <ChevronDown size={11} />
+      </button>
+
+      {open && (
+        <>
+          <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} />
+          <div className="absolute z-20 mt-1.5 right-0 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-lg overflow-hidden min-w-[140px]">
+            {PAYMENT_OPTIONS.map((status) => {
+              const c = PAYMENT_CONFIG[status];
+              const I = c.icon;
+              return (
+                <button
+                  key={status}
+                  onClick={() => handleSelect(status)}
+                  className="w-full flex items-center gap-2 px-3 py-2.5 text-xs font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors text-left"
+                >
+                  <I size={13} className={c.iconClass} />
+                  {c.label}
+                </button>
+              );
+            })}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
 
 export default function POOrderList() {
   const [orders, setOrders] = useState<POOrder[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [selected, setSelected] = useState<POOrder | null>(null);
+  const [editing, setEditing] = useState(false);
+  const [products, setProducts] = useState<POProduct[]>([]);
+  const [setting, setSetting] = useState<POSetting | null>(null);
+  const [loadingMeta, setLoadingMeta] = useState(false);
   const [filterType, setFilterType] = useState<"ALL" | "PUBLIC" | "RESELLER">(
+    "ALL",
+  );
+  const [filterPayment, setFilterPayment] = useState<"ALL" | PaymentStatus>(
     "ALL",
   );
   const [search, setSearch] = useState("");
@@ -39,6 +201,26 @@ export default function POOrderList() {
     else setLoading(false);
   }
 
+  async function openEditMode() {
+    if (products.length === 0 || !setting) {
+      setLoadingMeta(true);
+      const [prods, set] = await Promise.all([
+        getAllPOProducts(),
+        getPOSettingAdmin(),
+      ]);
+      setProducts(prods);
+      setSetting(set);
+      setLoadingMeta(false);
+    }
+    setEditing(true);
+  }
+
+  function handleOrderSaved(updated: POOrder) {
+    setOrders((prev) => prev.map((o) => (o.id === updated.id ? updated : o)));
+    setSelected(updated);
+    setEditing(false);
+  }
+
   async function handleDelete(id: string, po_number: string) {
     if (
       !confirm(
@@ -55,12 +237,52 @@ export default function POOrderList() {
     }
   }
 
+  async function handlePaymentChange(
+    id: string,
+    status: PaymentStatus,
+    paidAmount?: number,
+  ) {
+    const target = orders.find((o) => o.id === id);
+    const resolvedAmount =
+      paidAmount !== undefined
+        ? paidAmount
+        : status === "LUNAS"
+          ? (target?.total_amount ?? 0)
+          : status === "BELUM_BAYAR"
+            ? 0
+            : (target?.paid_amount ?? 0);
+
+    // Optimistic update di UI dulu
+    setOrders((prev) =>
+      prev.map((o) =>
+        o.id === id
+          ? { ...o, payment_status: status, paid_amount: resolvedAmount }
+          : o,
+      ),
+    );
+    if (selected?.id === id) {
+      setSelected((prev) =>
+        prev
+          ? { ...prev, payment_status: status, paid_amount: resolvedAmount }
+          : prev,
+      );
+    }
+
+    const result = await updatePaymentStatus(id, status, resolvedAmount);
+    if (!result.success) {
+      alert("Gagal update status pembayaran: " + result.error);
+      load(true); // rollback dengan reload data asli dari server
+    }
+  }
+
   const filtered = orders.filter((o) => {
     const matchType = filterType === "ALL" || o.customer_type === filterType;
+    const matchPayment =
+      filterPayment === "ALL" || o.payment_status === filterPayment;
     const matchSearch =
       o.po_number.toLowerCase().includes(search.toLowerCase()) ||
       o.customer_name.toLowerCase().includes(search.toLowerCase());
-    return matchType && matchSearch;
+    return matchType && matchPayment && matchSearch;
   });
 
   /* ── Export Excel (sesuai data yang sedang ter-filter) ──────── */
@@ -72,6 +294,9 @@ export default function POOrderList() {
     setExporting(true);
     try {
       const XLSX = await import("xlsx");
+
+      const paymentLabel = (status: PaymentStatus) =>
+        PAYMENT_CONFIG[status]?.label ?? status;
 
       // ── Sheet 1: Rekap per item (1 baris = 1 item produk) ──
       const itemRows: Record<string, any>[] = [];
@@ -85,6 +310,8 @@ export default function POOrderList() {
               : "-",
             Pelanggan: order.customer_name,
             WhatsApp: order.customer_wa,
+            "Status Bayar": paymentLabel(order.payment_status),
+            "Jumlah Dibayar": order.paid_amount || 0,
             "Metode Kirim": order.delivery_method,
             Alamat: order.shipping_address || "-",
             Produk: item.product_name,
@@ -115,6 +342,12 @@ export default function POOrderList() {
           : "-",
         Pelanggan: order.customer_name,
         WhatsApp: order.customer_wa,
+        "Status Bayar": paymentLabel(order.payment_status),
+        "Jumlah Dibayar": order.paid_amount || 0,
+        "Sisa Tagihan": Math.max(
+          0,
+          order.total_amount - (order.paid_amount || 0),
+        ),
         "Metode Kirim": order.delivery_method,
         Alamat: order.shipping_address || "-",
         "Jumlah Item": order.order_items.reduce((s, i) => s + i.qty, 0),
@@ -138,6 +371,9 @@ export default function POOrderList() {
         { wch: 22 }, // Reseller
         { wch: 20 }, // Pelanggan
         { wch: 16 }, // WhatsApp
+        { wch: 13 }, // Status Bayar
+        { wch: 14 }, // Jumlah Dibayar
+        { wch: 14 }, // Sisa Tagihan
         { wch: 12 }, // Metode Kirim
         { wch: 28 }, // Alamat
         { wch: 12 }, // Jumlah Item
@@ -154,6 +390,8 @@ export default function POOrderList() {
         { wch: 22 }, // Reseller
         { wch: 20 }, // Pelanggan
         { wch: 16 }, // WhatsApp
+        { wch: 13 }, // Status Bayar
+        { wch: 14 }, // Jumlah Dibayar
         { wch: 12 }, // Metode Kirim
         { wch: 28 }, // Alamat
         { wch: 22 }, // Produk
@@ -175,8 +413,13 @@ export default function POOrderList() {
           : filterType === "PUBLIC"
             ? "Public"
             : "Reseller";
+      const labelPayment =
+        filterPayment === "ALL" ? "" : `-${paymentLabel(filterPayment)}`;
 
-      XLSX.writeFile(wb, `Rekap-PO-${labelFilter}-${tanggalFile}.xlsx`);
+      XLSX.writeFile(
+        wb,
+        `Rekap-PO-${labelFilter}${labelPayment}-${tanggalFile}.xlsx`,
+      );
     } catch (err) {
       console.error(err);
       alert(
@@ -195,6 +438,19 @@ export default function POOrderList() {
         <span className="text-sm">Memuat pesanan...</span>
       </div>
     );
+
+  /* ── Edit View ─────────────────────────────────────────────── */
+  if (editing && selected && setting) {
+    return (
+      <POOrderEditForm
+        order={selected}
+        products={products}
+        setting={setting}
+        onCancel={() => setEditing(false)}
+        onSaved={handleOrderSaved}
+      />
+    );
+  }
 
   /* ── Detail View ───────────────────────────────────────────── */
   if (selected) {
@@ -218,16 +474,22 @@ export default function POOrderList() {
                 {selected.po_number}
               </p>
             </div>
-            <span
-              className={`inline-flex w-max text-xs font-extrabold px-3 py-1.5 rounded-xl mt-1
-              ${
-                selected.customer_type === "RESELLER"
-                  ? "bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400"
-                  : "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400"
-              }`}
-            >
-              {selected.customer_type}
-            </span>
+            <div className="flex flex-col items-end gap-2">
+              <span
+                className={`inline-flex w-max text-xs font-extrabold px-3 py-1.5 rounded-xl
+                ${
+                  selected.customer_type === "RESELLER"
+                    ? "bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400"
+                    : "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400"
+                }`}
+              >
+                {selected.customer_type}
+              </span>
+              <PaymentStatusBadge
+                order={selected}
+                onChange={handlePaymentChange}
+              />
+            </div>
           </div>
 
           {/* Info Card */}
@@ -254,6 +516,15 @@ export default function POOrderList() {
               selected.po_resellers && {
                 label: "Reseller",
                 value: `${selected.po_resellers.nama} (${selected.po_resellers.kode})`,
+              },
+              selected.payment_status === "DP" && {
+                label: "Sisa Tagihan",
+                value: formatRupiah(
+                  Math.max(
+                    0,
+                    selected.total_amount - (selected.paid_amount || 0),
+                  ),
+                ),
               },
               {
                 label: "Tanggal",
@@ -366,8 +637,23 @@ export default function POOrderList() {
 
           {/* Actions */}
           <div className="flex flex-col sm:flex-row gap-3 pt-2">
+            <button
+              onClick={openEditMode}
+              disabled={loadingMeta}
+              className="w-full sm:w-auto flex items-center justify-center gap-2 px-6 text-sm border border-blue-200 dark:border-blue-800 text-blue-600 dark:text-blue-400 py-3 rounded-xl font-semibold hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors disabled:opacity-50"
+            >
+              {loadingMeta ? (
+                <div className="w-4 h-4 border-2 border-blue-300 border-t-blue-600 rounded-full animate-spin" />
+              ) : (
+                <Pencil size={15} />
+              )}
+              Edit Pesanan
+            </button>
             <a
-              href={`https://wa.me/${selected.customer_wa}`}
+              href={buildWaLink(
+                selected.customer_wa,
+                buildOrderConfirmationMessage(selected),
+              )}
               target="_blank"
               className="w-full sm:flex-1 flex items-center justify-center gap-2 text-sm font-bold bg-emerald-500 hover:bg-emerald-600 text-white py-3 rounded-xl transition-colors shadow-sm"
             >
@@ -405,29 +691,12 @@ export default function POOrderList() {
           />
         </div>
 
-        {/* Tab Filter & Refresh Button */}
-        <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">
-          <div className="flex w-full sm:w-auto bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-xl p-1.5">
-            {(["ALL", "PUBLIC", "RESELLER"] as const).map((type) => (
-              <button
-                key={type}
-                onClick={() => setFilterType(type)}
-                className={`flex-1 sm:flex-none text-xs font-bold px-4 py-2 rounded-lg transition-all
-                  ${
-                    filterType === type
-                      ? "bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-sm"
-                      : "text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300"
-                  }`}
-              >
-                {type === "ALL" ? "Semua" : type}
-              </button>
-            ))}
-          </div>
-
+        {/* Refresh & Export */}
+        <div className="flex flex-row gap-2 sm:gap-3">
           <button
             onClick={() => load(true)}
             disabled={refreshing}
-            className="w-full sm:w-auto flex justify-center items-center gap-2 text-sm px-5 py-3 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors"
+            className="flex-1 sm:w-auto flex justify-center items-center gap-2 text-sm px-3 sm:px-5 py-3 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors"
           >
             <RefreshCw size={14} className={refreshing ? "animate-spin" : ""} />
             Refresh
@@ -436,11 +705,48 @@ export default function POOrderList() {
           <button
             onClick={handleExportExcel}
             disabled={exporting || filtered.length === 0}
-            className="w-full sm:w-auto flex justify-center items-center gap-2 text-sm px-5 py-3 bg-emerald-600 hover:bg-emerald-700 disabled:bg-emerald-400 text-white rounded-xl font-bold transition-colors"
+            className="flex-1 sm:w-auto flex justify-center items-center gap-2 text-sm px-3 sm:px-5 py-3 bg-emerald-600 hover:bg-emerald-700 disabled:bg-emerald-400 text-white rounded-xl font-bold transition-colors"
           >
             <Download size={14} className={exporting ? "animate-bounce" : ""} />
-            {exporting ? "Membuat..." : "Download Excel"}
+            {exporting ? "Membuat..." : "Excel"}
           </button>
+        </div>
+      </div>
+
+      {/* Tab Filter Tipe & Pembayaran */}
+      <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">
+        <div className="flex w-full sm:w-auto bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-xl p-1.5">
+          {(["ALL", "PUBLIC", "RESELLER"] as const).map((type) => (
+            <button
+              key={type}
+              onClick={() => setFilterType(type)}
+              className={`flex-1 sm:flex-none text-xs font-bold px-4 py-2 rounded-lg transition-all
+                ${
+                  filterType === type
+                    ? "bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-sm"
+                    : "text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300"
+                }`}
+            >
+              {type === "ALL" ? "Semua" : type}
+            </button>
+          ))}
+        </div>
+
+        <div className="flex w-full sm:w-auto bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-xl p-1.5">
+          {(["ALL", "BELUM_BAYAR", "DP", "LUNAS"] as const).map((status) => (
+            <button
+              key={status}
+              onClick={() => setFilterPayment(status)}
+              className={`flex-1 sm:flex-none text-xs font-bold px-4 py-2 rounded-lg transition-all
+                ${
+                  filterPayment === status
+                    ? "bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-sm"
+                    : "text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300"
+                }`}
+            >
+              {status === "ALL" ? "Semua Bayar" : PAYMENT_CONFIG[status].label}
+            </button>
+          ))}
         </div>
       </div>
 
@@ -458,12 +764,13 @@ export default function POOrderList() {
       ) : (
         /* Order Table */
         <div className="border border-slate-200 dark:border-slate-700 rounded-2xl overflow-hidden overflow-x-auto bg-white dark:bg-slate-900/20">
-          <table className="w-full text-sm min-w-[700px]">
+          <table className="w-full text-sm min-w-[820px]">
             <thead>
               <tr className="bg-slate-50 dark:bg-slate-800/60 border-b border-slate-200 dark:border-slate-700 text-[10px] font-extrabold uppercase tracking-wider text-slate-500 dark:text-slate-400">
                 <th className="text-left px-5 py-3.5">Kode PO</th>
                 <th className="text-left px-5 py-3.5">Pelanggan</th>
                 <th className="text-center px-5 py-3.5">Tipe</th>
+                <th className="text-center px-5 py-3.5">Pembayaran</th>
                 <th className="text-right px-5 py-3.5">Total</th>
                 <th className="text-right px-5 py-3.5">Tanggal</th>
                 <th className="px-5 py-3.5 w-12"></th>
@@ -502,6 +809,12 @@ export default function POOrderList() {
                     >
                       {order.customer_type}
                     </span>
+                  </td>
+                  <td className="px-5 py-4 text-center">
+                    <PaymentStatusBadge
+                      order={order}
+                      onChange={handlePaymentChange}
+                    />
                   </td>
                   <td className="px-5 py-4 text-right font-bold text-slate-800 dark:text-slate-200">
                     {formatRupiah(order.total_amount)}
