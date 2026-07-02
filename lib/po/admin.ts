@@ -2,7 +2,7 @@
 // Fungsi Supabase khusus untuk admin PO — semua perlu auth
 
 import { createClient } from '@/lib/supabase/client';
-import { POSetting, POProduct, POOrder, POResellerFull } from '@/types/po';
+import { POSetting, POProduct, POOrder, POResellerFull,POOrderItem } from '@/types/po';
 
 // ─────────────────────────────────────────────
 // SETTING
@@ -331,7 +331,7 @@ export async function getPOStats(): Promise<{
   const supabase = createClient();
   const { data } = await supabase
     .from('po_orders')
-    .select('customer_type, total_amount');
+    .select('customer_type, total_amount, order_items'); // ⬅️ tambahkan order_items
 
   if (!data) return { 
     totalOrders: 0, 
@@ -346,10 +346,19 @@ export async function getPOStats(): Promise<{
     .select('*', { count: 'exact', head: true })
     .eq('is_active', true); // Hitung produk yang aktif saja
 
+  // Jumlahkan qty semua item dalam satu pesanan
+  const sumQty = (items: POOrderItem[] | null | undefined) =>
+    (items || []).reduce((s, item) => s + (item.qty || 0), 0);
+
   return {
-    totalOrders: data.length,
-    totalPublic: data.filter((o) => o.customer_type === 'PUBLIC').length,
-    totalReseller: data.filter((o) => o.customer_type === 'RESELLER').length,
+    // ← sekarang total PCS terinput, bukan jumlah baris pesanan
+    totalOrders: data.reduce((sum, o) => sum + sumQty(o.order_items), 0),
+    totalPublic: data
+      .filter((o) => o.customer_type === 'PUBLIC')
+      .reduce((sum, o) => sum + sumQty(o.order_items), 0),
+    totalReseller: data
+      .filter((o) => o.customer_type === 'RESELLER')
+      .reduce((sum, o) => sum + sumQty(o.order_items), 0),
     totalAmount: data.reduce((sum, o) => sum + (o.total_amount || 0), 0),
     totalProducts: totalProducts || 0,
   };

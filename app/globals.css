@@ -40,3 +40,29 @@ button, .cursor-pointer {
   -webkit-user-select: none;
   user-select: none;
 }
+
+/* Area cetak disembunyikan dari layar normal */
+.print-only {
+  position: absolute;
+  left: -9999px;
+  top: 0;
+}
+
+@media print {
+  /* Sembunyikan semua isi halaman kecuali area cetak */
+  body * {
+    visibility: hidden;
+  }
+  .print-only,
+  .print-only * {
+    visibility: visible;
+  }
+  .print-only {
+    position: static;
+    left: 0;
+  }
+  @page {
+    size: A4;
+    margin: 0;
+  }
+}

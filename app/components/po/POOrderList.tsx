@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import POOrderPrintSlip from "./POOrderPrintSlip";
+import { useRef, useEffect, useState } from "react";
 import POOrderEditForm from "./POOrderEditForm";
 
 import {
@@ -30,6 +31,7 @@ import {
   XCircle,
   Pencil,
   ChevronDown,
+  Printer,
 } from "lucide-react";
 
 /* ── Konfigurasi tampilan status pembayaran ─────────────────── */
@@ -187,6 +189,98 @@ export default function POOrderList() {
   );
   const [search, setSearch] = useState("");
   const [exporting, setExporting] = useState(false);
+
+  const printRef = useRef<HTMLDivElement>(null);
+  const [downloadingPdf, setDownloadingPdf] = useState(false);
+
+  function handlePrint() {
+    window.print();
+  }
+
+  async function handleDownloadPdf(order: POOrder) {
+    setDownloadingPdf(true);
+    try {
+      const html2canvas = (await import("html2canvas-pro")).default;
+      const { jsPDF } = await import("jspdf");
+
+      const node = printRef.current;
+      if (!node) return;
+
+      const canvas = await html2canvas(node, {
+        scale: 3,
+        backgroundColor: "#ffffff",
+        useCORS: true,
+      });
+
+      const pdf = new jsPDF({
+        orientation: "portrait",
+        unit: "mm",
+        format: "a4",
+        compress: true,
+      });
+
+      // ── Atur margin di sini (mm) ──
+      const MARGIN_MM = 10;
+
+      const pageWidth = pdf.internal.pageSize.getWidth();
+      const pageHeight = pdf.internal.pageSize.getHeight();
+      const contentWidthMM = pageWidth - MARGIN_MM * 2;
+      const contentHeightMM = pageHeight - MARGIN_MM * 2;
+
+      // Berapa piksel canvas asli setara 1mm konten, lalu berapa piksel muat 1 halaman
+      const pxPerMm = canvas.width / contentWidthMM;
+      const pageHeightPx = Math.floor(contentHeightMM * pxPerMm);
+
+      const totalPages = Math.max(1, Math.ceil(canvas.height / pageHeightPx));
+
+      for (let i = 0; i < totalPages; i++) {
+        const sourceY = i * pageHeightPx;
+        const sliceHeightPx = Math.min(pageHeightPx, canvas.height - sourceY);
+
+        // Potong canvas asli jadi satu halaman penuh (bukan cuma digeser)
+        const pageCanvas = document.createElement("canvas");
+        pageCanvas.width = canvas.width;
+        pageCanvas.height = sliceHeightPx;
+        const ctx = pageCanvas.getContext("2d");
+        if (!ctx) continue;
+        ctx.fillStyle = "#ffffff";
+        ctx.fillRect(0, 0, pageCanvas.width, pageCanvas.height);
+        ctx.drawImage(
+          canvas,
+          0,
+          sourceY,
+          canvas.width,
+          sliceHeightPx,
+          0,
+          0,
+          canvas.width,
+          sliceHeightPx,
+        );
+
+        const sliceImgData = pageCanvas.toDataURL("image/jpeg", 0.75);
+        const sliceHeightMM = sliceHeightPx / pxPerMm;
+
+        if (i > 0) pdf.addPage();
+        pdf.addImage(
+          sliceImgData,
+          "JPEG",
+          MARGIN_MM,
+          MARGIN_MM,
+          contentWidthMM,
+          sliceHeightMM,
+          undefined,
+          "FAST",
+        );
+      }
+
+      pdf.save(`Struk-${order.po_number}.pdf`);
+    } catch (err) {
+      console.error(err);
+      alert("Gagal membuat PDF.");
+    } finally {
+      setDownloadingPdf(false);
+    }
+  }
 
   useEffect(() => {
     load();
@@ -430,6 +524,98 @@ export default function POOrderList() {
     }
   }
 
+  async function handleExportExcelAll() {
+    if (orders.length === 0) {
+      alert("Tidak ada data untuk diexport.");
+      return;
+    }
+    setExporting(true);
+    try {
+      const XLSX = await import("xlsx");
+
+      const paymentLabel = (status: PaymentStatus) =>
+        PAYMENT_CONFIG[status]?.label ?? status;
+
+      const itemRows: Record<string, any>[] = [];
+      orders.forEach((order) => {
+        // ← pakai orders, bukan filtered
+        order.order_items.forEach((item) => {
+          itemRows.push({
+            "Kode PO": order.po_number,
+            Tipe: order.customer_type,
+            Reseller: order.po_resellers
+              ? `${order.po_resellers.nama} (${order.po_resellers.kode})`
+              : "-",
+            Pelanggan: order.customer_name,
+            WhatsApp: order.customer_wa,
+            "Status Bayar": paymentLabel(order.payment_status),
+            "Jumlah Dibayar": order.paid_amount || 0,
+            "Metode Kirim": order.delivery_method,
+            Alamat: order.shipping_address || "-",
+            Produk: item.product_name,
+            Warna: item.warna,
+            Lengan: item.lengan,
+            Ukuran: item.ukuran,
+            Qty: item.qty,
+            "Harga Satuan": item.harga_satuan,
+            Subtotal: item.subtotal,
+            Catatan: order.notes || "-",
+            Tanggal: new Date(order.created_at).toLocaleString("id-ID", {
+              day: "numeric",
+              month: "short",
+              year: "numeric",
+              hour: "2-digit",
+              minute: "2-digit",
+            }),
+          });
+        });
+      });
+
+      const orderRows = orders.map((order) => ({
+        // ← pakai orders juga
+        "Kode PO": order.po_number,
+        Tipe: order.customer_type,
+        Reseller: order.po_resellers
+          ? `${order.po_resellers.nama} (${order.po_resellers.kode})`
+          : "-",
+        Pelanggan: order.customer_name,
+        WhatsApp: order.customer_wa,
+        "Status Bayar": paymentLabel(order.payment_status),
+        "Jumlah Dibayar": order.paid_amount || 0,
+        "Sisa Tagihan": Math.max(
+          0,
+          order.total_amount - (order.paid_amount || 0),
+        ),
+        "Metode Kirim": order.delivery_method,
+        Alamat: order.shipping_address || "-",
+        "Jumlah Item": order.order_items.reduce((s, i) => s + i.qty, 0),
+        "Total (Rp)": order.total_amount,
+        Catatan: order.notes || "-",
+        Tanggal: new Date(order.created_at).toLocaleString("id-ID", {
+          day: "numeric",
+          month: "short",
+          year: "numeric",
+          hour: "2-digit",
+          minute: "2-digit",
+        }),
+      }));
+
+      const wb = XLSX.utils.book_new();
+      const wsOrders = XLSX.utils.json_to_sheet(orderRows);
+      XLSX.utils.book_append_sheet(wb, wsOrders, "Rekap Pesanan");
+      const wsItems = XLSX.utils.json_to_sheet(itemRows);
+      XLSX.utils.book_append_sheet(wb, wsItems, "Detail Item");
+
+      const tanggalFile = new Date().toISOString().slice(0, 10);
+      XLSX.writeFile(wb, `Rekap-PO-SEMUA-${tanggalFile}.xlsx`);
+    } catch (err) {
+      console.error(err);
+      alert("Gagal membuat file Excel.");
+    } finally {
+      setExporting(false);
+    }
+  }
+
   /* ── Loading ───────────────────────────────────────────────── */
   if (loading)
     return (
@@ -649,6 +835,27 @@ export default function POOrderList() {
               )}
               Edit Pesanan
             </button>
+
+            {/* ── Tombol baru ── */}
+            <button
+              onClick={handlePrint}
+              className="w-full sm:w-auto flex items-center justify-center gap-2 px-6 text-sm border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 py-3 rounded-xl font-semibold hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors"
+            >
+              <Printer size={15} /> Print
+            </button>
+            <button
+              onClick={() => handleDownloadPdf(selected)}
+              disabled={downloadingPdf}
+              className="w-full sm:w-auto flex items-center justify-center gap-2 px-6 text-sm border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 py-3 rounded-xl font-semibold hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors disabled:opacity-50"
+            >
+              <Download
+                size={15}
+                className={downloadingPdf ? "animate-bounce" : ""}
+              />
+              {downloadingPdf ? "Membuat..." : "Download PDF"}
+            </button>
+            {/* ── akhir tombol baru ── */}
+
             <a
               href={buildWaLink(
                 selected.customer_wa,
@@ -666,6 +873,15 @@ export default function POOrderList() {
               <Trash2 size={15} /> Hapus Pesanan
             </button>
           </div>
+        </div>
+        {/* Area cetak — tersembunyi di layar, muncul saat print/PDF */}
+        <div className="print-only" ref={printRef}>
+          <POOrderPrintSlip
+            order={selected}
+            storeName="Langitan.co"
+            storeAddress="Mandungan, Widang, Tuban, Jawa Timur"
+            // logoUrl="/logo.png"
+          />
         </div>
       </div>
     );
