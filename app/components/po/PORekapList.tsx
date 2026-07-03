@@ -1,13 +1,21 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { getAllPOOrders, getAllPOProducts } from "@/lib/po/admin";
-import { POOrder, POProduct } from "@/types/po";
+import {
+  getAllPOOrders,
+  getAllPOProducts,
+  getPOSettingAdmin,
+} from "@/lib/po/admin";
+import { POOrder, POProduct, POSetting } from "@/types/po";
 import {
   RefreshCw,
   ClipboardList,
   Download,
   AlertTriangle,
+  ShoppingBag,
+  Shirt,
+  Baby,
+  Snowflake,
 } from "lucide-react";
 
 /* ── Tipe bantu untuk hasil rekap ── */
@@ -35,6 +43,7 @@ interface PORekapListProps {
 export default function PORekapList({ poId }: PORekapListProps) {
   const [orders, setOrders] = useState<POOrder[]>([]);
   const [products, setProducts] = useState<POProduct[]>([]);
+  const [setting, setSetting] = useState<POSetting | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [exporting, setExporting] = useState(false);
@@ -46,12 +55,14 @@ export default function PORekapList({ poId }: PORekapListProps) {
   async function load(isRefresh = false) {
     if (isRefresh) setRefreshing(true);
     else setLoading(true);
-    const [ordersData, productsData] = await Promise.all([
+    const [ordersData, productsData, settingData] = await Promise.all([
       getAllPOOrders(poId),
       getAllPOProducts(poId),
+      getPOSettingAdmin(poId),
     ]);
     setOrders(ordersData);
     setProducts(productsData);
+    setSetting(settingData);
     if (isRefresh) setRefreshing(false);
     else setLoading(false);
   }
@@ -189,7 +200,109 @@ export default function PORekapList({ poId }: PORekapListProps) {
 
   const totalUnitProduksi = rekapList.reduce((s, r) => s + r.totalJumlah, 0);
 
-  /* ── Export Excel: 1 sheet per produk ── */
+  /* ── Rekap Belanja Bahan: per Jenis Garmen (lintas semua produk) ── */
+  type BelanjaRow = {
+    label: string;
+    perUkuran: Record<string, number>;
+    jumlah: number;
+  };
+  type BelanjaSection = {
+    key: string;
+    label: string;
+    columns: string[];
+    rows: BelanjaRow[];
+    totalPerUkuran: Record<string, number>;
+    totalJumlah: number;
+  };
+
+  const GARMENT_LABELS: Record<string, string> = {
+    kaos_dewasa: "Kaos Dewasa",
+    kaos_kids: "Kaos Kids",
+    sweater: "Sweater",
+    hoodie: "Hoodie",
+  };
+  const GARMENT_ORDER = ["kaos_dewasa", "kaos_kids", "sweater", "hoodie"];
+
+  const belanjaSections: BelanjaSection[] = useMemo(() => {
+    if (orders.length === 0 || products.length === 0) return [];
+    const productMap = new Map(products.map((p) => [p.id, p]));
+
+    // Kolom ukuran per garment: ambil urutan dari master produk dulu
+    const columnsByGarment: Record<string, string[]> = {};
+    products.forEach((p) => {
+      const gt = p.garment_type || "kaos_dewasa";
+      if (!columnsByGarment[gt]) columnsByGarment[gt] = [];
+      p.available_sizes.forEach((u) => {
+        if (!columnsByGarment[gt].includes(u)) columnsByGarment[gt].push(u);
+      });
+    });
+
+    // Kumpulkan qty per garment_type::(warna+lengan)::ukuran, lintas SEMUA produk
+    const qtyMap = new Map<string, number>();
+    orders.forEach((order) => {
+      order.order_items.forEach((item) => {
+        const master = productMap.get(item.product_id);
+        const garmentType = master?.garment_type || "kaos_dewasa";
+        const jenisLabel = `${item.warna} ${item.lengan}`.trim() || "-";
+        const key = `${garmentType}::${jenisLabel}::${item.ukuran}`;
+        qtyMap.set(key, (qtyMap.get(key) || 0) + item.qty);
+
+        // Jaga-jaga kalau ukuran di order tidak ada di master produk manapun
+        if (!columnsByGarment[garmentType]) columnsByGarment[garmentType] = [];
+        if (!columnsByGarment[garmentType].includes(item.ukuran)) {
+          columnsByGarment[garmentType].push(item.ukuran);
+        }
+      });
+    });
+
+    const sections: BelanjaSection[] = [];
+
+    GARMENT_ORDER.forEach((garmentType) => {
+      const columns = columnsByGarment[garmentType];
+      if (!columns || columns.length === 0) return;
+
+      const jenisSet = new Set<string>();
+      qtyMap.forEach((_, key) => {
+        const [gt, jenis] = key.split("::");
+        if (gt === garmentType) jenisSet.add(jenis);
+      });
+      if (jenisSet.size === 0) return;
+
+      const rows: BelanjaRow[] = Array.from(jenisSet)
+        .sort()
+        .map((jenis) => {
+          const perUkuran: Record<string, number> = {};
+          let jumlah = 0;
+          columns.forEach((ukuran) => {
+            const qty = qtyMap.get(`${garmentType}::${jenis}::${ukuran}`) || 0;
+            perUkuran[ukuran] = qty;
+            jumlah += qty;
+          });
+          return { label: jenis, perUkuran, jumlah };
+        });
+
+      const totalPerUkuran: Record<string, number> = {};
+      let totalJumlah = 0;
+      columns.forEach((ukuran) => {
+        const t = rows.reduce((s, r) => s + (r.perUkuran[ukuran] || 0), 0);
+        totalPerUkuran[ukuran] = t;
+        totalJumlah += t;
+      });
+
+      sections.push({
+        key: garmentType,
+        label: GARMENT_LABELS[garmentType] || garmentType,
+        columns,
+        rows,
+        totalPerUkuran,
+        totalJumlah,
+      });
+    });
+
+    return sections;
+  }, [orders, products]);
+
+  /* ── Export Excel: gabung jadi 2 sheet (Belanja & Produksi) ── */
   async function handleExportExcel() {
     if (rekapList.length === 0) {
       alert("Tidak ada data rekap untuk diexport.");
@@ -200,39 +313,83 @@ export default function PORekapList({ poId }: PORekapListProps) {
       const XLSX = await import("xlsx");
       const wb = XLSX.utils.book_new();
 
-      rekapList.forEach((rekap) => {
+      // ── Sheet 1: Rekap Belanja Bahan (semua jenis garmen digabung) ──
+      if (belanjaSections.length > 0) {
+        const belanjaData: (string | number)[][] = [];
+        let maxCols = 0;
+
+        belanjaSections.forEach((section, idx) => {
+          if (idx > 0) belanjaData.push([]); // baris kosong pemisah antar section
+
+          belanjaData.push([section.label]);
+          const header = ["WARNA / LENGAN", ...section.columns, "JUMLAH"];
+          belanjaData.push(header);
+          maxCols = Math.max(maxCols, header.length);
+
+          section.rows.forEach((row) => {
+            belanjaData.push([
+              row.label,
+              ...section.columns.map((u) => row.perUkuran[u] || 0),
+              row.jumlah,
+            ]);
+          });
+
+          belanjaData.push([
+            "TOTAL",
+            ...section.columns.map((u) => section.totalPerUkuran[u] || 0),
+            section.totalJumlah,
+          ]);
+        });
+
+        const wsBelanja = XLSX.utils.aoa_to_sheet(belanjaData);
+        wsBelanja["!cols"] = [
+          { wch: 24 },
+          ...Array(Math.max(maxCols - 2, 0)).fill({ wch: 8 }),
+          { wch: 10 },
+        ];
+        XLSX.utils.book_append_sheet(wb, wsBelanja, "Rekap Belanja Bahan");
+      }
+
+      // ── Sheet 2: Rekap Produksi per Produk (semua produk digabung) ──
+      const rekapData: (string | number)[][] = [];
+      let maxColsProduk = 0;
+
+      rekapList.forEach((rekap, idx) => {
+        if (idx > 0) rekapData.push([]); // baris kosong pemisah antar produk
+
+        rekapData.push([`${rekap.product_code} - ${rekap.product_name}`]);
         const header = ["JENIS", ...rekap.ukuranList, "JUMLAH"];
-        const body = rekap.rows.map((row) => [
-          row.isExtra ? `${row.jenis} (*)` : row.jenis,
-          ...rekap.ukuranList.map((u) => row.perUkuran[u] || 0),
-          row.jumlah,
-        ]);
-        const totalRow = [
+        rekapData.push(header);
+        maxColsProduk = Math.max(maxColsProduk, header.length);
+
+        rekap.rows.forEach((row) => {
+          rekapData.push([
+            row.isExtra ? `${row.jenis} (*)` : row.jenis,
+            ...rekap.ukuranList.map((u) => row.perUkuran[u] || 0),
+            row.jumlah,
+          ]);
+        });
+
+        rekapData.push([
           "TOTAL",
           ...rekap.ukuranList.map((u) => rekap.totalPerUkuran[u] || 0),
           rekap.totalJumlah,
-        ];
-
-        const sheetData = [header, ...body, totalRow];
-        const ws = XLSX.utils.aoa_to_sheet(sheetData);
-
-        // Lebar kolom: JENIS lebih lebar, ukuran & jumlah secukupnya
-        ws["!cols"] = [
-          { wch: 20 },
-          ...rekap.ukuranList.map(() => ({ wch: 8 })),
-          { wch: 10 },
-        ];
-
-        // Nama sheet maksimal 31 karakter & tanpa karakter terlarang Excel
-        const safeName = `${rekap.product_code} ${rekap.product_name}`
-          .replace(/[\\/?*[\]:]/g, "")
-          .slice(0, 31);
-
-        XLSX.utils.book_append_sheet(wb, ws, safeName || rekap.product_id);
+        ]);
       });
 
+      const wsRekap = XLSX.utils.aoa_to_sheet(rekapData);
+      wsRekap["!cols"] = [
+        { wch: 24 },
+        ...Array(Math.max(maxColsProduk - 2, 0)).fill({ wch: 8 }),
+        { wch: 10 },
+      ];
+      XLSX.utils.book_append_sheet(wb, wsRekap, "Rekap Produksi");
+
       const tanggalFile = new Date().toISOString().slice(0, 10);
-      XLSX.writeFile(wb, `Rekap-Produksi-${tanggalFile}.xlsx`);
+      const namaPO = (setting?.title || "PO")
+        .replace(/[\\/?*[\]:]/g, "") // buang karakter terlarang nama file
+        .trim();
+      XLSX.writeFile(wb, `Rekap-${namaPO}-${tanggalFile}.xlsx`);
     } catch (err) {
       console.error(err);
       alert(
@@ -283,6 +440,119 @@ export default function PORekapList({ poId }: PORekapListProps) {
           </button>
         </div>
       </div>
+
+      {/* ── Rekap Belanja Bahan (per Jenis Garmen) ── */}
+      {belanjaSections.length > 0 && (
+        <div className="space-y-5">
+          <div className="flex items-center gap-2">
+            <ShoppingBag size={16} className="text-slate-400" />
+            <h2 className="text-sm font-extrabold text-slate-700 dark:text-slate-200">
+              Rekap Belanja Bahan
+            </h2>
+            <span className="text-xs text-slate-400 font-medium">
+              — per warna & lengan, lintas semua produk
+            </span>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+            {belanjaSections.map((section) => {
+              const Icon =
+                section.key === "kaos_kids"
+                  ? Baby
+                  : section.key === "sweater" || section.key === "hoodie"
+                    ? Snowflake
+                    : Shirt;
+              return (
+                <div
+                  key={section.key}
+                  className="border border-slate-200 dark:border-slate-700 rounded-2xl overflow-hidden"
+                >
+                  <div className="bg-slate-50 dark:bg-slate-800/60 px-4 sm:px-5 py-3.5 border-b border-slate-200 dark:border-slate-700 flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-2.5">
+                      <Icon
+                        size={16}
+                        className="text-slate-500 dark:text-slate-400"
+                      />
+                      <h3 className="font-bold text-sm text-slate-800 dark:text-slate-200">
+                        {section.label}
+                      </h3>
+                    </div>
+                    <span className="text-xs font-extrabold text-emerald-600 dark:text-emerald-400 shrink-0">
+                      {section.totalJumlah} pcs
+                    </span>
+                  </div>
+
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-xs sm:text-sm min-w-[420px]">
+                      <thead>
+                        <tr className="bg-white dark:bg-slate-900/40 border-b border-slate-200 dark:border-slate-700">
+                          <th className="text-left px-4 py-2.5 font-extrabold text-slate-600 dark:text-slate-300 whitespace-nowrap">
+                            WARNA / LENGAN
+                          </th>
+                          {section.columns.map((ukuran) => (
+                            <th
+                              key={ukuran}
+                              className="text-center px-3 py-2.5 font-extrabold text-slate-600 dark:text-slate-300 whitespace-nowrap"
+                            >
+                              {ukuran}
+                            </th>
+                          ))}
+                          <th className="text-center px-4 py-2.5 font-extrabold text-slate-600 dark:text-slate-300 whitespace-nowrap">
+                            JML
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {section.rows.map((row) => (
+                          <tr
+                            key={row.label}
+                            className="border-b border-slate-100 dark:border-slate-800 last:border-0"
+                          >
+                            <td className="px-4 py-2.5 font-semibold text-slate-700 dark:text-slate-300 whitespace-nowrap">
+                              {row.label}
+                            </td>
+                            {section.columns.map((ukuran) => (
+                              <td
+                                key={ukuran}
+                                className="text-center px-3 py-2.5 text-slate-600 dark:text-slate-400"
+                              >
+                                {row.perUkuran[ukuran] > 0
+                                  ? row.perUkuran[ukuran]
+                                  : ""}
+                              </td>
+                            ))}
+                            <td className="text-center px-4 py-2.5 font-bold text-slate-800 dark:text-slate-200">
+                              {row.jumlah}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                      <tfoot>
+                        <tr className="bg-slate-50 dark:bg-slate-800/60 border-t-2 border-slate-300 dark:border-slate-600">
+                          <td className="px-4 py-3 font-extrabold text-slate-800 dark:text-slate-100">
+                            TOTAL
+                          </td>
+                          {section.columns.map((ukuran) => (
+                            <td
+                              key={ukuran}
+                              className="text-center px-3 py-3 font-extrabold text-slate-800 dark:text-slate-100"
+                            >
+                              {section.totalPerUkuran[ukuran] || 0}
+                            </td>
+                          ))}
+                          <td className="text-center px-4 py-3 font-extrabold text-emerald-600 dark:text-emerald-400">
+                            {section.totalJumlah}
+                          </td>
+                        </tr>
+                      </tfoot>
+                    </table>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {/* Empty State */}
       {rekapList.length === 0 ? (

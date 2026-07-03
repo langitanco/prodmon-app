@@ -18,6 +18,7 @@ const EMPTY_PRODUCT: Omit<POProduct, "id"> = {
   product_code: "",
   name: "",
   category: "dewasa",
+  garment_type: "kaos_dewasa",
   base_price: 0,
   available_sizes: [],
   sleeve_types: [],
@@ -126,6 +127,7 @@ export default function POProductList({ poId }: POProductListProps) {
       product_code: p.product_code,
       name: p.name,
       category: p.category ?? "dewasa",
+      garment_type: p.garment_type ?? "kaos_dewasa",
       base_price: p.base_price,
       available_sizes: p.available_sizes,
       sleeve_types: p.sleeve_types,
@@ -323,6 +325,31 @@ export default function POProductList({ poId }: POProductListProps) {
               >
                 Anak-anak
               </button>
+            </div>
+          </Field>
+          <Field label="Jenis Garmen *" hint="(untuk rekap belanja bahan)">
+            <div className="grid grid-cols-2 gap-3">
+              {(
+                [
+                  { value: "kaos_dewasa", label: "Kaos Dewasa" },
+                  { value: "kaos_kids", label: "Kaos Kids" },
+                  { value: "sweater", label: "Sweater" },
+                  { value: "hoodie", label: "Hoodie" },
+                ] as const
+              ).map((opt) => (
+                <button
+                  key={opt.value}
+                  type="button"
+                  onClick={() => setForm({ ...form, garment_type: opt.value })}
+                  className={`flex items-center justify-center gap-2 py-2.5 rounded-xl border text-sm font-bold transition-all ${
+                    form.garment_type === opt.value
+                      ? "border-blue-600 bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400"
+                      : "border-slate-200 dark:border-slate-700 text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-800"
+                  }`}
+                >
+                  {opt.label}
+                </button>
+              ))}
             </div>
           </Field>
           <Field label="Nama Produk *">

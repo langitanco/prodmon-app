@@ -755,7 +755,7 @@ export default function POOrderList({ poId }: POOrderListProps) {
                       : ""
                   }`}
                 >
-                  <span className="text-slate-500 dark:text-slate-400 flex-shrink-0 text-xs sm:text-sm font-semibold sm:font-normal">
+                  <span className="text-slate-500 dark:text-slate-400 shrink-0 text-xs sm:text-sm font-semibold sm:font-normal">
                     {row.label}
                   </span>
                   <span

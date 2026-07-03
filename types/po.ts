@@ -20,11 +20,14 @@ export interface POSetting {
 
 export type POProductCategory = 'dewasa' | 'kids';
 
+export type POGarmentType = 'kaos_dewasa' | 'kaos_kids' | 'sweater' | 'hoodie';
+
 export interface POProduct {
   id: string;
   product_code: string;
   name: string;
   category: POProductCategory;
+  garment_type: POGarmentType;
   base_price: number;
   available_sizes: string[];
   sleeve_types: string[];

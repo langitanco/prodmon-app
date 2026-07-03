@@ -312,7 +312,7 @@ const ProfileCardDesktopMemo = memo(
     <div className="p-4 border-t border-slate-100 dark:border-slate-800 hidden md:block mt-auto">
       <div className="bg-slate-50 dark:bg-slate-800/50 rounded-2xl p-4 border border-slate-100 dark:border-slate-700/50">
         <div className="flex items-center gap-3 mb-4">
-          <div className="w-10 h-10 rounded-full bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 flex items-center justify-center text-slate-700 dark:text-slate-200 font-bold shadow-sm overflow-hidden flex-shrink-0">
+          <div className="w-10 h-10 rounded-full bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 flex items-center justify-center text-slate-700 dark:text-slate-200 font-bold shadow-sm overflow-hidden shrink-0">
             {currentUser.avatar_url ? (
               <img
                 src={currentUser.avatar_url}

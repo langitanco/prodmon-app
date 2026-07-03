@@ -68,6 +68,7 @@ function OrderFormContent() {
   const [successData, setSuccessData] = useState<{
     kodePO: string;
     total: number;
+    items: CartItemSession[];
   } | null>(null);
   const [copied, setCopied] = useState(false);
 
@@ -150,13 +151,14 @@ function OrderFormContent() {
         return;
       }
 
-      clearCart();
-      setCart([]);
-      setSubmitting(false);
       setSuccessData({
         kodePO: result.po_number || "ERROR",
         total: grandTotal,
+        items: cart, // ✅ simpan dulu isi keranjang sebelum dikosongkan
       });
+      clearCart();
+      setCart([]);
+      setSubmitting(false);
       window.scrollTo({ top: 0, behavior: "smooth" });
     } catch (error) {
       console.error(error);
@@ -218,7 +220,7 @@ function OrderFormContent() {
       infoPengiriman += `\n*Alamat Pengiriman:* ${alamat}`;
     }
 
-    const daftarBarang = cart
+    const daftarBarang = successData.items
       .map(
         (item, i) =>
           `${i + 1}. ${item.product_name} (${item.ukuran}, ${item.lengan}, ${item.warna})\n    ${item.qty}pcs x ${formatRupiah(item.harga_satuan)} = ${formatRupiah(item.subtotal)}`,
@@ -498,7 +500,7 @@ Mohon info langkah pembayarannya.`;
                       </div>
                       <button
                         onClick={() => removeFromCart(item.cart_id)}
-                        className="w-7 h-7 rounded-full border border-gray-200 flex items-center justify-center text-gray-300 hover:border-red-300 hover:text-red-500 hover:bg-red-50 transition-colors flex-shrink-0 mt-0.5"
+                        className="w-7 h-7 rounded-full border border-gray-200 flex items-center justify-center text-gray-300 hover:border-red-300 hover:text-red-500 hover:bg-red-50 transition-colors shrink-0 mt-0.5"
                       >
                         <Trash2 size={13} />
                       </button>
@@ -584,7 +586,7 @@ Mohon info langkah pembayarannya.`;
                     onChange={(e) => setAlamat(e.target.value)}
                     rows={3}
                     placeholder="Jalan, RT/RW, kelurahan, kecamatan, kota, kode pos..."
-                    className="w-full px-3.5 py-2.5 border border-gray-200 rounded-lg text-sm text-zinc-950 bg-white outline-none focus:border-zinc-950 focus:ring-4 focus:ring-zinc-950/5 transition-all resize-y min-h-[80px]"
+                    className="w-full px-3.5 py-2.5 border border-gray-200 rounded-lg text-sm text-zinc-950 bg-white outline-none focus:border-zinc-950 focus:ring-4 focus:ring-zinc-950/5 transition-all resize-y min-h-20"
                   />
                 </div>
               )}

@@ -50,13 +50,13 @@ function ResellerLoginContent() {
       </header>
 
       <div className="bg-[#0e0e0e] text-white px-4 py-8 md:py-11 md:px-12 relative overflow-hidden">
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_80%_50%,_#1f2937_0%,_transparent_55%)] pointer-events-none"></div>
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_80%_50%,#1f2937_0%,transparent_55%)] pointer-events-none"></div>
         <div className="relative z-10 max-w-[600px] mx-auto md:mx-0">
-          <div className="inline-flex items-center gap-[7px] text-[11px] font-bold tracking-[0.1em] uppercase text-white/50 mb-2">
+          <div className="inline-flex items-center gap-[7px] text-[11px] font-bold tracking-widest uppercase text-white/50 mb-2">
             <div className="w-1.5 h-1.5 rounded-full bg-[#4ade80]"></div>
             Akses Khusus Reseller
           </div>
-          <h1 className="text-[21px] md:text-[28px] font-extrabold tracking-tight leading-tight mb-[6px]">
+          <h1 className="text-[21px] md:text-[28px] font-extrabold tracking-tight leading-tight mb-15">
             Selamat datang,{" "}
             <em className="not-italic text-white/40">Reseller</em>
           </h1>
@@ -68,14 +68,14 @@ function ResellerLoginContent() {
       </div>
 
       <div className="max-w-[420px] w-full mx-auto mt-9 px-4 pb-20 flex-1">
-        <div className="bg-white border border-[#e5e7eb] rounded-[12px] overflow-hidden">
+        <div className="bg-white border border-[#e5e7eb] rounded-xl overflow-hidden">
           <div className="p-4 md:p-5">
-            <div className="text-[11px] font-bold tracking-[0.1em] uppercase text-[#9ca3af] mb-3.5 flex items-center gap-1.5">
+            <div className="text-[11px] font-bold tracking-widest uppercase text-[#9ca3af] mb-3.5 flex items-center gap-1.5">
               Login Reseller
             </div>
 
             {error && (
-              <div className="flex items-start gap-2 bg-[#fef2f2] text-[#b91c1c] border border-[#fecaca] p-3 rounded-[8px] text-[13px] font-semibold mb-3.5">
+              <div className="flex items-start gap-2 bg-[#fef2f2] text-[#b91c1c] border border-[#fecaca] p-3 rounded-lg text-[13px] font-semibold mb-3.5">
                 <span>{error}</span>
               </div>
             )}
@@ -94,7 +94,7 @@ function ResellerLoginContent() {
                     document.getElementById("pin-input")?.focus()
                   }
                   placeholder="Username Anda"
-                  className="w-full px-3 py-2.5 border border-[#e5e7eb] rounded-[8px] text-[14px] text-[#0e0e0e] outline-none focus:border-[#0e0e0e] focus:shadow-[0_0_0_3px_rgba(14,14,14,0.07)] transition-all bg-white uppercase"
+                  className="w-full px-3 py-2.5 border border-[#e5e7eb] rounded-lg text-[14px] text-[#0e0e0e] outline-none focus:border-[#0e0e0e] focus:shadow-[0_0_0_3px_rgba(14,14,14,0.07)] transition-all bg-white uppercase"
                 />
               </div>
               <div>
@@ -108,20 +108,20 @@ function ResellerLoginContent() {
                   onChange={(e) => setPin(e.target.value)}
                   onKeyDown={(e) => e.key === "Enter" && handleLogin()}
                   placeholder="Masukkan PIN/Sandi Anda"
-                  className="w-full px-3 py-2.5 border border-[#e5e7eb] rounded-[8px] text-[14px] text-[#0e0e0e] outline-none focus:border-[#0e0e0e] focus:shadow-[0_0_0_3px_rgba(14,14,14,0.07)] transition-all bg-white tracking-widest"
+                  className="w-full px-3 py-2.5 border border-[#e5e7eb] rounded-lg text-[14px] text-[#0e0e0e] outline-none focus:border-[#0e0e0e] focus:shadow-[0_0_0_3px_rgba(14,14,14,0.07)] transition-all bg-white tracking-widest"
                 />
               </div>
 
               <button
                 onClick={handleLogin}
                 disabled={loading}
-                className="w-full bg-[#0e0e0e] text-white py-2.5 rounded-[8px] text-[14px] font-bold flex items-center justify-center gap-2 hover:opacity-80 transition-opacity disabled:opacity-40 mt-1"
+                className="w-full bg-[#0e0e0e] text-white py-2.5 rounded-lg text-[14px] font-bold flex items-center justify-center gap-2 hover:opacity-80 transition-opacity disabled:opacity-40 mt-1"
               >
                 {loading ? "Memeriksa..." : "Masuk"}
               </button>
             </div>
 
-            <div className="h-[1px] bg-[#e5e7eb] my-3.5"></div>
+            <div className="h-px bg-[#e5e7eb] my-3.5"></div>
 
             <p className="text-[12px] text-[#9ca3af] text-center">
               Belum punya akun? Hubungi admin untuk didaftarkan.
