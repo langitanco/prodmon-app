@@ -3,7 +3,7 @@
 import React, { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import {
-  getPOSetting,
+  getPOSettingBySlug,
   getPOProducts,
   submitOrder,
   getResellerOrders,
@@ -78,12 +78,15 @@ export default function ResellerPortalPage() {
   const katalogHref = slug ? `/po/${slug}` : "/po";
 
   // ── Load orders ──────────────────────────────────────────────────
-  const loadOrders = useCallback(async (resellerId: string) => {
-    setLoadingOrders(true);
-    const data = await getResellerOrders(resellerId);
-    setOrders(data);
-    setLoadingOrders(false);
-  }, []);
+  const loadOrders = useCallback(
+    async (resellerId: string, poSettingId?: string) => {
+      setLoadingOrders(true);
+      const data = await getResellerOrders(resellerId, poSettingId);
+      setOrders(data);
+      setLoadingOrders(false);
+    },
+    [],
+  );
 
   // ── Init ─────────────────────────────────────────────────────────
   useEffect(() => {
@@ -102,20 +105,29 @@ export default function ResellerPortalPage() {
     setReseller(resellerData);
 
     async function load() {
-      const [s, p] = await Promise.all([getPOSetting(), getPOProducts()]);
+      if (!savedSlug) {
+        setLoading(false);
+        return;
+      }
+      const s = await getPOSettingBySlug(savedSlug);
+      if (!s) {
+        setLoading(false);
+        return;
+      }
+      const p = await getPOProducts(s.id);
       setSetting(s);
       setProducts(p);
       setLoading(false);
-      if (resellerData?.id) loadOrders(resellerData.id);
+      if (resellerData?.id) loadOrders(resellerData.id, s.id);
     }
     load();
   }, [router, loadOrders]);
 
   useEffect(() => {
     if (activeTab === "history" && reseller?.id) {
-      loadOrders(reseller.id);
+      loadOrders(reseller.id, setting?.id);
     }
-  }, [activeTab, reseller, loadOrders]);
+  }, [activeTab, reseller, setting, loadOrders]);
 
   // ── Handlers ──────────────────────────────────────────────────────
   const handleEditOrder = (order: POResellerOrder) => {
@@ -277,7 +289,7 @@ export default function ResellerPortalPage() {
     setToast({ poNumber: finalPoNumber, waUrl });
     setSubmitting(false);
 
-    loadOrders(reseller.id);
+    loadOrders(reseller.id, setting?.id);
   };
 
   const handleLogout = () => {

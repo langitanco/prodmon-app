@@ -172,7 +172,11 @@ function PaymentStatusBadge({
   );
 }
 
-export default function POOrderList() {
+interface POOrderListProps {
+  poId: string;
+}
+
+export default function POOrderList({ poId }: POOrderListProps) {
   const [orders, setOrders] = useState<POOrder[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -189,7 +193,6 @@ export default function POOrderList() {
   );
   const [search, setSearch] = useState("");
   const [exporting, setExporting] = useState(false);
-
   const printRef = useRef<HTMLDivElement>(null);
   const [downloadingPdf, setDownloadingPdf] = useState(false);
 
@@ -284,23 +287,39 @@ export default function POOrderList() {
 
   useEffect(() => {
     load();
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [poId]);
 
   async function load(isRefresh = false) {
-    if (isRefresh) setRefreshing(true);
-    else setLoading(true);
-    const data = await getAllPOOrders();
-    setOrders(data);
-    if (isRefresh) setRefreshing(false);
-    else setLoading(false);
+    if (isRefresh) {
+      setRefreshing(true);
+    } else {
+      setLoading(true);
+    }
+
+    const [ords, prods, st] = await Promise.all([
+      getAllPOOrders(poId),
+      getAllPOProducts(poId),
+      getPOSettingAdmin(poId),
+    ]);
+
+    setOrders(ords || []);
+    setProducts(prods || []);
+    setSetting(st);
+
+    if (isRefresh) {
+      setRefreshing(false);
+    } else {
+      setLoading(false);
+    }
   }
 
   async function openEditMode() {
     if (products.length === 0 || !setting) {
       setLoadingMeta(true);
       const [prods, set] = await Promise.all([
-        getAllPOProducts(),
-        getPOSettingAdmin(),
+        getAllPOProducts(poId), // ← tambahkan poId
+        getPOSettingAdmin(poId), // ← tambahkan poId
       ]);
       setProducts(prods);
       setSetting(set);

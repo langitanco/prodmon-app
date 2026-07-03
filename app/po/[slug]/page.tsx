@@ -3,7 +3,11 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { getPOSettingAdmin, getAllPOProducts } from "@/lib/po/admin";
+import {
+  getPOSettingAdmin,
+  getAllPOProducts,
+  getPOSettingBySlug,
+} from "@/lib/po/admin";
 import { formatRupiah, calculateItemPrice } from "@/lib/po/pricing";
 import { POSetting, POProduct } from "@/types/po";
 import {
@@ -100,8 +104,16 @@ export default function CatalogPage() {
 
     async function loadData() {
       setLoading(true);
-      const set = await getPOSettingAdmin();
-      const prods = await getAllPOProducts();
+      if (!slug) {
+        setLoading(false);
+        return;
+      }
+      const set = await getPOSettingBySlug(slug);
+      if (!set) {
+        setLoading(false);
+        return;
+      }
+      const prods = await getAllPOProducts(set.id);
       setSetting(set);
       setProducts(prods.filter((p) => p.is_active));
       setLoading(false);

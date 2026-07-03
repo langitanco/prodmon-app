@@ -20,7 +20,13 @@ import {
   UserCog,
 } from "lucide-react";
 
-export default function POOverview() {
+// 1. Tambahkan interface untuk props
+interface POOverviewProps {
+  poId: string;
+}
+
+// 2. Terima props poId di dalam komponen
+export default function POOverview({ poId }: POOverviewProps) {
   const [stats, setStats] = useState({
     totalOrders: 0,
     totalPublic: 0,
@@ -34,13 +40,18 @@ export default function POOverview() {
 
   useEffect(() => {
     async function load() {
-      const [s, st] = await Promise.all([getPOSettingAdmin(), getPOStats()]);
+      // 3. Teruskan poId ke dalam fungsi admin
+      // Pastikan fungsi getPOStats di lib/po/admin.ts juga sudah diperbarui untuk menerima parameter (poId?: string)
+      const [s, st] = await Promise.all([
+        getPOSettingAdmin(poId),
+        getPOStats(poId),
+      ]);
       setSetting(s);
       setStats(st);
       setLoading(false);
     }
     load();
-  }, []);
+  }, [poId]); // Tambahkan poId sebagai dependency
 
   const currentSlug = setting?.url_slug || "katalog";
   const origin = typeof window !== "undefined" ? window.location.origin : "";
@@ -48,160 +59,71 @@ export default function POOverview() {
   const links = [
     {
       key: "katalog",
-      label: "Link Katalog Publik",
-      icon: LinkIcon,
-      href: `/po/${currentSlug}`,
+      label: "Katalog PO (Publik)",
       url: `${origin}/po/${currentSlug}`,
+      href: `/po/${currentSlug}`,
+      icon: Globe,
     },
     {
-      key: "portal-reseller",
-      label: "Link Portal Reseller",
-      icon: UserCog,
-      href: `/po/reseller`,
-      url: `${origin}/po/reseller`,
+      key: "reseller",
+      label: "Portal Reseller",
+      url: `${origin}/po/reseller?slug=${currentSlug}`,
+      href: `/po/reseller?slug=${currentSlug}`,
+      icon: Users,
     },
     {
       key: "daftar-reseller",
-      label: "Link Pendaftaran Reseller",
-      icon: UserPlus,
-      href: `/po/${currentSlug}/daftar-reseller`,
+      label: "Form Pendaftaran Reseller",
       url: `${origin}/po/${currentSlug}/daftar-reseller`,
+      href: `/po/${currentSlug}/daftar-reseller`,
+      icon: UserPlus,
     },
   ];
 
-  function handleCopy(key: string, url: string) {
-    navigator.clipboard.writeText(url);
-    setCopiedKey(key);
-    setTimeout(() => setCopiedKey(null), 2000);
-  }
+  const handleCopy = async (key: string, url: string) => {
+    try {
+      await navigator.clipboard.writeText(url);
+      setCopiedKey(key);
+      setTimeout(() => setCopiedKey(null), 2000);
+    } catch (err) {
+      console.error("Gagal menyalin link:", err);
+    }
+  };
 
-  if (loading)
+  if (loading) {
     return (
-      <div className="flex items-center gap-3 py-8 text-slate-400 dark:text-slate-500">
-        <div className="w-5 h-5 border-2 border-slate-300 dark:border-slate-600 border-t-blue-500 rounded-full animate-spin" />
-        <span className="text-sm">Memuat data...</span>
+      <div className="flex items-center justify-center h-64">
+        <div className="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin" />
       </div>
     );
+  }
 
   return (
-    <div className="space-y-6">
-      {/* ── Status Banner ─────────────────────────────────────────── */}
-      <div
-        className={`rounded-2xl border px-5 py-4 flex items-center justify-between gap-4
-          ${
-            setting?.is_active
-              ? "bg-emerald-50 dark:bg-emerald-900/20 border-emerald-200 dark:border-emerald-800"
-              : "bg-rose-50 dark:bg-rose-900/20 border-rose-200 dark:border-rose-800"
-          }`}
-      >
-        <div className="flex items-center gap-3">
-          {setting?.is_active ? (
-            <CheckCircle2
-              size={20}
-              className="text-emerald-600 dark:text-emerald-400 flex-shrink-0"
-            />
-          ) : (
-            <XCircle
-              size={20}
-              className="text-rose-500 dark:text-rose-400 flex-shrink-0"
-            />
-          )}
-          <div>
-            <p
-              className={`text-sm font-extrabold ${setting?.is_active ? "text-emerald-800 dark:text-emerald-300" : "text-rose-700 dark:text-rose-400"}`}
-            >
-              PO {setting?.is_active ? "AKTIF" : "NONAKTIF"}
-            </p>
-            <p
-              className={`text-xs mt-0.5 ${setting?.is_active ? "text-emerald-600 dark:text-emerald-500" : "text-rose-500 dark:text-rose-500"}`}
-            >
-              {setting?.is_active
-                ? "Form pemesanan terbuka untuk publik"
-                : "Form pemesanan sedang ditutup"}
-            </p>
-          </div>
-        </div>
-
-        {setting?.periode_mulai && (
-          <div className="hidden sm:flex items-center gap-1.5 text-xs font-semibold text-slate-500 dark:text-slate-400">
-            <CalendarDays size={14} />
-            <span>
-              {setting.periode_mulai} — {setting.periode_selesai || "Selesai"}
-            </span>
-          </div>
-        )}
-      </div>
-
-      {/* ── Stats Grid ────────────────────────────────────────────── */}
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-        {[
-          {
-            label: "Total Pesanan",
-            value: stats.totalOrders,
-            icon: ShoppingBag,
-            color: "text-blue-600 dark:text-blue-400",
-            bg: "bg-blue-50 dark:bg-blue-900/20",
-          },
-          {
-            label: "Total Produk",
-            value: stats.totalProducts || 0,
-            icon: Package,
-            color: "text-indigo-600 dark:text-indigo-400",
-            bg: "bg-indigo-50 dark:bg-indigo-900/20",
-          },
-          {
-            label: "Publik",
-            value: stats.totalPublic,
-            icon: Globe,
-            color: "text-violet-600 dark:text-violet-400",
-            bg: "bg-violet-50 dark:bg-violet-900/20",
-          },
-          {
-            label: "Reseller",
-            value: stats.totalReseller,
-            icon: Users,
-            color: "text-amber-600 dark:text-amber-400",
-            bg: "bg-amber-50 dark:bg-amber-900/20",
-          },
-          {
-            label: "Total Revenue",
-            value: formatRupiah(stats.totalAmount),
-            icon: Banknote,
-            color: "text-emerald-600 dark:text-emerald-400",
-            bg: "bg-emerald-50 dark:bg-emerald-900/20",
-          },
-        ].map((s) => (
-          <div
-            key={s.label}
-            className="bg-slate-50 dark:bg-slate-800/40 border border-slate-200 dark:border-slate-700/50 rounded-2xl p-4 flex flex-col"
-          >
+    <div className="space-y-6 animate-in fade-in duration-300">
+      {/* ── Action Links ── */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        {links.map((link) => {
+          const Icon = link.icon;
+          return (
             <div
-              className={`w-8 h-8 ${s.bg} rounded-lg flex items-center justify-center mb-3`}
+              key={link.key}
+              className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 p-4 rounded-2xl shadow-sm flex flex-col justify-between gap-4"
             >
-              <s.icon size={15} className={s.color} />
-            </div>
-            <p className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-1">
-              {s.label}
-            </p>
-            <p className="text-xl font-extrabold text-slate-900 dark:text-white leading-none mt-auto">
-              {s.value}
-            </p>
-          </div>
-        ))}
-      </div>
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 flex items-center justify-center shrink-0">
+                  <Icon size={20} />
+                </div>
+                <div>
+                  <h3 className="font-bold text-sm text-slate-800 dark:text-slate-200">
+                    {link.label}
+                  </h3>
+                  <p className="text-[10px] text-slate-500 font-medium mt-0.5">
+                    Klik salin untuk membagikan
+                  </p>
+                </div>
+              </div>
 
-      {/* ── Quick Links ───────────────────────────────────────────── */}
-      <div className="space-y-3">
-        {links.map((link) => (
-          <div
-            key={link.key}
-            className="bg-slate-50 dark:bg-slate-800/40 border border-slate-200 dark:border-slate-700 rounded-2xl p-4"
-          >
-            <p className="text-[10px] text-slate-400 dark:text-slate-500 mb-3 font-extrabold uppercase tracking-widest flex items-center gap-2">
-              <link.icon size={11} /> {link.label}
-            </p>
-            <div className="flex gap-2 items-center flex-wrap md:flex-nowrap">
-              <code className="text-sm bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2.5 w-full md:flex-1 font-mono text-slate-600 dark:text-slate-300 truncate">
+              <code className="block w-full p-2.5 bg-slate-50 dark:bg-slate-900 rounded-lg text-[11px] text-slate-600 dark:text-slate-400 border border-slate-100 dark:border-slate-800 truncate select-all">
                 {link.url}
               </code>
               <div className="flex gap-2 w-full md:w-auto">
@@ -222,12 +144,161 @@ export default function POOverview() {
                   target="_blank"
                   className="flex-1 md:flex-none flex items-center justify-center gap-1.5 text-xs font-bold border border-slate-200 dark:border-slate-700 px-4 py-2.5 rounded-xl bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 transition-colors"
                 >
-                  <ExternalLink size={13} /> Buka
+                  <ExternalLink size={13} />
+                  Buka
                 </a>
               </div>
             </div>
+          );
+        })}
+      </div>
+
+      {/* ── Status & Settings Summary ── */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {/* Status PO */}
+        <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 p-5 rounded-2xl shadow-sm flex items-start gap-4">
+          <div
+            className={`w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 ${
+              setting?.is_active
+                ? "bg-emerald-50 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400"
+                : "bg-red-50 text-red-600 dark:bg-red-900/30 dark:text-red-400"
+            }`}
+          >
+            {setting?.is_active ? (
+              <CheckCircle2 size={24} />
+            ) : (
+              <XCircle size={24} />
+            )}
           </div>
-        ))}
+          <div>
+            <h3 className="font-bold text-slate-800 dark:text-slate-200 mb-1">
+              Status Pre-Order
+            </h3>
+            <div className="flex items-center gap-2 mb-2">
+              <span
+                className={`inline-flex items-center px-2 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider ${
+                  setting?.is_active
+                    ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/50 dark:text-emerald-400"
+                    : "bg-red-100 text-red-700 dark:bg-red-900/50 dark:text-red-400"
+                }`}
+              >
+                {setting?.is_active ? "AKTIF" : "DITUTUP"}
+              </span>
+            </div>
+            <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
+              {setting?.is_active
+                ? "Sistem sedang menerima pesanan dari publik maupun reseller."
+                : "Pre-order sedang ditutup. Pelanggan tidak dapat membuat pesanan baru."}
+            </p>
+          </div>
+        </div>
+
+        {/* Info Periode */}
+        <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 p-5 rounded-2xl shadow-sm flex items-start gap-4">
+          <div className="w-12 h-12 rounded-2xl bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 flex items-center justify-center shrink-0">
+            <CalendarDays size={24} />
+          </div>
+          <div className="flex-1">
+            <h3 className="font-bold text-slate-800 dark:text-slate-200 mb-3">
+              Periode Pre-Order
+            </h3>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <p className="text-[10px] text-slate-500 font-bold uppercase mb-1">
+                  Mulai
+                </p>
+                <p className="text-sm font-semibold text-slate-700 dark:text-slate-300">
+                  {setting?.periode_mulai
+                    ? new Date(setting.periode_mulai).toLocaleDateString(
+                        "id-ID",
+                        {
+                          day: "numeric",
+                          month: "short",
+                          year: "numeric",
+                        },
+                      )
+                    : "-"}
+                </p>
+              </div>
+              <div>
+                <p className="text-[10px] text-slate-500 font-bold uppercase mb-1">
+                  Selesai
+                </p>
+                <p className="text-sm font-semibold text-slate-700 dark:text-slate-300">
+                  {setting?.periode_selesai
+                    ? new Date(setting.periode_selesai).toLocaleDateString(
+                        "id-ID",
+                        {
+                          day: "numeric",
+                          month: "short",
+                          year: "numeric",
+                        },
+                      )
+                    : "-"}
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* ── Key Metrics ── */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 p-4 rounded-2xl shadow-sm flex flex-col items-center text-center justify-center gap-2">
+          <div className="w-10 h-10 rounded-full bg-blue-50 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400 flex items-center justify-center">
+            <ShoppingBag size={20} />
+          </div>
+          <div>
+            <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1">
+              Total Pesanan
+            </p>
+            <p className="text-2xl font-extrabold text-slate-800 dark:text-slate-100">
+              {stats.totalOrders}
+            </p>
+          </div>
+        </div>
+
+        <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 p-4 rounded-2xl shadow-sm flex flex-col items-center text-center justify-center gap-2">
+          <div className="w-10 h-10 rounded-full bg-emerald-50 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400 flex items-center justify-center">
+            <Banknote size={20} />
+          </div>
+          <div>
+            <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1">
+              Omset Sementara
+            </p>
+            <p className="text-lg font-extrabold text-slate-800 dark:text-slate-100">
+              {formatRupiah(stats.totalAmount)}
+            </p>
+          </div>
+        </div>
+
+        <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 p-4 rounded-2xl shadow-sm flex flex-col items-center text-center justify-center gap-2">
+          <div className="w-10 h-10 rounded-full bg-orange-50 text-orange-600 dark:bg-orange-900/30 dark:text-orange-400 flex items-center justify-center">
+            <Package size={20} />
+          </div>
+          <div>
+            <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1">
+              Katalog Produk
+            </p>
+            <p className="text-2xl font-extrabold text-slate-800 dark:text-slate-100">
+              {stats.totalProducts}
+            </p>
+          </div>
+        </div>
+
+        <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 p-4 rounded-2xl shadow-sm flex flex-col items-center text-center justify-center gap-2">
+          <div className="w-10 h-10 rounded-full bg-purple-50 text-purple-600 dark:bg-purple-900/30 dark:text-purple-400 flex items-center justify-center">
+            <UserCog size={20} />
+          </div>
+          <div>
+            <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1">
+              Pesanan Reseller
+            </p>
+            <p className="text-2xl font-extrabold text-slate-800 dark:text-slate-100">
+              {stats.totalReseller}
+            </p>
+          </div>
+        </div>
       </div>
     </div>
   );

@@ -4,7 +4,7 @@ import { useEffect, useState, Suspense } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import {
-  getPOSettingAdmin,
+  getPOSettingBySlug,
   getAllPOProducts,
   submitOrder,
 } from "@/lib/po/admin";
@@ -81,8 +81,17 @@ function OrderFormContent() {
     setCart(loadCart());
 
     async function load() {
-      const set = await getPOSettingAdmin();
-      const prods = await getAllPOProducts();
+      const effectiveSlug = slug || sessionStorage.getItem("po_slug");
+      if (!effectiveSlug) {
+        setLoading(false);
+        return;
+      }
+      const set = await getPOSettingBySlug(effectiveSlug);
+      if (!set) {
+        setLoading(false);
+        return;
+      }
+      const prods = await getAllPOProducts(set.id);
       setSetting(set);
       setProducts(prods.filter((p) => p.is_active));
       setLoading(false);

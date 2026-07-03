@@ -19,17 +19,29 @@ export async function getPOSetting(): Promise<POSetting | null> {
   return data;
 }
 
+export async function getPOSettingBySlug(slug: string): Promise<POSetting | null> {
+  const supabase = createClient();
+  const { data, error } = await supabase
+    .from('po_setting')
+    .select('*')
+    .eq('url_slug', slug)
+    .single();
+  if (error) return null;
+  return data;
+}
+
 /**
  * Ambil semua produk aktif, diurutkan by sort_order
  */
-export async function getPOProducts(): Promise<POProduct[]> {
+export async function getPOProducts(poSettingId?: string): Promise<POProduct[]> {
   const supabase = createClient();
-  const { data, error } = await supabase
-    .from('po_products')
-    .select('*')
-    .eq('is_active', true)
-    .order('sort_order', { ascending: true });
+  let query = supabase.from('po_products').select('*').eq('is_active', true);
 
+  if (poSettingId) {
+    query = query.eq('po_setting_id', poSettingId);
+  }
+
+  const { data, error } = await query.order('sort_order', { ascending: true });
   if (error) return [];
   return data;
 }
@@ -51,15 +63,21 @@ export async function loginReseller(kode: string, pin: string) {
 /**
  * Ambil semua pesanan milik reseller tertentu, diurutkan dari terbaru
  */
-export async function getResellerOrders(resellerId: string): Promise<POResellerOrder[]> {
+export async function getResellerOrders(
+  resellerId: string,
+  poSettingId?: string,
+): Promise<POResellerOrder[]> {
   const supabase = createClient();
-  const { data, error } = await supabase
+  let query = supabase
     .from('po_orders')
-    // ✅ TAMBAH 'id' di sini
     .select('id, po_number, created_at, total_amount, order_items, notes, delivery_method')
-    .eq('reseller_id', resellerId)
-    .order('created_at', { ascending: false });
+    .eq('reseller_id', resellerId);
 
+  if (poSettingId) {
+    query = query.eq('po_setting_id', poSettingId);
+  }
+
+  const { data, error } = await query.order('created_at', { ascending: false });
   if (error) return [];
   return data as POResellerOrder[];
 }
@@ -126,17 +144,18 @@ export async function submitOrder(
 
   // Insert pesanan
   const { error } = await supabase.from('po_orders').insert({
-    po_number:        poNumber,
-    customer_type:    payload.customer_type,
-    reseller_id:      payload.reseller_id ?? null,
-    customer_name:    payload.customer_name,
-    customer_wa:      payload.customer_wa,
-    delivery_method:  payload.delivery_method,
-    shipping_address: payload.shipping_address ?? null,
-    order_items:      validatedItems,
-    notes:            payload.notes ?? null,
-    total_amount:     totalAmount,
-  });
+  po_number:        poNumber,
+  customer_type:    payload.customer_type,
+  reseller_id:      payload.reseller_id ?? null,
+  customer_name:    payload.customer_name,
+  customer_wa:      payload.customer_wa,
+  delivery_method:  payload.delivery_method,
+  shipping_address: payload.shipping_address ?? null,
+  order_items:      validatedItems,
+  notes:            payload.notes ?? null,
+  total_amount:     totalAmount,
+  po_setting_id:    setting.id,   // ← WAJIB ditambahkan
+});
 
   if (error) return { success: false, error: error.message };
   return { success: true, po_number: poNumber };

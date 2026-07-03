@@ -1,4 +1,3 @@
-// app/components/po/POProductList.tsx
 "use client";
 
 import { useEffect, useState } from "react";
@@ -8,7 +7,7 @@ import {
   updatePOProduct,
   deletePOProduct,
   togglePOProductActive,
-  deleteProductImages, // ← tambahkan ini
+  deleteProductImages,
 } from "@/lib/po/admin";
 import { formatRupiah } from "@/lib/po/pricing";
 import { POProduct } from "@/types/po";
@@ -69,7 +68,12 @@ function Field({
 const inputCls =
   "w-full bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2.5 text-sm text-slate-800 dark:text-slate-200 placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500 dark:focus:border-blue-500 transition-all";
 
-export default function POProductList() {
+// Wajibkan komponen menerima properti poId
+interface POProductListProps {
+  poId: string;
+}
+
+export default function POProductList({ poId }: POProductListProps) {
   const [products, setProducts] = useState<POProduct[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
@@ -87,7 +91,8 @@ export default function POProductList() {
 
   useEffect(() => {
     load();
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [poId]); // Reload jika poId berganti
 
   useEffect(() => {
     if (showForm) {
@@ -100,7 +105,8 @@ export default function POProductList() {
 
   async function load() {
     setLoading(true);
-    const data = await getAllPOProducts();
+    // Teruskan poId agar admin.ts bisa memfilter data
+    const data = await getAllPOProducts(poId);
     setProducts(data);
     setLoading(false);
   }
@@ -110,7 +116,7 @@ export default function POProductList() {
     setForm(EMPTY_PRODUCT);
     setNewFiles([]);
     setPreviewUrls([]);
-    setPendingDeleteUrls([]); // ← tambahkan ini
+    setPendingDeleteUrls([]);
     setShowForm(true);
   }
 
@@ -134,7 +140,7 @@ export default function POProductList() {
     });
     setNewFiles([]);
     setPreviewUrls([]);
-    setPendingDeleteUrls([]); // ← tambahkan ini
+    setPendingDeleteUrls([]);
     setShowForm(true);
   }
 
@@ -152,10 +158,6 @@ export default function POProductList() {
     const updated = [...form.image_urls];
     updated.splice(index, 1);
     setForm({ ...form, image_urls: updated });
-
-    // Tandai untuk dihapus nanti, BUKAN dihapus sekarang.
-    // Kalau user klik "Batal", daftar ini akan dibuang begitu saja
-    // dan file di storage tetap aman karena tidak pernah dieksekusi.
     setPendingDeleteUrls((prev) => [...prev, urlToDelete]);
   }
 
@@ -201,37 +203,32 @@ export default function POProductList() {
         }
       }
 
-      const finalData = {
+      const finalProduct = {
         ...form,
+        available_sizes: strToArray(rawSizes),
+        sleeve_types: strToArray(rawSleeves),
+        colors: strToArray(rawColors),
         image_urls: [...form.image_urls, ...uploadedUrls],
       };
 
       if (editTarget) {
-        await updatePOProduct(editTarget.id, finalData);
+        await updatePOProduct(editTarget.id, finalProduct);
       } else {
-        await createPOProduct(finalData);
+        // Menyisipkan po_setting_id ke produk baru menggunakan keyword 'any' agar tidak error TypeScript
+        await createPOProduct({ ...finalProduct, po_setting_id: poId } as any);
       }
 
-      // Baru sekarang, SETELAH save ke database berhasil,
-      // benar-benar hapus file-file lama yang ditandai dari storage.
       if (pendingDeleteUrls.length > 0) {
         await deleteProductImages(pendingDeleteUrls);
       }
-
-      setShowForm(false);
-      load();
     } catch (err) {
       console.error(err);
-      alert("Terjadi kesalahan saat menyimpan produk.");
+      alert("Terjadi kesalahan saat menyimpan data.");
     } finally {
       setSaving(false);
+      setShowForm(false);
+      load();
     }
-  }
-
-  async function handleDelete(id: string, name: string) {
-    if (!confirm(`Hapus produk "${name}"?`)) return;
-    await deletePOProduct(id);
-    setProducts((prev) => prev.filter((p) => p.id !== id));
   }
 
   async function handleToggle(id: string, current: boolean) {
@@ -241,34 +238,41 @@ export default function POProductList() {
     );
   }
 
-  if (loading)
+  async function handleDelete(id: string, name: string) {
+    if (!confirm(`Hapus produk "${name}"?`)) return;
+    await deletePOProduct(id);
+    setProducts((prev) => prev.filter((p) => p.id !== id));
+  }
+
+  if (loading) {
     return (
-      <div className="flex items-center gap-3 py-8 text-slate-400 dark:text-slate-500">
-        <div className="w-5 h-5 border-2 border-slate-300 dark:border-slate-600 border-t-blue-500 rounded-full animate-spin" />
-        <span className="text-sm">Memuat produk...</span>
+      <div className="flex justify-center items-center h-40">
+        <div className="w-6 h-6 border-4 border-blue-600 border-t-transparent rounded-full animate-spin" />
       </div>
     );
+  }
 
   if (showForm) {
     return (
-      <div className="w-full max-w-4xl mx-auto space-y-6 animate-in fade-in duration-200">
-        <button
-          onClick={() => {
-            setPendingDeleteUrls([]);
-            setShowForm(false);
-          }}
-          className="flex items-center gap-2 text-sm font-semibold text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-white transition-colors"
-        >
-          <ArrowLeft size={15} /> Kembali
-        </button>
-
-        <div>
-          <p className="text-[10px] font-extrabold uppercase tracking-widest text-slate-400 dark:text-slate-500 mb-1">
-            {editTarget ? "Edit" : "Baru"}
-          </p>
-          <h2 className="text-xl md:text-2xl font-extrabold text-slate-900 dark:text-white">
-            {editTarget ? editTarget.name : "Tambah Produk"}
-          </h2>
+      <div className="animate-in fade-in zoom-in-95 duration-200 origin-top bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-4 md:p-6 lg:p-8 max-w-4xl mx-auto shadow-sm">
+        <div className="flex items-start gap-4 mb-8">
+          <button
+            onClick={() => {
+              setPendingDeleteUrls([]);
+              setShowForm(false);
+            }}
+            className="p-2 -ml-2 rounded-xl text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+          >
+            <ArrowLeft size={20} />
+          </button>
+          <div>
+            <p className="text-[10px] font-extrabold uppercase tracking-widest text-slate-400 dark:text-slate-500 mb-1">
+              {editTarget ? "Edit" : "Baru"}
+            </p>
+            <h2 className="text-xl md:text-2xl font-extrabold text-slate-900 dark:text-white">
+              {editTarget ? editTarget.name : "Tambah Produk"}
+            </h2>
+          </div>
         </div>
 
         <div className="space-y-4 md:space-y-5">
@@ -295,7 +299,6 @@ export default function POProductList() {
               />
             </Field>
           </div>
-
           <Field label="Kategori Produk *">
             <div className="grid grid-cols-2 gap-3">
               <button
@@ -303,101 +306,151 @@ export default function POProductList() {
                 onClick={() => setForm({ ...form, category: "dewasa" })}
                 className={`flex items-center justify-center gap-2 py-2.5 rounded-xl border text-sm font-bold transition-all ${
                   form.category === "dewasa"
-                    ? "border-blue-600 bg-blue-50 dark:bg-blue-500/10 text-blue-600 dark:text-blue-400"
-                    : "border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400 hover:border-slate-300 dark:hover:border-slate-600"
+                    ? "border-blue-600 bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400"
+                    : "border-slate-200 dark:border-slate-700 text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-800"
                 }`}
               >
-                Dewasa
+                Dewasa / Umum
               </button>
               <button
                 type="button"
                 onClick={() => setForm({ ...form, category: "kids" })}
                 className={`flex items-center justify-center gap-2 py-2.5 rounded-xl border text-sm font-bold transition-all ${
                   form.category === "kids"
-                    ? "border-blue-600 bg-blue-50 dark:bg-blue-500/10 text-blue-600 dark:text-blue-400"
-                    : "border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400 hover:border-slate-300 dark:hover:border-slate-600"
+                    ? "border-blue-600 bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400"
+                    : "border-slate-200 dark:border-slate-700 text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-800"
                 }`}
               >
-                Kids
+                Anak-anak
               </button>
             </div>
           </Field>
+          <Field label="Nama Produk *">
+            <input
+              type="text"
+              value={form.name}
+              onChange={(e) => setForm({ ...form, name: e.target.value })}
+              placeholder="Kaos Lengan Pendek Combed 30s"
+              className={inputCls}
+            />
+          </Field>
+          <Field label="Harga Dasar (Rp) *">
+            <input
+              type="number"
+              value={form.base_price}
+              onChange={(e) =>
+                setForm({ ...form, base_price: Number(e.target.value) })
+              }
+              className={inputCls}
+            />
+          </Field>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <Field label="Nama Produk *">
-              <input
-                type="text"
-                value={form.name}
-                onChange={(e) => setForm({ ...form, name: e.target.value })}
-                placeholder="Kaos Basic Oversize"
-                className={inputCls}
-              />
-            </Field>
-            <Field label="Harga Dasar (Rp) *">
-              <input
-                type="number"
-                value={form.base_price}
-                onChange={(e) =>
-                  setForm({ ...form, base_price: Number(e.target.value) })
-                }
-                placeholder="95000"
-                className={inputCls}
-              />
-              {form.base_price > 0 && (
-                <p className="text-xs text-blue-500 dark:text-blue-400 mt-1.5 font-semibold">
-                  {formatRupiah(form.base_price)}
-                </p>
-              )}
-            </Field>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <Field label="Ukuran Tersedia" hint="(pisah koma)">
+            <Field label="Ukuran" hint="(pisahkan dengan koma)">
               <input
                 type="text"
                 value={rawSizes}
                 onChange={(e) => setRawSizes(e.target.value)}
-                onBlur={() =>
-                  setForm({ ...form, available_sizes: strToArray(rawSizes) })
-                }
-                placeholder="S, M, L, XL, 2XL, 3XL"
+                placeholder="S, M, L, XL, XXL"
                 className={inputCls}
               />
             </Field>
-            <Field label="Jenis Lengan" hint="(pisah koma)">
+            <Field label="Jenis Lengan" hint="(pisahkan dengan koma)">
               <input
                 type="text"
                 value={rawSleeves}
                 onChange={(e) => setRawSleeves(e.target.value)}
-                onBlur={() =>
-                  setForm({ ...form, sleeve_types: strToArray(rawSleeves) })
-                }
                 placeholder="Pendek, Panjang"
-                className={inputCls}
-              />
-            </Field>
-            <Field label="Warna Tersedia" hint="(pisah koma)">
-              <input
-                type="text"
-                value={rawColors}
-                onChange={(e) => setRawColors(e.target.value)}
-                onBlur={() =>
-                  setForm({ ...form, colors: strToArray(rawColors) })
-                }
-                placeholder="Hitam, Putih, Abu-abu"
                 className={inputCls}
               />
             </Field>
           </div>
 
-          <Field label="Foto Produk" hint="(Bisa upload lebih dari 1)">
-            <div className="relative border-2 border-dashed border-slate-300 dark:border-slate-700 rounded-xl p-6 flex flex-col items-center justify-center text-center hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors group">
-              <UploadCloud className="w-8 h-8 text-slate-400 mb-2 group-hover:text-blue-500 transition-colors" />
-              <p className="text-sm font-semibold text-slate-600 dark:text-slate-300">
-                Klik di sini untuk mengunggah foto
+          <Field label="Warna" hint="(pisahkan dengan koma)">
+            <input
+              type="text"
+              value={rawColors}
+              onChange={(e) => setRawColors(e.target.value)}
+              placeholder="Hitam, Putih, Navy"
+              className={inputCls}
+            />
+          </Field>
+
+          <div className="bg-slate-50 dark:bg-slate-800/50 p-4 rounded-xl border border-slate-200 dark:border-slate-700 space-y-3">
+            <p className="text-xs font-bold text-slate-600 dark:text-slate-300">
+              Biaya Tambahan Tambahan (Surcharge)
+            </p>
+            <label className="flex items-center gap-3 cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={form.enable_xxl_surcharge}
+                onChange={(e) =>
+                  setForm({ ...form, enable_xxl_surcharge: e.target.checked })
+                }
+                className="w-4 h-4 text-blue-600"
+              />
+              <span className="text-sm text-slate-600 dark:text-slate-300">
+                Aktifkan biaya tambahan untuk size XXL (Kaos Dewasa)
+              </span>
+            </label>
+            <label className="flex items-center gap-3 cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={form.enable_sleeve_surcharge}
+                onChange={(e) =>
+                  setForm({
+                    ...form,
+                    enable_sleeve_surcharge: e.target.checked,
+                  })
+                }
+                className="w-4 h-4 text-blue-600"
+              />
+              <span className="text-sm text-slate-600 dark:text-slate-300">
+                Aktifkan biaya tambahan untuk Lengan Panjang (Kaos)
+              </span>
+            </label>
+            <label className="flex items-center gap-3 cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={form.enable_sweater_xxl_surcharge}
+                onChange={(e) =>
+                  setForm({
+                    ...form,
+                    enable_sweater_xxl_surcharge: e.target.checked,
+                  })
+                }
+                className="w-4 h-4 text-blue-600"
+              />
+              <span className="text-sm text-slate-600 dark:text-slate-300">
+                Aktifkan biaya tambahan untuk size XXL (Sweater/Hoodie)
+              </span>
+            </label>
+          </div>
+
+          <Field label="Deskripsi">
+            <textarea
+              value={form.description}
+              onChange={(e) =>
+                setForm({ ...form, description: e.target.value })
+              }
+              rows={3}
+              className={inputCls}
+            />
+          </Field>
+
+          <div className="pt-2">
+            <label className="text-xs font-bold text-slate-600 dark:text-slate-300 block mb-2">
+              Foto Produk
+            </label>
+            <div className="relative border-2 border-dashed border-slate-300 dark:border-slate-700 rounded-2xl p-8 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors flex flex-col items-center justify-center gap-2 group overflow-hidden">
+              <div className="w-12 h-12 rounded-full bg-blue-50 dark:bg-blue-900/30 text-blue-500 dark:text-blue-400 flex items-center justify-center group-hover:scale-110 transition-transform duration-300">
+                <UploadCloud size={24} />
+              </div>
+              <p className="text-sm font-semibold text-slate-700 dark:text-slate-300 mt-2">
+                Klik atau Drag gambar ke sini
               </p>
-              <p className="text-xs text-slate-400 mt-1">
-                Format JPG, PNG (Direkomendasikan max 2MB)
+              <p className="text-xs text-slate-400 dark:text-slate-500 text-center max-w-xs">
+                (Direkomendasikan max 2MB)
               </p>
               <input
                 type="file"
@@ -432,7 +485,7 @@ export default function POProductList() {
                       alt={`New ${i}`}
                       className="w-full h-full object-cover rounded-lg border-2 border-blue-400 shadow-sm"
                     />
-                    <span className="absolute bottom-1 right-1 text-[8px] font-bold bg-blue-500 text-white px-1.5 rounded-sm">
+                    <span className="absolute bottom-1 right-1 text-[8px] font-bold bg-blue-500 text-white px-1.5 rounded-full shadow-sm">
                       BARU
                     </span>
                     <button
@@ -445,195 +498,120 @@ export default function POProductList() {
                 ))}
               </div>
             )}
-          </Field>
+          </div>
 
-          <Field label="Deskripsi">
-            <textarea
-              value={form.description || ""}
-              onChange={(e) =>
-                setForm({ ...form, description: e.target.value })
-              }
-              rows={3}
-              placeholder="Deskripsi singkat produk..."
-              className={`${inputCls} resize-y`}
-            />
-          </Field>
-
-          {/* Pengaturan Penyesuaian Harga */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-4 border-t border-slate-100 dark:border-slate-800">
-            <label className="flex items-center gap-3 cursor-pointer p-3 border border-slate-200 dark:border-slate-700 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors">
-              <input
-                type="checkbox"
-                checked={form.enable_sleeve_surcharge}
-                onChange={(e) =>
-                  setForm({
-                    ...form,
-                    enable_sleeve_surcharge: e.target.checked,
-                  })
-                }
-                className="w-5 h-5 rounded text-blue-600 focus:ring-blue-500"
-              />
-              <div className="flex flex-col">
-                <span className="text-sm font-bold text-slate-800 dark:text-slate-200">
-                  Tambahan Lengan Panjang
-                </span>
-                <span className="text-[11px] text-slate-500">
-                  Sesuaikan harga jika ada opsi lengan panjang
-                </span>
+          <div className="flex items-center gap-3 pt-2">
+            <label className="flex items-center gap-3 cursor-pointer">
+              <div
+                onClick={() => setForm({ ...form, is_active: !form.is_active })}
+                className={`relative w-10 h-5 rounded-full transition-colors cursor-pointer ${form.is_active ? "bg-blue-600" : "bg-slate-300 dark:bg-slate-600"}`}
+              >
+                <span
+                  className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${form.is_active ? "translate-x-5" : "translate-x-0.5"}`}
+                />
               </div>
-            </label>
-
-            <label className="flex items-center gap-3 cursor-pointer p-3 border border-slate-200 dark:border-slate-700 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors">
-              <input
-                type="checkbox"
-                checked={form.enable_xxl_surcharge}
-                onChange={(e) =>
-                  setForm({ ...form, enable_xxl_surcharge: e.target.checked })
-                }
-                className="w-5 h-5 rounded text-blue-600 focus:ring-blue-500"
-              />
-              <div className="flex flex-col">
-                <span className="text-sm font-bold text-slate-800 dark:text-slate-200">
-                  Tambahan Size Jumbo
-                </span>
-                <span className="text-[11px] text-slate-500">
-                  Sesuaikan harga untuk ukuran XXL atau lebih
-                </span>
-              </div>
-            </label>
-            {/* Setelah label enable_xxl_surcharge yang sudah ada */}
-            <label className="flex items-center gap-3 cursor-pointer p-3 border border-slate-200 dark:border-slate-700 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors">
-              <input
-                type="checkbox"
-                checked={form.enable_sweater_xxl_surcharge}
-                onChange={(e) =>
-                  setForm({
-                    ...form,
-                    enable_sweater_xxl_surcharge: e.target.checked,
-                  })
-                }
-                className="w-5 h-5 rounded text-blue-600 focus:ring-blue-500"
-              />
-              <div className="flex flex-col">
-                <span className="text-sm font-bold text-slate-800 dark:text-slate-200">
-                  Tambahan Sweater Size 2XL+
-                </span>
-                <span className="text-[11px] text-slate-500">
-                  Harga berlipat mulai ukuran 2XL ke atas
-                </span>
-              </div>
+              <span className="text-sm text-slate-700 dark:text-slate-300 font-medium">
+                Produk aktif (tampil di katalog)
+              </span>
             </label>
           </div>
 
-          <label className="flex items-center gap-3 cursor-pointer select-none pt-2">
-            <div
-              onClick={() => setForm({ ...form, is_active: !form.is_active })}
-              className={`relative w-10 h-5 rounded-full transition-colors cursor-pointer ${form.is_active ? "bg-blue-600" : "bg-slate-300 dark:bg-slate-600"}`}
+          <div className="flex flex-col-reverse md:flex-row gap-3 pt-4 border-t border-slate-100 dark:border-slate-800">
+            <button
+              onClick={() => {
+                setPendingDeleteUrls([]);
+                setShowForm(false);
+              }}
+              className="w-full md:w-auto px-6 py-3 border border-slate-200 dark:border-slate-700 rounded-xl font-bold text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
             >
-              <span
-                className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${form.is_active ? "translate-x-5" : "translate-x-0.5"}`}
-              />
-            </div>
-            <span className="text-sm text-slate-700 dark:text-slate-300 font-medium">
-              Produk aktif (tampil di katalog)
-            </span>
-          </label>
-        </div>
-
-        <div className="flex flex-col-reverse md:flex-row gap-3 pt-4 border-t border-slate-100 dark:border-slate-800">
-          <button
-            onClick={() => {
-              setPendingDeleteUrls([]);
-              setShowForm(false);
-            }}
-            className="w-full md:w-auto px-6 py-3 border border-slate-200 dark:border-slate-700 rounded-xl text-sm font-semibold text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
-          >
-            Batal
-          </button>
-          <button
-            onClick={handleSave}
-            disabled={saving}
-            className="w-full md:w-auto flex-1 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white py-3 rounded-xl text-sm font-bold transition-colors flex items-center justify-center gap-2"
-          >
-            {saving ? (
-              <>
-                <div className="w-4 h-4 border-2 border-white/20 border-t-white rounded-full animate-spin" />{" "}
-                Menyimpan...
-              </>
-            ) : editTarget ? (
-              "Simpan Perubahan"
-            ) : (
-              "Tambah Produk"
-            )}
-          </button>
+              Batal
+            </button>
+            <button
+              onClick={handleSave}
+              disabled={saving}
+              className="w-full md:flex-1 bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-xl font-bold shadow-sm shadow-blue-500/20 transition-all disabled:opacity-50"
+            >
+              {saving ? "Menyimpan..." : "Simpan Produk"}
+            </button>
+          </div>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="w-full max-w-4xl mx-auto space-y-4 animate-in fade-in duration-200">
-      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3">
-        <p className="text-sm text-slate-400 dark:text-slate-500">
-          {products.length} produk terdaftar
-        </p>
+    <div className="space-y-4 animate-in fade-in duration-300">
+      <div className="flex flex-col sm:flex-row gap-3 justify-between items-start sm:items-center bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 md:p-6 shadow-sm">
+        <div>
+          <h2 className="text-lg md:text-xl font-extrabold text-slate-900 dark:text-white tracking-tight">
+            Katalog Produk
+          </h2>
+          <p className="text-xs text-slate-500 mt-1 font-medium">
+            {products.length} produk terdaftar dalam katalog
+          </p>
+        </div>
         <button
           onClick={openCreate}
-          className="w-full sm:w-auto flex justify-center items-center gap-2 text-sm bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-xl font-bold transition-colors"
+          className="w-full sm:w-auto flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-xl text-sm font-bold shadow-sm shadow-blue-500/20 transition-all active:scale-95"
         >
-          <Plus size={15} /> Tambah Produk
+          <Plus size={16} /> Tambah Produk
         </button>
       </div>
 
       {products.length === 0 ? (
-        <div className="py-16 flex flex-col items-center gap-3 text-slate-400 dark:text-slate-500 border border-slate-200 dark:border-slate-800 rounded-2xl border-dashed">
-          <ImageOff size={32} strokeWidth={1.2} />
-          <p className="text-sm font-semibold">Belum ada produk</p>
+        <div className="bg-slate-50 dark:bg-slate-800/50 border border-dashed border-slate-300 dark:border-slate-700 rounded-2xl p-12 flex flex-col items-center justify-center text-center">
+          <div className="w-16 h-16 bg-white dark:bg-slate-800 rounded-full shadow-sm flex items-center justify-center text-slate-400 mb-4">
+            <ImageOff size={24} />
+          </div>
+          <h3 className="font-bold text-slate-700 dark:text-slate-200 mb-1">
+            Belum ada produk
+          </h3>
+          <p className="text-sm text-slate-500 mb-6 max-w-sm">
+            Katalog masih kosong. Tambahkan produk pertama Anda untuk mulai
+            menerima pesanan.
+          </p>
           <button
             onClick={openCreate}
-            className="text-xs text-blue-500 hover:underline"
+            className="text-sm font-bold text-blue-600 dark:text-blue-400 hover:underline"
           >
-            Tambahkan produk pertama →
+            + Tambah Produk Sekarang
           </button>
         </div>
       ) : (
-        <div className="space-y-3">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {products.map((p) => (
             <div
               key={p.id}
-              className={`border rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center gap-4 transition-colors ${!p.is_active ? "opacity-60 bg-slate-50 dark:bg-slate-800/30 border-slate-200 dark:border-slate-700" : "bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600"}`}
+              className={`flex flex-col sm:flex-row gap-4 p-4 border rounded-2xl bg-white dark:bg-slate-900 transition-colors ${!p.is_active ? "border-slate-200 dark:border-slate-800 opacity-60" : "border-slate-200 dark:border-slate-700 shadow-sm"}`}
             >
-              <div className="flex items-start gap-4 flex-1 min-w-0">
-                {p.image_urls[0] ? (
+              <div className="w-full sm:w-28 h-48 sm:h-28 rounded-xl bg-slate-100 dark:bg-slate-800 shrink-0 overflow-hidden relative">
+                {p.image_urls && p.image_urls.length > 0 ? (
                   <img
                     src={p.image_urls[0]}
                     alt={p.name}
-                    className="w-16 h-16 sm:w-14 sm:h-14 object-cover rounded-xl flex-shrink-0 bg-slate-100 dark:bg-slate-800"
+                    className="w-full h-full object-cover"
                   />
                 ) : (
-                  <div className="w-16 h-16 sm:w-14 sm:h-14 bg-slate-100 dark:bg-slate-800 rounded-xl flex-shrink-0 flex items-center justify-center">
-                    <ImageOff
-                      size={18}
-                      className="text-slate-300 dark:text-slate-600"
-                    />
+                  <div className="w-full h-full flex flex-col items-center justify-center text-slate-400">
+                    <ImageOff size={20} className="mb-1 opacity-50" />
+                    <span className="text-[9px] font-bold uppercase">
+                      No Image
+                    </span>
                   </div>
                 )}
-                <div className="flex-1 min-w-0 pt-0.5">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <p className="font-bold text-sm text-slate-800 dark:text-slate-200">
-                      {p.name}
-                    </p>
-                    <span className="text-[10px] font-mono font-bold text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded">
-                      {p.product_code}
+                {!p.is_active && (
+                  <div className="absolute inset-0 bg-slate-900/10 backdrop-blur-[1px] flex items-center justify-center">
+                    <span className="bg-slate-900 text-white text-[10px] font-bold px-2 py-1 rounded">
+                      NONAKTIF
                     </span>
-                    <span
-                      className={`text-[10px] font-bold px-2 py-0.5 rounded-lg ${
-                        p.category === "kids"
-                          ? "bg-pink-100 dark:bg-pink-500/10 text-pink-600 dark:text-pink-400"
-                          : "bg-indigo-100 dark:bg-indigo-500/10 text-indigo-600 dark:text-indigo-400"
-                      }`}
-                    >
-                      {p.category === "kids" ? "Kids" : "Dewasa"}
+                  </div>
+                )}
+              </div>
+              <div className="flex-1 flex flex-col sm:flex-row sm:items-start justify-between min-w-0">
+                <div className="flex-1 min-w-0 pr-0 sm:pr-4">
+                  <div className="flex items-center gap-2 mb-1.5">
+                    <span className="text-[10px] font-extrabold uppercase tracking-widest text-slate-400 dark:text-slate-500 bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded-lg">
+                      {p.product_code}
                     </span>
                     {!p.is_active && (
                       <span className="text-[10px] font-bold bg-slate-200 dark:bg-slate-800 text-slate-500 dark:text-slate-400 px-2 py-0.5 rounded-lg">
@@ -641,34 +619,39 @@ export default function POProductList() {
                       </span>
                     )}
                   </div>
-                  <p className="text-sm font-bold text-blue-600 dark:text-blue-400 mt-1">
+                  <h3
+                    className="font-extrabold text-slate-800 dark:text-slate-100 truncate mb-1"
+                    title={p.name}
+                  >
+                    {p.name}
+                  </h3>
+                  <div className="text-xs text-slate-500 dark:text-slate-400 mb-2 truncate">
+                    {p.available_sizes.join(", ")} • {p.colors.length} Warna
+                  </div>
+                  <p className="text-lg font-black text-blue-600 dark:text-blue-400 mt-auto">
                     {formatRupiah(p.base_price)}
                   </p>
-                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 truncate">
-                    {p.available_sizes.join(", ")}{" "}
-                    {p.colors.length > 0 && ` · ${p.colors.join(", ")}`}
-                  </p>
                 </div>
-              </div>
-              <div className="grid grid-cols-3 sm:flex gap-2 sm:gap-1.5 flex-shrink-0 w-full sm:w-auto mt-2 sm:mt-0 pt-3 sm:pt-0 border-t sm:border-0 border-slate-100 dark:border-slate-800">
-                <button
-                  onClick={() => handleToggle(p.id, p.is_active)}
-                  className="text-xs border border-slate-200 dark:border-slate-700 px-3 py-2 sm:py-1.5 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-400 font-semibold transition-colors"
-                >
-                  {p.is_active ? "Nonaktifkan" : "Aktifkan"}
-                </button>
-                <button
-                  onClick={() => openEdit(p)}
-                  className="text-xs border border-slate-200 dark:border-slate-700 px-3 py-2 sm:py-1.5 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-400 font-semibold transition-colors"
-                >
-                  Edit
-                </button>
-                <button
-                  onClick={() => handleDelete(p.id, p.name)}
-                  className="text-xs border border-red-200 dark:border-red-900/50 text-red-500 dark:text-red-400 px-3 py-2 sm:py-1.5 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 font-semibold transition-colors"
-                >
-                  Hapus
-                </button>
+                <div className="grid grid-cols-3 sm:flex gap-2 sm:gap-1.5 shrink-0 w-full sm:w-auto mt-2 sm:mt-0 pt-3 sm:pt-0 border-t sm:border-0 border-slate-100 dark:border-slate-800">
+                  <button
+                    onClick={() => handleToggle(p.id, p.is_active)}
+                    className="text-xs border border-slate-200 dark:border-slate-700 px-3 py-2 sm:py-1.5 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-400 font-semibold transition-colors"
+                  >
+                    {p.is_active ? "Nonaktifkan" : "Aktifkan"}
+                  </button>
+                  <button
+                    onClick={() => openEdit(p)}
+                    className="text-xs border border-slate-200 dark:border-slate-700 px-3 py-2 sm:py-1.5 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-400 font-semibold transition-colors"
+                  >
+                    Edit
+                  </button>
+                  <button
+                    onClick={() => handleDelete(p.id, p.name)}
+                    className="text-xs border border-red-200 dark:border-red-900/50 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 px-3 py-2 sm:py-1.5 rounded-lg font-semibold transition-colors"
+                  >
+                    Hapus
+                  </button>
+                </div>
               </div>
             </div>
           ))}

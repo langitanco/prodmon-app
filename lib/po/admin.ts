@@ -8,13 +8,31 @@ import { POSetting, POProduct, POOrder, POResellerFull,POOrderItem } from '@/typ
 // SETTING
 // ─────────────────────────────────────────────
 
-export async function getPOSettingAdmin() {
+// Ganti fungsi getPOSettingAdmin lama dengan ini
+export async function getPOSettingAdmin(poId?: string) {
+  const supabase = createClient();
+  let query = supabase.from('po_setting').select('*');
+  
+  // Jika poId dikirim, filter berdasarkan ID tersebut
+  if (poId) {
+    query = query.eq('id', poId);
+  } else {
+    // Fallback: jika tidak ada poId, ambil baris pertama seperti sistem lama
+    query = query.limit(1);
+  }
+
+  const { data, error } = await query.single();
+  if (error) return null;
+  return data;
+}
+
+export async function getPOSettingBySlug(slug: string): Promise<POSetting | null> {
   const supabase = createClient();
   const { data, error } = await supabase
     .from('po_setting')
-    .select('*') // Pastikan menggunakan '*' atau eksplisit memanggil 'url_slug'
+    .select('*')
+    .eq('url_slug', slug)
     .single();
-
   if (error) return null;
   return data;
 }
@@ -36,12 +54,17 @@ export async function updatePOSetting(
 // PRODUK
 // ─────────────────────────────────────────────
 
-export async function getAllPOProducts(): Promise<POProduct[]> {
+// Ganti fungsi getAllPOProducts lama dengan ini
+export async function getAllPOProducts(poId?: string): Promise<POProduct[]> {
   const supabase = createClient();
-  const { data } = await supabase
-    .from('po_products')
-    .select('*')
-    .order('sort_order', { ascending: true });
+  let query = supabase.from('po_products').select('*');
+  
+  // Filter berdasarkan PO tertentu jika parameter tersedia
+  if (poId) {
+    query = query.eq('po_setting_id', poId);
+  }
+
+  const { data } = await query.order('sort_order', { ascending: true });
   return data || [];
 }
 
@@ -182,20 +205,15 @@ export async function submitOrder(
 ): Promise<{ success: boolean; po_number?: string; error?: string }> {
   const supabase = createClient();
 
-  // 1. Hitung total amount dari items
   const total_amount = payload.order_items.reduce(
     (sum: number, item: any) => sum + item.subtotal,
     0
   );
 
-  // 2. Generate Nomor PO sementara (Format: PO-YYMMDD-XXXX)
-  // Catatan: Jika di Supabase Anda sudah membuat trigger/RPC khusus untuk ini, 
-  // bagian ini bisa disesuaikan atau dihapus.
-  const dateStr = new Date().toISOString().slice(2, 10).replace(/-/g, ''); // Hasil: 260617 (YYMMDD)
-  const randomStr = Math.floor(1000 + Math.random() * 9000).toString(); // 4 digit acak
+  const dateStr = new Date().toISOString().slice(2, 10).replace(/-/g, '');
+  const randomStr = Math.floor(1000 + Math.random() * 9000).toString();
   const po_number = `PO-${dateStr}-${randomStr}`;
 
-  // 3. Siapkan data yang akan di-insert ke tabel po_orders
   const orderData = {
     po_number: po_number,
     customer_type: payload.customer_type,
@@ -203,12 +221,12 @@ export async function submitOrder(
     customer_wa: payload.customer_wa,
     delivery_method: payload.delivery_method,
     shipping_address: payload.shipping_address,
-    order_items: payload.order_items, // Disimpan sebagai JSONB di Supabase
+    order_items: payload.order_items,
     total_amount: total_amount,
-    reseller_id: payload.reseller_id || null, // Null jika pemesan PUBLIC
+    reseller_id: payload.reseller_id || null,
+    po_setting_id: setting.id,   // ← WAJIB ditambahkan
   };
 
-  // 4. Insert ke database
   const { data, error } = await supabase
     .from('po_orders')
     .insert(orderData)
@@ -222,12 +240,17 @@ export async function submitOrder(
   return { success: true, po_number: data.po_number };
 }
 
-export async function getAllPOOrders(): Promise<POOrder[]> {
+export async function getAllPOOrders(poId?: string): Promise<POOrder[]> {
   const supabase = createClient();
-  const { data } = await supabase
+  let query = supabase
     .from('po_orders')
-    .select('*, po_resellers(nama, kode)')
-    .order('created_at', { ascending: false });
+    .select('*, po_resellers(nama, kode)');
+
+  if (poId) {
+    query = query.eq('po_setting_id', poId);
+  }
+
+  const { data } = await query.order('created_at', { ascending: false });
   return data || [];
 }
 
@@ -321,7 +344,7 @@ export async function updatePOOrderFull(
 // STATISTIK
 // ─────────────────────────────────────────────
 
-export async function getPOStats(): Promise<{
+export async function getPOStats(poId?: string): Promise<{
   totalOrders: number;
   totalPublic: number;
   totalReseller: number;
@@ -329,9 +352,14 @@ export async function getPOStats(): Promise<{
   totalProducts: number;
 }> {
   const supabase = createClient();
-  const { data } = await supabase
+
+  let ordersQuery = supabase
     .from('po_orders')
-    .select('customer_type, total_amount, order_items'); // ⬅️ tambahkan order_items
+    .select('customer_type, total_amount, order_items');
+  if (poId) {
+    ordersQuery = ordersQuery.eq('po_setting_id', poId);
+  }
+  const { data } = await ordersQuery;
 
   if (!data) return { 
     totalOrders: 0, 
@@ -341,10 +369,14 @@ export async function getPOStats(): Promise<{
     totalProducts: 0 
   };
 
-  const { count: totalProducts } = await supabase
+  let productsQuery = supabase
     .from('po_products')
     .select('*', { count: 'exact', head: true })
-    .eq('is_active', true); // Hitung produk yang aktif saja
+    .eq('is_active', true);
+  if (poId) {
+    productsQuery = productsQuery.eq('po_setting_id', poId);
+  }
+  const { count: totalProducts } = await productsQuery;
 
   // Jumlahkan qty semua item dalam satu pesanan
   const sumQty = (items: POOrderItem[] | null | undefined) =>
@@ -406,4 +438,34 @@ export async function deleteProductImages(imageUrls: string[]): Promise<void> {
     // walau file di storage gagal terhapus (misal sudah terhapus manual sebelumnya).
     console.error('Gagal menghapus file gambar dari storage:', error.message);
   }
+}
+
+// ─────────────────────────────────────────────
+// LIST & CREATE PO (untuk multi-PO management)
+// ─────────────────────────────────────────────
+
+export async function getAllPOSettings(): Promise<POSetting[]> {
+  const supabase = createClient();
+  const { data } = await supabase
+    .from('po_setting')
+    .select('*')
+    .order('updated_at', { ascending: false });
+  return data || [];
+}
+
+export async function createPOSetting(
+  input: { title: string; url_slug: string }
+): Promise<{ success: boolean; id?: string; error?: string }> {
+  const supabase = createClient();
+  const { data, error } = await supabase
+    .from('po_setting')
+    .insert({
+      title: input.title,
+      url_slug: input.url_slug,
+      is_active: false,
+    })
+    .select('id')
+    .single();
+  if (error) return { success: false, error: error.message };
+  return { success: true, id: data.id };
 }

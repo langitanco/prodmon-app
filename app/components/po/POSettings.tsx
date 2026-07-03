@@ -65,7 +65,11 @@ function SectionHeading({ children }: { children: React.ReactNode }) {
 const INPUT =
   "w-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3.5 py-2.5 text-sm text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400 transition-all";
 
-export default function POSettings() {
+// Tambahkan ini di POSettings.tsx
+interface POSettingsProps {
+  poId: string;
+}
+export default function POSettings({ poId }: POSettingsProps) {
   const [setting, setSetting] = useState<POSetting | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -88,7 +92,7 @@ export default function POSettings() {
   // ✅ Semua useEffect di atas, sebelum early return apapun
   useEffect(() => {
     async function load() {
-      const data = await getPOSettingAdmin();
+      const data = await getPOSettingAdmin(poId);
       if (data) {
         setSetting(data);
         setForm({
@@ -111,7 +115,7 @@ export default function POSettings() {
       setLoading(false);
     }
     load();
-  }, []);
+  }, [poId]);
 
   async function handleSave() {
     if (!setting) return;

@@ -22,6 +22,7 @@ import Header from "@/app/components/layout/Header";
 import CustomAlert from "@/app/components/ui/CustomAlert";
 import LoginScreen from "@/app/components/auth/LoginScreen";
 import ProfileModal from "@/app/components/ui/ProfileModal";
+import POListSelector from "@/app/components/po/POListSelector";
 
 // ─── Lazy Load ───────────────────────────────────────────────────────────────
 import dynamic from "next/dynamic";
@@ -123,6 +124,7 @@ export default function ProductionApp() {
     "list",
   );
   const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
+  const [selectedPoId, setSelectedPoId] = useState<string | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [showProfileModal, setShowProfileModal] = useState(false);
   const [alertState, setAlertState] = useState<{
@@ -356,7 +358,7 @@ export default function ProductionApp() {
       />
 
       {isUploading && (
-        <div className="absolute inset-0 z-[9999] bg-black/60 flex flex-col items-center justify-center text-white backdrop-blur-sm">
+        <div className="absolute inset-0 z-9999 bg-black/60 flex flex-col items-center justify-center text-white backdrop-blur-sm">
           <Loader2 className="w-12 h-12 animate-spin mb-3 text-blue-400" />
           <p className="font-bold">Mengupload File...</p>
           <p className="text-xs text-gray-300 mt-1">
@@ -384,6 +386,7 @@ export default function ProductionApp() {
         handleNav={(tab: any) => {
           setActiveTab(tab);
           setView("list");
+          setSelectedPoId(null);
           setSidebarOpen(false);
         }}
         onLogout={handleLogout}
@@ -510,7 +513,15 @@ export default function ProductionApp() {
                 onUpdatePayment={handleUpdatePayment}
               />
             )}
-            {activeTab === "po_management" && <POManagementView />}
+            {activeTab === "po_management" &&
+              (selectedPoId ? (
+                <POManagementView
+                  poId={selectedPoId}
+                  onBack={() => setSelectedPoId(null)}
+                />
+              ) : (
+                <POListSelector onSelect={setSelectedPoId} />
+              ))}
             {activeTab === "kalkulator" && p?.kalkulator?.view && (
               <CalculatorView />
             )}

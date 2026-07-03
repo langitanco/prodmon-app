@@ -1,0 +1,122 @@
+
+/Users/macbook/monitoring-produksi
+├── README.md
+├── app
+|  ├── api
+|  |  ├── backup
+|  |  |  └── route.ts
+|  |  ├── cleanup-storage
+|  |  |  └── route.ts
+|  |  ├── cron
+|  |  |  └── check-overdue
+|  |  ├── delete-user
+|  |  |  └── route.ts
+|  |  ├── po
+|  |  |  └── orders
+|  |  ├── send-notification
+|  |  |  └── route.ts
+|  |  ├── sync-sheets
+|  |  |  └── route.ts
+|  |  └── version
+|  |     └── route.ts
+|  ├── components
+|  |  ├── apps
+|  |  |  ├── ActivityLogView.tsx
+|  |  |  ├── CalculatorView.tsx
+|  |  |  ├── CalendarView.tsx
+|  |  |  ├── ConfigPriceView.tsx
+|  |  |  ├── NotaView.tsx
+|  |  |  ├── SalaryView.tsx
+|  |  |  └── WeeklyNotesView.tsx
+|  |  ├── auth
+|  |  |  └── LoginScreen.tsx
+|  |  ├── dashboard
+|  |  |  ├── ActionList.tsx
+|  |  |  ├── ChartBar.tsx
+|  |  |  ├── ChartPie.tsx
+|  |  |  ├── Dashboard.tsx
+|  |  |  ├── HeroSection.tsx
+|  |  |  ├── ShareTicket.tsx
+|  |  |  └── UpdateBanner.tsx
+|  |  ├── finance
+|  |  |  └── FinanceView.tsx
+|  |  ├── layout
+|  |  |  ├── Header.tsx
+|  |  |  └── Sidebar.tsx
+|  |  ├── misc
+|  |  |  ├── AboutView.tsx
+|  |  |  ├── FCMManager.tsx
+|  |  |  └── TestNotifButton.tsx
+|  |  ├── orders
+|  |  |  ├── CompletedOrders.tsx
+|  |  |  ├── CreateOrder.tsx
+|  |  |  ├── EditOrder.tsx
+|  |  |  ├── OrderDetail.tsx
+|  |  |  ├── OrderList.tsx
+|  |  |  ├── SizeInputForm.tsx
+|  |  |  ├── TrashView.tsx
+|  |  |  └── detail
+|  |  ├── po
+|  |  |  ├── POManagementView.tsx
+|  |  |  ├── POOrderEditForm.tsx
+|  |  |  ├── POOrderList.tsx
+|  |  |  ├── POOrderPrintSlip.tsx
+|  |  |  ├── POOverview.tsx
+|  |  |  ├── POProductList.tsx
+|  |  |  ├── PORekapList.tsx
+|  |  |  ├── POResellerList.tsx
+|  |  |  └── POSettings.tsx
+|  |  ├── settings
+|  |  |  └── SettingsPage.tsx
+|  |  └── ui
+|  |     ├── AnnouncementBanner.tsx
+|  |     ├── CustomAlert.tsx
+|  |     └── ProfileModal.tsx
+|  ├── debug
+|  |  └── page.tsx
+|  ├── favicon.ico
+|  ├── globals.css
+|  ├── layout.tsx
+|  ├── page.tsx
+|  ├── po
+|  |  ├── [slug]
+|  |  |  ├── daftar-reseller
+|  |  |  └── page.tsx
+|  |  ├── order
+|  |  |  └── page.tsx
+|  |  └── reseller
+|  |     ├── page.tsx
+|  |     └── portal
+|  └── tracking
+|     ├── TrackingTimeline.tsx
+|     └── page.tsx
+├── eslint.config.mjs
+├── hooks
+|  ├── useAuth.ts
+|  ├── useDashboard.ts
+|  ├── useNotifications.ts
+|  ├── useOrderDetail.ts
+|  ├── useOrders.ts
+|  ├── useUpdateCheck.ts
+|  ├── useUpload.ts
+|  └── useUsers.ts
+├── lib
+|  ├── changelog.ts
+|  ├── firebase.ts
+|  ├── notificationHelper.ts
+|  ├── orderLogic.ts
+|  ├── po
+|  |  ├── admin.ts
+|  |  ├── generator.ts
+|  |  ├── pricing.ts
+|  |  ├── public.ts
+|  |  ├── supabase.ts
+|  |  └── wa-messages.ts
+|  ├── supabase
+|  |  └── client.ts
+|  ├── supabaseClient.ts
+|  └── utils.ts
+├── middleware.ts
+├── next-env.d.ts
+├── next.config.ts
+├── node_modules

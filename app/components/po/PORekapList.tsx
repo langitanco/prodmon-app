@@ -28,7 +28,11 @@ type RekapProduk = {
   totalJumlah: number;
 };
 
-export default function PORekapList() {
+// Tambahkan ini di PORekapList.tsx
+interface PORekapListProps {
+  poId: string;
+}
+export default function PORekapList({ poId }: PORekapListProps) {
   const [orders, setOrders] = useState<POOrder[]>([]);
   const [products, setProducts] = useState<POProduct[]>([]);
   const [loading, setLoading] = useState(true);
@@ -37,14 +41,14 @@ export default function PORekapList() {
 
   useEffect(() => {
     load();
-  }, []);
+  }, [poId]);
 
   async function load(isRefresh = false) {
     if (isRefresh) setRefreshing(true);
     else setLoading(true);
     const [ordersData, productsData] = await Promise.all([
-      getAllPOOrders(),
-      getAllPOProducts(),
+      getAllPOOrders(poId),
+      getAllPOProducts(poId),
     ]);
     setOrders(ordersData);
     setProducts(productsData);

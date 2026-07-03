@@ -14,6 +14,7 @@ import {
   Users,
   Settings2,
   ClipboardPaste,
+  ArrowLeft,
 } from "lucide-react";
 
 type POTab =
@@ -33,7 +34,15 @@ const tabs: { id: POTab; label: string; icon: React.ElementType }[] = [
   { id: "rekap", label: "Rekap", icon: ClipboardPaste },
 ];
 
-export default function POManagementView() {
+interface POManagementViewProps {
+  poId: string;
+  onBack?: () => void;
+}
+
+export default function POManagementView({
+  poId,
+  onBack,
+}: POManagementViewProps) {
   const [activeTab, setActiveTab] = useState<POTab>("overview");
 
   const ActiveIcon =
@@ -41,30 +50,40 @@ export default function POManagementView() {
 
   return (
     <div className="space-y-4 animate-in fade-in duration-300">
-      {/* ── Page Header ─────────────────────────────────────────── */}
-      <div className="flex items-center justify-between">
-        <div>
-          <p className="text-[10px] font-extrabold uppercase tracking-[0.18em] text-blue-500 dark:text-blue-400 mb-1">
-            Pre-Order System
-          </p>
-          <h1 className="text-2xl font-extrabold text-slate-900 dark:text-white tracking-tight leading-none">
-            PO Management
-          </h1>
-          <p className="text-sm text-slate-400 dark:text-slate-500 mt-1">
-            Kelola produk, pesanan, dan reseller Langitan.co
-          </p>
-        </div>
-
-        {/* Active tab pill — desktop hint */}
-        <div className="hidden md:flex items-center gap-2 bg-blue-50 dark:bg-blue-950/40 border border-blue-100 dark:border-blue-900 rounded-xl px-4 py-2.5">
-          <ActiveIcon size={15} className="text-blue-600 dark:text-blue-400" />
-          <span className="text-sm font-bold text-blue-700 dark:text-blue-300">
-            {tabs.find((t) => t.id === activeTab)?.label}
-          </span>
+      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6">
+        {onBack && (
+          <button
+            onClick={onBack}
+            className="inline-flex items-center gap-1.5 mb-4 pl-2.5 pr-3.5 py-1.5 rounded-full border border-slate-200 dark:border-slate-700 text-xs font-bold text-slate-500 dark:text-slate-400 hover:border-slate-300 dark:hover:border-slate-600 hover:bg-slate-50 dark:hover:bg-slate-800 hover:text-slate-800 dark:hover:text-slate-200 transition-all group"
+          >
+            <ArrowLeft
+              size={13}
+              className="transition-transform group-hover:-translate-x-0.5"
+            />
+            Kembali ke daftar PO
+          </button>
+        )}
+        <div className="flex items-center gap-4">
+          <div className="p-3 bg-blue-50 dark:bg-blue-950/50 text-blue-600 dark:text-blue-400 rounded-xl border border-blue-100 dark:border-blue-900/50 shadow-sm shrink-0">
+            <ActiveIcon size={24} />
+          </div>
+          <div className="min-w-0">
+            <p className="text-[10px] font-extrabold uppercase tracking-[0.18em] text-blue-500 mb-1">
+              Pre-Order System
+            </p>
+            <h1 className="text-2xl font-extrabold text-slate-900 dark:text-white tracking-tight leading-none truncate">
+              PO Management{" "}
+              <span className="text-blue-600 font-mono text-xl ml-1">
+                #{poId.slice(0, 8)}
+              </span>
+            </h1>
+            <p className="text-xs text-slate-400 dark:text-slate-500 mt-1.5 font-medium truncate">
+              Mengelola data terisolasi untuk ID Campaign: {poId}
+            </p>
+          </div>
         </div>
       </div>
 
-      {/* ── Tab Bar ─────────────────────────────────────────────── */}
       <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-1.5 flex gap-1 overflow-x-auto no-scrollbar">
         {tabs.map(({ id, label, icon: Icon }) => (
           <button
@@ -86,14 +105,15 @@ export default function POManagementView() {
         ))}
       </div>
 
-      {/* ── Content Panel ───────────────────────────────────────── */}
       <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 min-h-[420px]">
-        {activeTab === "overview" && <POOverview />}
-        {activeTab === "orders" && <POOrderList />}
-        {activeTab === "products" && <POProductList />}
-        {activeTab === "resellers" && <POResellerList />}
-        {activeTab === "settings" && <POSettings />}
-        {activeTab === "rekap" && <PORekapList />}
+        {/* Catatan: Bagian di bawah ini akan tetap ada garis merah (error TypeScript) 
+            sampai kita menambahkan props 'poId' ke dalam file sub-komponennya masing-masing */}
+        {activeTab === "overview" && <POOverview poId={poId} />}
+        {activeTab === "orders" && <POOrderList poId={poId} />}
+        {activeTab === "products" && <POProductList poId={poId} />}
+        {activeTab === "resellers" && <POResellerList poId={poId} />}
+        {activeTab === "settings" && <POSettings poId={poId} />}
+        {activeTab === "rekap" && <PORekapList poId={poId} />}
       </div>
     </div>
   );
