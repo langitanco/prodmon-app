@@ -43,10 +43,10 @@ export default function DaftarResellerPage({ slug }: Props) {
   const [done, setDone] = useState(false);
 
   useEffect(() => {
-    getPOSettingPublic().then((s) => {
+    getPOSettingPublic(slug).then((s) => {
       if (s?.wa_admin_phone) setAdminPhone(s.wa_admin_phone);
     });
-  }, []);
+  }, [slug]);
 
   const isFormValid =
     form.nama.trim() &&
@@ -144,7 +144,7 @@ export default function DaftarResellerPage({ slug }: Props) {
 
   /* ── Form Utama ────────────────────────────────────────────────── */
   return (
-    <div className="min-h-[100dvh] bg-slate-50 dark:bg-slate-950 flex justify-center py-8 px-4 sm:py-12">
+    <div className="min-h-dvh bg-slate-50 dark:bg-slate-950 flex justify-center py-8 px-4 sm:py-12">
       <div className="w-full max-w-lg bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-xl h-fit animate-in fade-in slide-in-from-bottom-4 duration-300">
         {/* HEADER (Sama Persis dengan SyaratKetentuanModal) */}
         <div className="flex items-start justify-between gap-3 px-5 pt-5 pb-4 border-b border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 rounded-t-2xl">

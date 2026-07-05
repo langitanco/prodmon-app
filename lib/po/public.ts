@@ -42,13 +42,12 @@ export async function registerReseller(
 }
 
 
-export async function getPOSettingPublic() {
+export async function getPOSettingPublic(slug: string) {
   const supabase = createClient();
   const { data, error } = await supabase
     .from('po_setting')
-    // PASTIKAN MEMAKAI '*' AGAR SEMUA DATA (TERMASUK WA) TERBAWA
-    .select('*') 
-    // Atau jika pakai slug: .eq('url_slug', slug)
+    .select('*')
+    .eq('url_slug', slug)
     .single();
 
   if (error) return null;
