@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useParams } from "next/navigation";
 import {
   UserPlus,
   User,
@@ -17,10 +18,6 @@ import { registerReseller, getPOSettingPublic } from "@/lib/po/public";
 import { buildRegistrationMessage, buildWaLink } from "@/lib/po/wa-messages";
 import SyaratKetentuanModal from "./SyaratKetentuanModal";
 
-interface Props {
-  slug: string;
-}
-
 const EMPTY_FORM = {
   nama: "",
   panggilan: "",
@@ -33,7 +30,9 @@ const EMPTY_FORM = {
   provinsi: "",
 };
 
-export default function DaftarResellerPage({ slug }: Props) {
+export default function DaftarResellerPage() {
+  const params = useParams();
+  const slug = params?.slug as string;
   const [form, setForm] = useState(EMPTY_FORM);
   const [agreed, setAgreed] = useState(false);
   const [showSK, setShowSK] = useState(false);
