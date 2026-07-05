@@ -120,3 +120,29 @@
 ├── next-env.d.ts
 ├── next.config.ts
 ├── node_modules
+├── package-lock.json
+├── package.json
+├── postcss.config.mjs
+├── public
+|  ├── file.svg
+|  ├── firebase-messaging-sw.js
+|  ├── globe.svg
+|  ├── header-nota.png
+|  ├── icon-bedge.png
+|  ├── logo.png
+|  ├── next.svg
+|  ├── vercel.svg
+|  └── window.svg
+├── struktur_aplikasi.txt
+├── tailwind.config.ts
+├── tsconfig.json
+├── tsconfig.tsbuildinfo
+└── types
+   ├── index.ts
+   └── po.ts
+
+directory: 2125 file: 13071
+
+
+
+[2K[1G

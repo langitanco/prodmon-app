@@ -245,10 +245,10 @@ export default function POSettings({ poId }: POSettingsProps) {
           {form.is_active ? (
             <CheckCircle2
               size={18}
-              className="text-emerald-500 flex-shrink-0"
+              className="text-emerald-500 shrink-0"
             />
           ) : (
-            <XCircle size={18} className="text-slate-400 flex-shrink-0" />
+            <XCircle size={18} className="text-slate-400 shrink-0" />
           )}
           <div>
             <p className="font-bold text-slate-900 dark:text-white text-sm">
@@ -263,7 +263,7 @@ export default function POSettings({ poId }: POSettingsProps) {
         </div>
         <button
           onClick={() => setForm({ ...form, is_active: !form.is_active })}
-          className="flex-shrink-0 transition-colors"
+          className="shrink-0 transition-colors"
           aria-label="Toggle status PO"
         >
           {form.is_active ? (
@@ -430,7 +430,7 @@ export default function POSettings({ poId }: POSettingsProps) {
             }
             rows={2}
             placeholder="BCA 1234567890 a/n Langitan Store"
-            className={`${INPUT} resize-none h-full min-h-[80px]`}
+            className={`${INPUT} resize-none h-full min-h-20`}
           />
         </Field>
       </div>
@@ -443,7 +443,7 @@ export default function POSettings({ poId }: POSettingsProps) {
       >
         <div className="flex flex-col sm:flex-row gap-4 items-start">
           {/* Preview */}
-          <div className="w-40 h-40 rounded-xl border-2 border-dashed border-slate-200 dark:border-slate-700 flex items-center justify-center overflow-hidden bg-slate-50 dark:bg-slate-800/50 flex-shrink-0">
+          <div className="w-40 h-40 rounded-xl border-2 border-dashed border-slate-200 dark:border-slate-700 flex items-center justify-center overflow-hidden bg-slate-50 dark:bg-slate-800/50 shrink-0">
             {qrisPreview ? (
               <img
                 src={qrisPreview}

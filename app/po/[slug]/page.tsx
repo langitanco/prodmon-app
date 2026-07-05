@@ -327,7 +327,7 @@ export default function CatalogPage() {
                   .getElementById("sec-catalog")
                   ?.scrollIntoView({ behavior: "smooth" })
               }
-              className="inline-flex items-center gap-2 bg-white text-zinc-950 px-6 py-3 rounded-full font-extrabold text-sm hover:opacity-90 hover:-translate-y-[1px] transition-all"
+              className="inline-flex items-center gap-2 bg-white text-zinc-950 px-6 py-3 rounded-full font-extrabold text-sm hover:opacity-90 hover:-translate-y-px transition-all"
             >
               <LayoutGrid size={16} />
               Lihat Katalog
@@ -412,7 +412,7 @@ export default function CatalogPage() {
         {!loading && (
           <div className="mb-8">
             {isActive ? (
-              <div className="flex items-start gap-2.5 p-3.5 md:px-5 md:py-3.5 bg-green-50 text-green-700 border border-green-200 rounded-xl text-sm font-semibold break-words">
+              <div className="flex items-start gap-2.5 p-3.5 md:px-5 md:py-3.5 bg-green-50 text-green-700 border border-green-200 rounded-xl text-sm font-semibold wrap-break-words">
                 <CheckCircle2 size={18} className="shrink-0 mt-0.5" />
                 <span>
                   PO sedang <strong className="font-extrabold">AKTIF</strong> —
@@ -420,7 +420,7 @@ export default function CatalogPage() {
                 </span>
               </div>
             ) : (
-              <div className="flex items-start gap-2.5 p-3.5 md:px-5 md:py-3.5 bg-red-50 text-red-700 border border-red-200 rounded-xl text-sm font-semibold break-words">
+              <div className="flex items-start gap-2.5 p-3.5 md:px-5 md:py-3.5 bg-red-50 text-red-700 border border-red-200 rounded-xl text-sm font-semibold wrap-break-words">
                 <XCircle size={18} className="shrink-0 mt-0.5" />
                 <span>
                   PO sedang <strong className="font-extrabold">TUTUP</strong> —
@@ -458,7 +458,7 @@ export default function CatalogPage() {
                 className="bg-white border border-gray-200 rounded-xl md:rounded-2xl overflow-hidden cursor-pointer flex flex-col transition-all duration-200 hover:border-gray-300 hover:-translate-y-1 group"
               >
                 {/* ✅ Aspect ratio diubah dari 4/3 → 4/5 agar sesuai rasio asli foto produk (portrait), supaya object-cover tidak memotong bagian penting gambar di semua ukuran layar */}
-                <div className="w-full aspect-[4/5] bg-slate-100 relative overflow-hidden shrink-0">
+                <div className="w-full aspect-[4/5 bg-slate-100 relative overflow-hidden shrink-0">
                   {p.image_urls[0] ? (
                     <img
                       src={p.image_urls[0]}
@@ -567,7 +567,7 @@ export default function CatalogPage() {
             {/* ── Sisi Foto ── */}
             {/* ✅ Aspect ratio mobile diubah dari 4/3 → 4/5 agar konsisten dengan rasio asli foto produk. Di desktop (sm:) tetap pakai min-h dengan object-cover, karena modal landscape punya ruang vertikal lebih fleksibel mengikuti tinggi konten */}
             <div
-              className="w-full sm:flex-[1.2] bg-slate-100 relative overflow-hidden flex items-center justify-center aspect-[4/5] sm:aspect-auto sm:min-h-[480px] select-none"
+              className="w-full sm:flex-[1.2] bg-slate-100 relative overflow-hidden flex items-center justify-center aspect-4/5 sm:aspect-auto sm:min-h-[480px] select-none"
               onTouchStart={(e) => setTouchStart(e.touches[0].clientX)}
               onTouchEnd={handleTouchEnd}
             >

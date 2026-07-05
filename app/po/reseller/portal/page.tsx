@@ -311,7 +311,7 @@ export default function ResellerPortalPage() {
   if (!setting?.is_active) {
     return (
       <div className="min-h-screen bg-[#f5f5f4] flex items-center justify-center p-4">
-        <div className="bg-white border border-[#e5e7eb] rounded-[12px] p-8 text-center max-w-sm w-full">
+        <div className="bg-white border border-[#e5e7eb] rounded-xl p-8 text-center max-w-sm w-full">
           <h2 className="text-[18px] font-bold text-[#0e0e0e] mb-2">
             PO Sedang Tutup
           </h2>
@@ -336,19 +336,19 @@ export default function ResellerPortalPage() {
         .animate-slide-up { animation: slide-up 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
       `}</style>
 
-      <div className="min-h-screen bg-[#f5f5f4] text-[#0e0e0e] font-sans pb-[40px]">
+      <div className="min-h-screen bg-[#f5f5f4] text-[#0e0e0e] font-sans pb-10">
         {/* ── Header ── */}
         <header className="bg-white border-b border-[#e5e7eb] px-4 md:px-12 h-[58px] flex items-center justify-between sticky top-0 z-50">
           <div className="text-[15px] font-extrabold tracking-tight">
             Portal Reseller
           </div>
-          <div className="flex items-center gap-[10px]">
-            <div className="hidden md:flex items-center gap-1.5 px-[12px] py-[5px] bg-[#f5f5f4] border border-[#e5e7eb] rounded-full text-[12.5px] font-bold text-[#4b5563]">
+          <div className="flex items-center gap-2.5">
+            <div className="hidden md:flex items-center gap-1.5 px-3 py-[5px] bg-[#f5f5f4] border border-[#e5e7eb] rounded-full text-[12.5px] font-bold text-[#4b5563]">
               {reseller?.nama} ({reseller?.kode})
             </div>
             <button
               onClick={handleLogout}
-              className="flex items-center gap-1.5 px-[14px] py-[5px] bg-transparent border border-[#e5e7eb] rounded-full text-[12.5px] font-semibold text-[#9ca3af] hover:border-[#d1d5db] hover:text-[#0e0e0e] transition-colors"
+              className="flex items-center gap-1.5 px-3.5 py-[5px] bg-transparent border border-[#e5e7eb] rounded-full text-[12.5px] font-semibold text-[#9ca3af] hover:border-[#d1d5db] hover:text-[#0e0e0e] transition-colors"
             >
               Keluar
             </button>
@@ -357,13 +357,13 @@ export default function ResellerPortalPage() {
 
         {/* ── Hero ── */}
         <div className="bg-[#0e0e0e] text-white px-4 py-7 md:py-11 md:px-12 relative overflow-hidden">
-          <div className="absolute inset-0 bg-[radial-gradient(circle_at_80%_50%,_#1f2937_0%,_transparent_55%)] pointer-events-none" />
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_80%_50%,#1f2937_0%,transparent_55%)] pointer-events-none" />
           <div className="relative z-10 max-w-[600px] mx-auto md:mx-0">
-            <div className="inline-flex items-center gap-[7px] text-[11px] font-bold tracking-[0.1em] uppercase text-white/50 mb-2">
+            <div className="inline-flex items-center gap-[7px] text-[11px] font-bold tracking-widest uppercase text-white/50 mb-2">
               <div className="w-1.5 h-1.5 rounded-full bg-[#4ade80]" />
               Portal Reseller Aktif
             </div>
-            <h1 className="text-[21px] md:text-[28px] font-extrabold tracking-tight leading-tight mb-[6px]">
+            <h1 className="text-[21px] md:text-[28px] font-extrabold tracking-tight leading-tight mb-1.5">
               Selamat datang,{" "}
               <em className="not-italic text-white/40">{reseller?.nama}</em>
             </h1>
@@ -386,7 +386,7 @@ export default function ResellerPortalPage() {
                 <button
                   key={tab}
                   onClick={() => setActiveTab(tab)}
-                  className={`relative flex items-center gap-[7px] px-[4px] py-[16px] mr-[28px] text-[13.5px] font-bold transition-colors ${
+                  className={`relative flex items-center gap-[7px] px-1 py-4 mr-7 text-[13.5px] font-bold transition-colors ${
                     isActive
                       ? "text-[#0e0e0e]"
                       : "text-[#9ca3af] hover:text-[#4b5563]"
@@ -395,7 +395,7 @@ export default function ResellerPortalPage() {
                   {label}
                   {count > 0 && (
                     <span
-                      className={`px-[6px] py-[1px] rounded-full text-[10.5px] font-bold ${
+                      className={`1.5[6px] py-px rounded-full text-[10.5px] font-bold ${
                         isActive
                           ? "bg-[#0e0e0e] text-white"
                           : "bg-[#f3f4f6] text-[#9ca3af]"
@@ -405,7 +405,7 @@ export default function ResellerPortalPage() {
                     </span>
                   )}
                   {isActive && (
-                    <div className="absolute bottom-0 left-0 right-0 h-[2px] bg-[#0e0e0e] rounded-t-full" />
+                    <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-[#0e0e0e] rounded-t-full" />
                   )}
                 </button>
               );
@@ -415,7 +415,7 @@ export default function ResellerPortalPage() {
 
         {/* ── Tab: Buat Pesanan ── */}
         {activeTab === "order" && (
-          <div className="max-w-[1200px] mx-auto p-[20px] md:py-[36px] md:px-[48px] grid grid-cols-1 md:grid-cols-[300px_1fr] gap-[20px] items-start">
+          <div className="max-w-[1200px] mx-auto p-5 md:py-9 md:px-12 grid grid-cols-1 md:grid-cols-[300px_1fr] gap-5 items-start">
             <OrderCart
               reseller={reseller}
               cart={cart}
@@ -450,7 +450,7 @@ export default function ResellerPortalPage() {
 
         {/* ── Tab: Riwayat Pesanan ── */}
         {activeTab === "history" && (
-          <div className="max-w-[780px] mx-auto p-[20px] md:py-[36px] md:px-[48px]">
+          <div className="max-w-[780px] mx-auto p-5 md:py-9 md:px-12">
             <HistoryTab
               orders={orders}
               loadingOrders={loadingOrders}
