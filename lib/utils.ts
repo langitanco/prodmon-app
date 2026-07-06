@@ -130,3 +130,54 @@ export const openWA = (hp: string) => {
   if (formatted.startsWith('0')) formatted = '62' + formatted.slice(1);
   window.open(`https://wa.me/${formatted}`, '_blank');
 };
+
+// ─── Penamaan File Dokumen Order ──────────────────────────────────────────
+
+function sanitizeFilenamePart(str: string): string {
+  return str
+    .normalize('NFKD')
+    .replace(/[^\w\s-]/g, '')   // buang karakter spesial (misal #, /, tanda kutip)
+    .trim()
+    .replace(/\s+/g, '');       // "Pecah Gambar" -> "PecahGambar"
+}
+
+/**
+ * Memetakan type upload (dari onTriggerUpload) + nama step (jika ada)
+ * menjadi label dokumen yang jelas dan konsisten untuk nama file.
+ */
+export function getDocumentLabel(type: string, stepName?: string): string {
+  switch (type) {
+    case 'approval':
+      return 'ApprovalDesain';
+    case 'packing':
+      return 'Packing';
+    case 'shipping_kirim':
+      return 'BuktiKirim';
+    case 'shipping_terima':
+      return 'BuktiTerima';
+    case 'kendala_bukti':
+      return 'BuktiKendala';
+    case 'step':
+      // stepName contoh: "Proofing", "Pecah Gambar", "Print Film", "Produksi Massal"
+      return stepName ? sanitizeFilenamePart(stepName) : 'Produksi';
+    default:
+      return sanitizeFilenamePart(type);
+  }
+}
+
+/**
+ * Menyusun nama file storage: YYYY-MM-DD_KodeProduksi_JenisDokumen
+ * (tanpa ekstensi — tambahkan ekstensi terpisah saat dipakai)
+ */
+export function generateStorageFilename(
+  jenisDokumen: string,
+  kodeProduksi: string,
+  tanggal: Date = new Date(),
+): string {
+  const sanitizeKode = (str: string) =>
+    str.replace(/[#/\\]/g, '').replace(/\s+/g, '-').trim();
+
+  const tgl = tanggal.toISOString().split('T')[0]; // "2026-07-04"
+
+  return `${tgl}_${sanitizeKode(kodeProduksi)}_${jenisDokumen}`;
+}

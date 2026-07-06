@@ -118,6 +118,9 @@ interface CurrentUser extends UserData {
 
 export default function ProductionApp() {
   const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null);
+  const [previousTab, setPreviousTab] = useState<ActiveTab | null>(null);
+  const [completedOrdersPage, setCompletedOrdersPage] = useState(1);
+  const [completedOrdersPerPage, setCompletedOrdersPerPage] = useState(10);
   const [loadingUser, setLoadingUser] = useState(true);
   const [activeTab, setActiveTab] = useState<ActiveTab>("dashboard");
   const [view, setView] = useState<"list" | "detail" | "create" | "edit">(
@@ -416,6 +419,7 @@ export default function ProductionApp() {
                 role={currentUser.role}
                 orders={activeOrders}
                 onSelectOrder={(id) => {
+                  setPreviousTab(activeTab); // simpan "dashboard"
                   setSelectedOrderId(id);
                   setView("detail");
                   setActiveTab("orders");
@@ -463,6 +467,10 @@ export default function ProductionApp() {
                     onBack={() => {
                       setSelectedOrderId(null);
                       setView("list");
+                      if (previousTab) {
+                        setActiveTab(previousTab);
+                        setPreviousTab(null);
+                      }
                     }}
                     onEdit={() => setView("edit")}
                     onTriggerUpload={triggerUpload}
@@ -479,7 +487,12 @@ export default function ProductionApp() {
             {activeTab === "completed_orders" && p?.orders?.view && (
               <CompletedOrders
                 orders={activeOrders}
+                currentPage={completedOrdersPage}
+                onPageChange={setCompletedOrdersPage}
+                itemsPerPage={completedOrdersPerPage}
+                onItemsPerPageChange={setCompletedOrdersPerPage}
                 onSelectOrder={(id) => {
+                  setPreviousTab(activeTab);
                   setSelectedOrderId(id);
                   setView("detail");
                   setActiveTab("orders");
@@ -491,6 +504,7 @@ export default function ProductionApp() {
               <CalendarView
                 orders={activeOrders}
                 onSelectOrder={(id) => {
+                  setPreviousTab(activeTab); // simpan "dashboard"
                   setSelectedOrderId(id);
                   setView("detail");
                   setActiveTab("orders");

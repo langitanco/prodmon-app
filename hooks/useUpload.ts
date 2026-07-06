@@ -1,6 +1,7 @@
 // hooks/useUpload.ts
 import { useState, useRef, useCallback } from 'react';
 import { SupabaseClient } from '@supabase/supabase-js';
+import { getDocumentLabel, generateStorageFilename } from '@/lib/utils';
 import imageCompression from 'browser-image-compression';
 import { Order, UserData } from '@/types';
 
@@ -52,57 +53,72 @@ export function useUpload({
   }, []);
 
   const handleFileChange = useCallback(async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file || !selectedOrderId || !uploadContext) return;
+  const file = event.target.files?.[0];
+  if (!file || !selectedOrderId || !uploadContext) return;
 
-    setIsUploading(true);
-    let processedFile = file;
+  // 🟢 Ambil data order dulu — dibutuhkan untuk penamaan file
+  const order = orders.find((o: Order) => o.id === selectedOrderId);
+  if (!order) return;
 
-    if (file.type.startsWith('image/')) {
-      try {
-        processedFile = await imageCompression(file, {
-          maxSizeMB: 1,
-          maxWidthOrHeight: 1920,
-          useWebWorker: true,
-        });
-      } catch (error) {
-        console.error('Kompresi gagal, pakai asli', error);
-      }
-    } else if (file.type === 'application/pdf') {
-      const MAX_MB = 15;
-      if (file.size > MAX_MB * 1024 * 1024) {
-        alert(`File PDF terlalu besar (> ${MAX_MB}MB). Harap kecilkan ukuran file.`);
-        setIsUploading(false);
-        return;
-      }
+  setIsUploading(true);
+  let processedFile = file;
+
+  if (file.type.startsWith('image/')) {
+    try {
+      processedFile = await imageCompression(file, {
+        maxSizeMB: 1,
+        maxWidthOrHeight: 1920,
+        useWebWorker: true,
+      });
+    } catch (error) {
+      console.error('Kompresi gagal, pakai asli', error);
     }
-
-    const fileName = `${selectedOrderId}/${Date.now()}.${processedFile.name.split('.').pop()}`;
-    const { error: uploadError } = await supabase.storage
-      .from('production-proofs')
-      .upload(fileName, processedFile, { upsert: false });
-
-    if (uploadError) {
-      showAlert('Gagal Upload', uploadError.message, 'error');
+  } else if (file.type === 'application/pdf') {
+    const MAX_MB = 15;
+    if (file.size > MAX_MB * 1024 * 1024) {
+      alert(`File PDF terlalu besar (> ${MAX_MB}MB). Harap kecilkan ukuran file.`);
       setIsUploading(false);
       return;
     }
+  }
 
-    const { data: urlData } = supabase.storage.from('production-proofs').getPublicUrl(fileName);
+  // 🟢 Cari nama step (kalau type === 'step') untuk label dokumen
+  let stepName: string | undefined;
+  if (uploadContext.type === 'step' && uploadContext.stepId) {
+    const steps = order.jenis_produksi === 'manual' ? order.steps_manual : order.steps_dtf;
+    const step = steps?.find((s: any) => s.id === uploadContext.stepId);
+    stepName = (step as any)?.name;
+  }
 
-    const order = orders.find((o: Order) => o.id === selectedOrderId);
-    if (!order) {
-      setIsUploading(false);
-      return;
-    }
+  // 🟢 Susun nama file terstruktur: YYYY-MM-DD_KodeProduksi_JenisDokumen.ext
+  const docLabel = getDocumentLabel(uploadContext.type, stepName);
+  const ext = processedFile.name.split('.').pop();
+  const baseFilename = generateStorageFilename(docLabel, order.kode_produksi);
+  const fileName = `${selectedOrderId}/${baseFilename}.${ext}`;
 
-    await writeLog({
-      order,
-      category: 'FILE',
-      event: `Upload File ${uploadContext.type}`,
-      ket: `Nama File: ${processedFile.name}`,
-      meta: { url: urlData.publicUrl, context: uploadContext },
-    });
+  const { error: uploadError } = await supabase.storage
+    .from('production-proofs')
+    .upload(fileName, processedFile, { upsert: true }); // 🟢 upsert:true — replace kalau upload ulang/revisi
+
+  if (uploadError) {
+    showAlert('Gagal Upload', uploadError.message, 'error');
+    setIsUploading(false);
+    return;
+  }
+
+  const { data: urlData } = supabase.storage.from('production-proofs').getPublicUrl(fileName);
+
+  // (hapus baris "const order = orders.find(...)" yang lama di bawah sini, karena sudah diambil di atas)
+
+  await writeLog({
+    order,
+    category: 'FILE',
+    event: `Upload File ${uploadContext.type}`,
+    ket: `Nama File: ${baseFilename}.${ext}`, // 🟢 log pakai nama baru yang jelas
+    meta: { url: urlData.publicUrl, context: uploadContext },
+  });
+
+  // ...lanjut kode yang sudah ada (updatedOrder, dst) — tidak perlu diubah
 
     const updatedOrder = JSON.parse(JSON.stringify(order));
     const common = {
