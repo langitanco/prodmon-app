@@ -1,5 +1,4 @@
 import { SizeEntry } from "@/types";
-import { HargaConfig } from "./types";
 
 /** Urutan ukuran dari terkecil ke terbesar, dipakai untuk menentukan
  *  berapa banyak "step" kelipatan biaya tambahan yang berlaku. */
@@ -10,17 +9,17 @@ const SURCHARGE_START_INDEX = SIZE_ORDER.indexOf("XXL");
 
 /**
  * Hitung biaya tambahan untuk satu ukuran tertentu.
- * XXL = 1x biaya_ukuran_besar, XXXL = 2x, dst (kelipatan).
+ * XXL = 1x biayaUkuranBesar, XXXL = 2x, dst (kelipatan).
  * Ukuran di bawah XXL (S/M/L/XL) atau ukuran tak dikenal = 0.
  */
 export function getSizeSurcharge(
   ukuranKey: string,
-  config: Pick<HargaConfig, "biaya_ukuran_besar">,
+  biayaUkuranBesar: number,
 ): number {
   const idx = SIZE_ORDER.indexOf(ukuranKey.toUpperCase() as any);
   if (idx === -1 || idx < SURCHARGE_START_INDEX) return 0;
   const step = idx - SURCHARGE_START_INDEX + 1;
-  return step * config.biaya_ukuran_besar;
+  return step * biayaUkuranBesar;
 }
 
 export interface SizePricingRow {
@@ -49,6 +48,8 @@ export interface PricingResult {
 
 /**
  * Hitung total harga dari breakdown detail_ukuran (warna + lengan + ukuran).
+ * biayaUkuranBesar & biayaLenganPanjang diinput manual oleh admin per order
+ * (berbeda jenis produksi, misalnya kaos vs hoodie, bisa beda nilai).
  * Kalau detailUkuran kosong/tidak ada (order lama sebelum fitur ini),
  * fallback ke kalkulasi sederhana: hargaDasar x jumlah.
  */
@@ -56,7 +57,8 @@ export function calculateTotalHarga(
   detailUkuran: SizeEntry[] | null | undefined,
   hargaDasar: number,
   jumlahFallback: number,
-  config: HargaConfig,
+  biayaUkuranBesar: number,
+  biayaLenganPanjang: number,
 ): PricingResult {
   if (!detailUkuran || detailUkuran.length === 0) {
     return {
@@ -73,14 +75,16 @@ export function calculateTotalHarga(
 
   for (const entry of detailUkuran) {
     const lenganSurcharge =
-      entry.lengan === "panjang" ? config.biaya_lengan_panjang : 0;
+      entry.lengan === "panjang" ? biayaLenganPanjang : 0;
 
     const sizes: SizePricingRow[] = Object.entries(entry.ukuran || {})
       .filter(([, qty]) => (qty ?? 0) > 0)
       .map(([ukuran, qtyRaw]) => {
         const qty = qtyRaw ?? 0;
         const hargaPerPcs =
-          hargaDasar + getSizeSurcharge(ukuran, config) + lenganSurcharge;
+          hargaDasar +
+          getSizeSurcharge(ukuran, biayaUkuranBesar) +
+          lenganSurcharge;
         return { ukuran, qty, hargaPerPcs, subtotal: hargaPerPcs * qty };
       })
       .sort((a, b) => {

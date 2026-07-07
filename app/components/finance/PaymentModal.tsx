@@ -12,17 +12,11 @@ import { StatusBadge } from "./StatusBadge";
 import { CurrencyInput } from "./CurrencyInput";
 import { formatRupiah } from "./utils";
 import { calculateTotalHarga } from "./pricing";
-import {
-  OrderWithPayment,
-  PaymentData,
-  PaymentStatus,
-  HargaConfig,
-} from "./types";
+import { OrderWithPayment, PaymentData, PaymentStatus } from "./types";
 
 interface PaymentModalProps {
   order: OrderWithPayment;
   canEdit: boolean;
-  config: HargaConfig;
   onClose: () => void;
   onSubmit: (data: PaymentData) => void;
 }
@@ -36,12 +30,17 @@ function deriveStatus(totalHarga: number, dpMasuk: number): PaymentStatus {
 export function PaymentModal({
   order,
   canEdit,
-  config,
   onClose,
   onSubmit,
 }: PaymentModalProps) {
   const [hargaPerPcs, setHargaPerPcs] = useState<number>(
     order.harga_per_pcs ?? 0,
+  );
+  const [biayaUkuranBesar, setBiayaUkuranBesar] = useState<number>(
+    order.biaya_ukuran_besar ?? 0,
+  );
+  const [biayaLenganPanjang, setBiayaLenganPanjang] = useState<number>(
+    order.biaya_lengan_panjang ?? 0,
   );
   const [dpMasuk, setDpMasuk] = useState<number>(order.dp_masuk ?? 0);
   const [statusPembayaran, setStatusPembayaran] = useState<PaymentStatus>(
@@ -55,15 +54,30 @@ export function PaymentModal({
         order.detail_ukuran,
         hargaPerPcs,
         order.jumlah,
-        config,
+        biayaUkuranBesar,
+        biayaLenganPanjang,
       ),
-    [order.detail_ukuran, order.jumlah, hargaPerPcs, config],
+    [
+      order.detail_ukuran,
+      order.jumlah,
+      hargaPerPcs,
+      biayaUkuranBesar,
+      biayaLenganPanjang,
+    ],
   );
 
   const totalHarga = pricing.totalHarga;
   const sisaTagihan = Math.max(0, totalHarga - dpMasuk);
   const isLunas = sisaTagihan === 0 && totalHarga > 0;
   const pcsMismatch = !pricing.isLegacy && pricing.totalPcs !== order.jumlah;
+  const hasSizeDetail = !pricing.isLegacy && pricing.entries.length > 0;
+  const hasLenganPanjang =
+    hasSizeDetail && pricing.entries.some((e) => e.lengan === "panjang");
+  const hasUkuranBesar =
+    hasSizeDetail &&
+    pricing.entries.some((e) =>
+      e.sizes.some((s) => ["XXL", "XXXL"].includes(s.ukuran.toUpperCase())),
+    );
 
   const autoStatus = useMemo(
     () => deriveStatus(totalHarga, dpMasuk),
@@ -83,6 +97,8 @@ export function PaymentModal({
       total_harga: totalHarga,
       dp_masuk: dpMasuk,
       status_pembayaran: statusPembayaran,
+      biaya_ukuran_besar: biayaUkuranBesar,
+      biaya_lengan_panjang: biayaLenganPanjang,
     });
     setSaving(false);
     onClose();
@@ -152,8 +168,34 @@ export function PaymentModal({
               required
             />
 
+            {/* Biaya tambahan — hanya tampil kalau order ini punya rincian ukuran */}
+            {hasSizeDetail && (
+              <div className="grid grid-cols-2 gap-3">
+                <CurrencyInput
+                  label="Tambahan / Pcs mulai XXL (per step)"
+                  value={biayaUkuranBesar}
+                  onChange={setBiayaUkuranBesar}
+                />
+                <CurrencyInput
+                  label="Tambahan / Pcs Lengan Panjang"
+                  value={biayaLenganPanjang}
+                  onChange={setBiayaLenganPanjang}
+                />
+              </div>
+            )}
+            {hasSizeDetail && (
+              <p className="text-[10px] text-slate-400 -mt-2">
+                Sesuaikan nilai tambahan ini sesuai jenis produksi (mis. kaos vs
+                hoodie/sweater bisa beda). Nilai ini tersimpan khusus untuk
+                order ini saja.
+                {hasUkuranBesar || hasLenganPanjang
+                  ? ""
+                  : " Order ini tidak ada varian XXL+/lengan panjang, jadi tidak berpengaruh."}
+              </p>
+            )}
+
             {/* Rincian per varian (warna + lengan + ukuran) */}
-            {!pricing.isLegacy && pricing.entries.length > 0 && (
+            {hasSizeDetail && (
               <div className="rounded-xl border border-slate-100 dark:border-slate-700 overflow-hidden">
                 <div className="px-3 py-2 bg-slate-50 dark:bg-slate-800/60 text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide">
                   Rincian Harga per Varian
