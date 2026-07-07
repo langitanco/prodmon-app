@@ -122,6 +122,8 @@ export interface Order {
   total_harga?:        number;
   dp_masuk?:           number;
   status_pembayaran?:  'Belum DP' | 'DP' | 'Lunas';
+  biaya_ukuran_besar?: number;
+  biaya_lengan_panjang?: number;
 }
 
 export interface ProductionStep {
