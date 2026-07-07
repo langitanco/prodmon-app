@@ -116,6 +116,28 @@ interface CurrentUser extends UserData {
   id: string;
 }
 
+const VALID_TABS: ActiveTab[] = [
+  "dashboard",
+  "orders",
+  "calendar",
+  "logs",
+  "completed_orders",
+  "settings",
+  "trash",
+  "kalkulator",
+  "config_harga",
+  "about",
+  "salary",
+  "nota",
+  "weekly_notes",
+  "finance",
+  "po_management",
+];
+
+function isValidTab(value: string | null): value is ActiveTab {
+  return !!value && (VALID_TABS as string[]).includes(value);
+}
+
 export default function ProductionApp() {
   const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null);
   const [previousTab, setPreviousTab] = useState<ActiveTab | null>(null);
@@ -137,6 +159,8 @@ export default function ProductionApp() {
     type: "success" | "error" | "confirm";
     onConfirm?: () => void;
   }>({ isOpen: false, title: "", message: "", type: "success" });
+
+  const [isRestored, setIsRestored] = useState(false);
 
   // ─── Ref untuk scroll container utama ──────────────────────────────────────
   const mainRef = useRef<HTMLDivElement>(null);
@@ -272,19 +296,57 @@ export default function ProductionApp() {
 
   // ─── Navigation ────────────────────────────────────────────────────────────
 
+  // ─── Restore state dari URL saat pertama kali mount ─────────────────────────
   useEffect(() => {
-    const handlePopState = () => {
-      if (activeTab !== "dashboard") {
-        setActiveTab("dashboard");
-        setView("list");
-        setSelectedOrderId(null);
-      }
-    };
-    window.addEventListener("popstate", handlePopState);
-    if (activeTab !== "dashboard")
-      window.history.pushState({ tab: activeTab }, "", `?tab=${activeTab}`);
-    return () => window.removeEventListener("popstate", handlePopState);
-  }, [activeTab]);
+    const params = new URLSearchParams(window.location.search);
+
+    const tabFromUrl = params.get("tab");
+    const viewFromUrl = params.get("view");
+    const orderIdFromUrl = params.get("orderId");
+    const poIdFromUrl = params.get("poId");
+
+    if (isValidTab(tabFromUrl)) setActiveTab(tabFromUrl);
+    if (
+      viewFromUrl === "list" ||
+      viewFromUrl === "detail" ||
+      viewFromUrl === "create" ||
+      viewFromUrl === "edit"
+    ) {
+      setView(viewFromUrl);
+    }
+    if (orderIdFromUrl) setSelectedOrderId(orderIdFromUrl);
+    if (poIdFromUrl) setSelectedPoId(poIdFromUrl);
+
+    setIsRestored(true);
+    // sengaja hanya jalan sekali saat mount
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // ─── Sinkronkan state ke URL setiap kali berubah ─────────────────────────────
+  useEffect(() => {
+    // jangan push history sebelum restore awal selesai,
+    // supaya tidak menimpa state yang baru saja di-restore dari URL
+    if (!isRestored) return;
+
+    const params = new URLSearchParams();
+    params.set("tab", activeTab);
+    if (activeTab === "orders") {
+      params.set("view", view);
+      if (selectedOrderId) params.set("orderId", selectedOrderId);
+    }
+    if (activeTab === "po_management" && selectedPoId) {
+      params.set("poId", selectedPoId);
+    }
+
+    const query = params.toString();
+    const newUrl = query ? `?${query}` : window.location.pathname;
+
+    window.history.pushState(
+      { tab: activeTab, view, selectedOrderId, selectedPoId },
+      "",
+      newUrl,
+    );
+  }, [activeTab, view, selectedOrderId, selectedPoId, isRestored]);
 
   // ─── Scroll to top saat view atau tab berubah ───────────────────────────────
   useEffect(() => {
