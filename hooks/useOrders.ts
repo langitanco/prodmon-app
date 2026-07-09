@@ -46,6 +46,7 @@ export function useOrders({
     if (data) setOrders(data.map((o: any) => ({
       ...o,
       kendala: Array.isArray(o.kendala) ? o.kendala : [],
+      bukti_pembayaran: Array.isArray(o.bukti_pembayaran) ? o.bukti_pembayaran : [], // ── TAMBAHAN ──
     })));
   }, [supabase]);
 
@@ -165,9 +166,9 @@ export function useOrders({
       kode_produksi: generateProductionCode(),
       nama_pemesan: formData.nama,
       no_hp: formData.hp,
-      alamat_pemesan: formData.alamat_pemesan || null,   // ← tambah
-      jumlah: formData.jumlah || 0,                      // ← hapus parseInt, sudah number
-      detail_ukuran: formData.detail_ukuran || null,     // ← tambah
+      alamat_pemesan: formData.alamat_pemesan || null,
+      jumlah: formData.jumlah || 0,
+      detail_ukuran: formData.detail_ukuran || null,
       tanggal_masuk: new Date().toISOString().split('T')[0],
       deadline: formData.deadline,
       jenis_produksi: formData.type,
@@ -188,6 +189,12 @@ export function useOrders({
       finishing_packing: { isPacked: false },
       shipping: {},
       kendala: [],
+      // ── TAMBAHAN ── harga boleh diisi langsung saat create (opsional).
+      // Kalau admin belum tahu harga fix, dibiarkan 0 dan dilengkapi nanti
+      // dari section "Harga & Pembayaran" di Order Detail.
+      harga_per_pcs: formData.harga_per_pcs || 0,
+      biaya_ukuran_besar: formData.biaya_ukuran_besar || 0,
+      biaya_lengan_panjang: formData.biaya_lengan_panjang || 0,
     };
 
     const { data, error } = await supabase.from('orders').insert([payload]).select().single();
@@ -213,9 +220,9 @@ export function useOrders({
     const updates = {
       nama_pemesan: d.nama,
       no_hp: d.hp,
-      alamat_pemesan: d.alamat_pemesan || null,   // ← tambah
-      jumlah: d.jumlah || 0,                      // ← ubah dari parseInt
-      detail_ukuran: d.detail_ukuran || null,     // ← tambah
+      alamat_pemesan: d.alamat_pemesan || null,
+      jumlah: d.jumlah || 0,
+      detail_ukuran: d.detail_ukuran || null,
       deadline: d.deadline,
       jenis_produksi: d.type,
       assigned_to: d.assigned_to || null,
@@ -275,7 +282,9 @@ export function useOrders({
       try {
         const { data: orderData } = await supabase
           .from('orders')
-          .select('link_approval, steps_manual, steps_dtf, finishing_packing, shipping, kendala')
+          // ── TAMBAHAN ── sertakan bukti_pembayaran supaya file-nya ikut
+          // ditemukan & dihapus dari Storage oleh processData() di bawah.
+          .select('link_approval, steps_manual, steps_dtf, finishing_packing, shipping, kendala, bukti_pembayaran')
           .eq('id', id)
           .single();
 
@@ -318,6 +327,11 @@ export function useOrders({
     });
   }, [showConfirm, supabase, fetchOrders, showAlert]);
 
+  // ── UBAH ── type diperluas eksplisit (tadinya cuma 4 field). Field
+  // biaya_ukuran_besar/biaya_lengan_panjang sebenarnya sudah kekirim juga
+  // sebelumnya (structural typing, TS tidak strip extra props dari variabel),
+  // tapi sekarang dibikin eksplisit supaya jelas di typing & enak dipanggil
+  // dari StepPembayaran.tsx (Order module) maupun PaymentModal (Finance).
   const handleUpdatePayment = useCallback(async (
     orderId: string,
     paymentData: {
@@ -325,6 +339,8 @@ export function useOrders({
       total_harga: number;
       dp_masuk: number;
       status_pembayaran: 'Belum DP' | 'DP' | 'Lunas';
+      biaya_ukuran_besar: number;
+      biaya_lengan_panjang: number;
     }
   ) => {
     const { error } = await supabase

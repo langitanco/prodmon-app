@@ -26,7 +26,17 @@ export interface UserPermissions {
   trash:         ModuleTrash;
   nota:          ModuleView;
   keuangan:      ModuleViewEdit;
-  po_management: ModuleFull;   // ← TAMBAHAN
+  po_management: ModuleFull;
+  // ── TAMBAHAN ──
+  // Kontrol khusus untuk input harga & status pembayaran DI DALAM modul Order
+  // (Order Detail). Sengaja dipisah dari `orders` (yang isinya CRUD detail
+  // produksi) dan dari `keuangan` (yang sekarang jadi mode "koreksi" di
+  // Finance) supaya admin yang boleh isi order belum tentu otomatis boleh
+  // lihat/isi harga jual, kecuali permission ini juga di-ON-kan untuknya.
+  // Pakai ModuleFull (bukan ModuleViewEdit) karena butuh slot `delete`
+  // terpisah untuk hapus bukti pembayaran (create tidak dipakai/disembunyikan
+  // di Settings lewat hasCreate:false).
+  harga_pesanan: ModuleFull;
 }
 
 // ─── DEFAULT_PERMISSIONS ─────────────────────────────────────────────────────
@@ -45,7 +55,9 @@ export const DEFAULT_PERMISSIONS: UserPermissions = {
   trash:         { view: false, delete: false },
   nota:          { view: false },
   keuangan:      { view: false, edit: false },
-  po_management: { view: false, create: false, edit: false, delete: false }, // ← TAMBAHAN
+  po_management: { view: false, create: false, edit: false, delete: false },
+  // ── TAMBAHAN ──
+  harga_pesanan: { view: false, create: false, edit: false, delete: false },
 };
 
 // ─── User ────────────────────────────────────────────────────────────────────
@@ -87,6 +99,15 @@ export type OrderStatus =
   | 'Ada Kendala'
   | 'Telat';
 
+// ── TAMBAHAN ── satu bukti transfer/pembayaran
+export interface BuktiPembayaran {
+  id: string;
+  url: string;
+  label: 'DP' | 'Lunas';
+  uploadedBy?: string;
+  timestamp?: string;
+}
+
 export interface Order {
   id: string;
   created_at: string;
@@ -124,6 +145,8 @@ export interface Order {
   status_pembayaran?:  'Belum DP' | 'DP' | 'Lunas';
   biaya_ukuran_besar?: number;
   biaya_lengan_panjang?: number;
+  // ── TAMBAHAN ──
+  bukti_pembayaran?: BuktiPembayaran[];
 }
 
 export interface ProductionStep {

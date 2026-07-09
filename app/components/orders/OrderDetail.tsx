@@ -1,45 +1,65 @@
 // app/components/orders/OrderDetail.tsx
-import React, { useRef, useState } from 'react';
-import { Order, UserData } from '@/types';
-import { toJpeg } from 'html-to-image';
-import jsPDF from 'jspdf';
-import { useOrderDetail } from '@/hooks/useOrderDetail';
-import LabelPengiriman from './detail/LabelPengiriman';
-import OrderDetailHeader from './detail/OrderDetailHeader';
-import DetailUkuran from './detail/DetailUkuran';
-import StepApproval from './detail/StepApproval';
-import StepProduksi from './detail/StepProduksi';
-import StepFinishing from './detail/StepFinishing';
+import React, { useRef, useState } from "react";
+import { Order, UserData } from "@/types";
+import { toJpeg } from "html-to-image";
+import jsPDF from "jspdf";
+import { useOrderDetail } from "@/hooks/useOrderDetail";
+import LabelPengiriman from "./detail/LabelPengiriman";
+import OrderDetailHeader from "./detail/OrderDetailHeader";
+import DetailUkuran from "./detail/DetailUkuran";
+import StepApproval from "./detail/StepApproval";
+import StepProduksi from "./detail/StepProduksi";
+import StepFinishing from "./detail/StepFinishing";
+import StepPembayaran from "./detail/StepPembayaran"; // ── TAMBAHAN ──
+import { PaymentData } from "../finance/types"; // ── TAMBAHAN ──
 
 interface OrderDetailProps {
   currentUser: UserData;
   order: Order;
   onBack: () => void;
   onEdit: () => void;
-  onTriggerUpload: (type: string, stepId?: string, kendalaId?: string) => void;
+  onTriggerUpload: (
+    type: string,
+    stepId?: string,
+    kendalaId?: string,
+    label?: string,
+  ) => void; // ── UBAH ── + label
   onUpdateOrder: (updatedOrder: Order) => void;
   onDelete: (id: string) => void;
   onConfirm: (title: string, msg: string, action: () => void) => void;
+  onUpdatePayment: (orderId: string, data: PaymentData) => Promise<void>; // ── TAMBAHAN ──
 }
 
 export default function OrderDetail({
-  currentUser, order, onBack, onEdit,
-  onTriggerUpload, onUpdateOrder, onDelete, onConfirm,
+  currentUser,
+  order,
+  onBack,
+  onEdit,
+  onTriggerUpload,
+  onUpdateOrder,
+  onDelete,
+  onConfirm,
+  onUpdatePayment, // ── TAMBAHAN ──
 }: OrderDetailProps) {
   const labelRef = useRef<HTMLDivElement>(null);
   const [isPrintingLabel, setIsPrintingLabel] = useState(false);
 
   // ─── Hak Akses (struktur baru) ────────────────────────────────────────────
-  const isSupervisor = currentUser.role === 'supervisor';
-  const isManagement = ['admin', 'manager', 'supervisor'].includes(currentUser.role);
+  const isSupervisor = currentUser.role === "supervisor";
+  const isManagement = ["admin", "manager", "supervisor"].includes(
+    currentUser.role,
+  );
   const perms = currentUser.permissions;
 
   const currentStatus = order.status;
-  const jenisProd = order.jenis_produksi?.toLowerCase() || '';
-  const isManual = jenisProd === 'manual' || jenisProd === 'sablon';
+  const jenisProd = order.jenis_produksi?.toLowerCase() || "";
+  const isManual = jenisProd === "manual" || jenisProd === "sablon";
   const currentSteps = isManual ? order.steps_manual : order.steps_dtf;
-  const isProductionFinished = currentSteps && currentSteps.length > 0 && currentSteps.every(s => s.isCompleted);
-  const isRevisi = currentStatus === 'Revisi';
+  const isProductionFinished =
+    currentSteps &&
+    currentSteps.length > 0 &&
+    currentSteps.every((s) => s.isCompleted);
+  const isRevisi = currentStatus === "Revisi";
 
   // produksi.edit  → update step & lapor kendala
   // produksi.create → upload approval
@@ -47,29 +67,56 @@ export default function OrderDetail({
   // finishing.edit  → cek QC, update packing, update pengiriman
   // finishing.create → reset QC (aksi "undo")
   // finishing.delete → hapus file finishing
+  // harga_pesanan.edit → isi harga, DP, status pembayaran & upload bukti      ── TAMBAHAN ──
+  // harga_pesanan.delete → hapus bukti pembayaran                            ── TAMBAHAN ──
 
-  const canUpdateStep      = isSupervisor || (perms?.produksi?.edit   && (currentStatus === 'On Process' || currentStatus === 'Revisi' || currentStatus === 'Ada Kendala'));
-  const canCheckQC         = isSupervisor || (perms?.finishing?.edit   && (currentStatus === 'Finishing' || isProductionFinished));
-  const canUpdatePacking   = isSupervisor || (perms?.finishing?.edit   && order.finishing_qc.isPassed);
-  const canUpdateShipping  = isSupervisor || (perms?.finishing?.edit   && (currentStatus === 'Kirim' || currentStatus === 'Selesai'));
-  const canEditOrderInfo   = isSupervisor || perms?.orders?.edit;
-  const canDeleteOrder     = isSupervisor || perms?.orders?.delete;
-  const canUploadApproval  = isSupervisor || perms?.produksi?.create;
+  const canUpdateStep =
+    isSupervisor ||
+    (perms?.produksi?.edit &&
+      (currentStatus === "On Process" ||
+        currentStatus === "Revisi" ||
+        currentStatus === "Ada Kendala"));
+  const canCheckQC =
+    isSupervisor ||
+    (perms?.finishing?.edit &&
+      (currentStatus === "Finishing" || isProductionFinished));
+  const canUpdatePacking =
+    isSupervisor || (perms?.finishing?.edit && order.finishing_qc.isPassed);
+  const canUpdateShipping =
+    isSupervisor ||
+    (perms?.finishing?.edit &&
+      (currentStatus === "Kirim" || currentStatus === "Selesai"));
+  const canEditOrderInfo = isSupervisor || perms?.orders?.edit;
+  const canDeleteOrder = isSupervisor || perms?.orders?.delete;
+  const canUploadApproval = isSupervisor || perms?.produksi?.create;
   const canDeleteApprovalFile = isSupervisor || perms?.produksi?.delete;
-  const canResetQC         = isSupervisor || perms?.finishing?.create;
+  const canResetQC = isSupervisor || perms?.finishing?.create;
   const canDeleteFinishingFile = isSupervisor || perms?.finishing?.delete;
+  const canEditHarga = isSupervisor || !!perms?.harga_pesanan?.edit; // ── TAMBAHAN ──
+  const canDeleteBukti = isSupervisor || !!perms?.harga_pesanan?.delete; // ── TAMBAHAN ──
 
   // ─── Hook ─────────────────────────────────────────────────────────────────
   const {
-    qcNote, setQcNote,
-    kendalaNote, setKendalaNote,
-    showKendalaForm, setShowKendalaForm,
-    proofingRevisiNote, setProofingRevisiNote,
-    proofingStepId, setProofingStepId,
-    handleStatusStep, handleSaveProofingRevisi,
-    handleQC, handleDeleteQC, handleRevisiSelesai,
-    handleAddKendala, handleResolveKendala, handleDeleteKendala,
+    qcNote,
+    setQcNote,
+    kendalaNote,
+    setKendalaNote,
+    showKendalaForm,
+    setShowKendalaForm,
+    proofingRevisiNote,
+    setProofingRevisiNote,
+    proofingStepId,
+    setProofingStepId,
+    handleStatusStep,
+    handleSaveProofingRevisi,
+    handleQC,
+    handleDeleteQC,
+    handleRevisiSelesai,
+    handleAddKendala,
+    handleResolveKendala,
+    handleDeleteKendala,
     handleFileDelete,
+    handleDeleteBuktiPembayaran, // ── TAMBAHAN ──
   } = useOrderDetail({ order, currentUser, onUpdateOrder, onConfirm });
 
   // ─── Print Label ──────────────────────────────────────────────────────────
@@ -77,17 +124,24 @@ export default function OrderDetail({
     if (!labelRef.current) return;
     setIsPrintingLabel(true);
     try {
-      await new Promise(resolve => setTimeout(resolve, 150));
+      await new Promise((resolve) => setTimeout(resolve, 150));
       const dataUrl = await toJpeg(labelRef.current, {
-        pixelRatio: 2, quality: 0.9, cacheBust: true, backgroundColor: '#ffffff',
+        pixelRatio: 2,
+        quality: 0.9,
+        cacheBust: true,
+        backgroundColor: "#ffffff",
       });
-      const pdf = new jsPDF({ orientation: 'landscape', unit: 'mm', format: [165, 107.5] });
-      pdf.addImage(dataUrl, 'JPEG', 0, 0, 165, 107.5);
-      const pdfUrl = URL.createObjectURL(pdf.output('blob'));
-      window.open(pdfUrl, '_blank');
+      const pdf = new jsPDF({
+        orientation: "landscape",
+        unit: "mm",
+        format: [165, 107.5],
+      });
+      pdf.addImage(dataUrl, "JPEG", 0, 0, 165, 107.5);
+      const pdfUrl = URL.createObjectURL(pdf.output("blob"));
+      window.open(pdfUrl, "_blank");
     } catch (error) {
-      console.error('Gagal membuat Label PDF:', error);
-      alert('Terjadi kesalahan saat mengekspor Label PDF.');
+      console.error("Gagal membuat Label PDF:", error);
+      alert("Terjadi kesalahan saat mengekspor Label PDF.");
     } finally {
       setIsPrintingLabel(false);
     }
@@ -95,7 +149,6 @@ export default function OrderDetail({
 
   return (
     <div className="space-y-4 md:space-y-6 pb-24 relative">
-
       <LabelPengiriman order={order} labelRef={labelRef} />
 
       <OrderDetailHeader
@@ -162,6 +215,16 @@ export default function OrderDetail({
         onFileDelete={handleFileDelete}
       />
 
+      {/* ── TAMBAHAN ── */}
+      <StepPembayaran
+        order={order}
+        currentUser={currentUser}
+        canEditHarga={!!canEditHarga}
+        canDeleteBukti={!!canDeleteBukti}
+        onSubmitPayment={(data) => onUpdatePayment(order.id, data)}
+        onTriggerUpload={onTriggerUpload}
+        onDeleteBukti={handleDeleteBuktiPembayaran}
+      />
     </div>
   );
 }

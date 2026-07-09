@@ -9,6 +9,10 @@ interface UploadContextState {
   type: string;
   stepId?: string;
   kendalaId?: string;
+  // ── TAMBAHAN ── label bebas untuk konteks upload yang butuh sub-kategori,
+  // dipakai untuk bukti_pembayaran ("DP" | "Lunas"). Generic string supaya
+  // tidak perlu ubah signature tiap kali ada konteks baru yang butuh label.
+  label?: string;
 }
 
 interface UseUploadProps {
@@ -42,8 +46,13 @@ export function useUpload({
   const [uploadContext, setUploadContext] = useState<UploadContextState | null>(null);
   const [isUploading, setIsUploading] = useState(false);
 
-  const triggerUpload = useCallback((targetType: string, stepId?: string, kendalaId?: string) => {
-    setUploadContext({ type: targetType, stepId, kendalaId });
+  // ── UBAH ── tambah parameter opsional `label` di posisi ke-4.
+  // Dipanggil dari StepPembayaran.tsx sebagai:
+  //   onTriggerUpload('bukti_pembayaran', undefined, undefined, 'DP')
+  // Semua pemanggilan lama (packing, shipping_kirim, dst) tetap jalan apa
+  // adanya karena parameter ini opsional dan diletakkan di paling akhir.
+  const triggerUpload = useCallback((targetType: string, stepId?: string, kendalaId?: string, label?: string) => {
+    setUploadContext({ type: targetType, stepId, kendalaId, label });
     setTimeout(() => {
       if (fileInputRef.current) {
         fileInputRef.current.value = '';
@@ -91,14 +100,21 @@ export function useUpload({
   }
 
   // 🟢 Susun nama file terstruktur: YYYY-MM-DD_KodeProduksi_JenisDokumen.ext
-  const docLabel = getDocumentLabel(uploadContext.type, stepName);
+  // ── UBAH ── untuk bukti_pembayaran, sisipkan label (DP/Lunas) + timestamp
+  // ke docLabel supaya nama file unik per upload (tidak upsert/overwrite
+  // seperti field single-file lain, karena ini harus terkumpul di array).
+  const docLabel = uploadContext.type === 'bukti_pembayaran'
+    ? `bukti-pembayaran-${(uploadContext.label || 'DP').toLowerCase()}-${Date.now()}`
+    : getDocumentLabel(uploadContext.type, stepName);
   const ext = processedFile.name.split('.').pop();
   const baseFilename = generateStorageFilename(docLabel, order.kode_produksi);
   const fileName = `${selectedOrderId}/${baseFilename}.${ext}`;
 
+  // ── UBAH ── upsert:false khusus bukti_pembayaran, karena nama filenya
+  // sudah unik (ada timestamp) — tidak ada skenario "replace file lama".
   const { error: uploadError } = await supabase.storage
     .from('production-proofs')
-    .upload(fileName, processedFile, { upsert: true }); // 🟢 upsert:true — replace kalau upload ulang/revisi
+    .upload(fileName, processedFile, { upsert: uploadContext.type !== 'bukti_pembayaran' });
 
   if (uploadError) {
     showAlert('Gagal Upload', uploadError.message, 'error');
@@ -108,17 +124,13 @@ export function useUpload({
 
   const { data: urlData } = supabase.storage.from('production-proofs').getPublicUrl(fileName);
 
-  // (hapus baris "const order = orders.find(...)" yang lama di bawah sini, karena sudah diambil di atas)
-
   await writeLog({
     order,
     category: 'FILE',
     event: `Upload File ${uploadContext.type}`,
-    ket: `Nama File: ${baseFilename}.${ext}`, // 🟢 log pakai nama baru yang jelas
+    ket: `Nama File: ${baseFilename}.${ext}`,
     meta: { url: urlData.publicUrl, context: uploadContext },
   });
-
-  // ...lanjut kode yang sudah ada (updatedOrder, dst) — tidak perlu diubah
 
     const updatedOrder = JSON.parse(JSON.stringify(order));
     const common = {
@@ -159,6 +171,16 @@ export function useUpload({
     } else if (uploadContext.type === 'kendala_bukti' && uploadContext.kendalaId) {
       const idx = updatedOrder.kendala.findIndex((k: any) => k.id === uploadContext.kendalaId);
       if (idx >= 0) updatedOrder.kendala[idx].buktiFile = urlData.publicUrl;
+    } else if (uploadContext.type === 'bukti_pembayaran') {
+      // ── TAMBAHAN ── push entry baru ke array, TIDAK overwrite yang lama.
+      if (!Array.isArray(updatedOrder.bukti_pembayaran)) updatedOrder.bukti_pembayaran = [];
+      updatedOrder.bukti_pembayaran.push({
+        id: `bp_${Date.now()}`,
+        url: urlData.publicUrl,
+        label: uploadContext.label || 'DP',
+        uploadedBy: currentUser?.name,
+        timestamp: common.timestamp,
+      });
     }
 
     await checkAutoStatus(updatedOrder);

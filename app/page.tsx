@@ -539,6 +539,7 @@ export default function ProductionApp() {
                     onUpdateOrder={checkAutoStatus}
                     onDelete={handleDeleteOrder}
                     onConfirm={showConfirm}
+                    onUpdatePayment={handleUpdatePayment}
                     // @ts-ignore
                     onLogActivity={writeLog}
                   />

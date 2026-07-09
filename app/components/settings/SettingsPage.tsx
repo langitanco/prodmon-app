@@ -107,6 +107,15 @@ const MODULES: ModuleDef[] = [
     editLabel: "Edit data pembayaran",
   },
   {
+    key: "harga_pesanan",
+    label: "Harga & Pembayaran (Order)",
+    hasCreate: false,
+    hasEdit: true,
+    hasDelete: true,
+    editLabel: "Isi harga, DP, status & upload bukti bayar",
+    deleteLabel: "Hapus bukti pembayaran",
+  },
+  {
     key: "logs",
     label: "Log Aktivitas",
     hasCreate: false,
@@ -451,6 +460,13 @@ export default function SettingsPage({
         delete: false,
         ...((u.permissions as any)?.po_management || {}),
       }, // ← TAMBAHAN
+      harga_pesanan: {
+        view: false,
+        create: false,
+        edit: false,
+        delete: false,
+        ...((u.permissions as any)?.harga_pesanan || {}),
+      },
     };
     setPermissions(merged);
   };
