@@ -7,16 +7,18 @@ import POProductList from "./POProductList";
 import POResellerList from "./POResellerList";
 import POSettings from "./POSettings";
 import PORekapList from "./PORekapList";
-import POShippingList from "./POShippingList"; // <-- IMPORT BARU
+import POShippingList from "./POShippingList";
+import POPackingList from "./POPackingList"; // <-- IMPORT BARU (Pengemasan)
 import {
   LayoutDashboard,
   ShoppingBag,
   Package,
+  PackageCheck, // <-- IKON BARU untuk tab Pengemasan
   Users,
   Settings2,
   ClipboardPaste,
   ArrowLeft,
-  Truck, // <-- IKON BARU
+  Truck,
 } from "lucide-react";
 
 type POTab =
@@ -26,14 +28,16 @@ type POTab =
   | "resellers"
   | "settings"
   | "rekap"
-  | "shipping"; // <-- TAB BARU
+  | "shipping"
+  | "packing";
 
 const tabs: { id: POTab; label: string; icon: React.ElementType }[] = [
   { id: "overview", label: "Overview", icon: LayoutDashboard },
   { id: "orders", label: "Pesanan", icon: ShoppingBag },
   { id: "products", label: "Produk", icon: Package },
   { id: "resellers", label: "Reseller", icon: Users },
-  { id: "shipping", label: "Pengiriman", icon: Truck }, // <-- MENU BARU
+  { id: "packing", label: "Pengemasan", icon: PackageCheck }, // <-- MENU BARU
+  { id: "shipping", label: "Pengiriman", icon: Truck },
   { id: "rekap", label: "Rekap", icon: ClipboardPaste },
   { id: "settings", label: "Pengaturan", icon: Settings2 },
 ];
@@ -114,8 +118,8 @@ export default function POManagementView({
         {activeTab === "orders" && <POOrderList poId={poId} />}
         {activeTab === "products" && <POProductList poId={poId} />}
         {activeTab === "resellers" && <POResellerList poId={poId} />}
-        {activeTab === "shipping" && <POShippingList poId={poId} />}{" "}
-        {/* <-- RENDER BARU */}
+        {activeTab === "packing" && <POPackingList poId={poId} />}
+        {activeTab === "shipping" && <POShippingList poId={poId} />}
         {activeTab === "settings" && <POSettings poId={poId} />}
         {activeTab === "rekap" && <PORekapList poId={poId} />}
       </div>

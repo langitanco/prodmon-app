@@ -1,7 +1,6 @@
 "use client";
 
 import { POOrder } from "@/types/po";
-import { formatRupiah } from "@/lib/po/pricing";
 
 interface POOrderReceiptA6Props {
   order: POOrder;
@@ -32,10 +31,6 @@ export default function POOrderReceiptA6({
     minute: "2-digit",
   });
 
-  const sisaTagihan = Math.max(
-    0,
-    order.total_amount - (order.paid_amount || 0),
-  );
   const isDikirim = order.delivery_method === "Dikirim";
 
   return (
@@ -43,10 +38,10 @@ export default function POOrderReceiptA6({
       style={{
         width: "100%",
         fontFamily: "Arial, Helvetica, sans-serif",
-        fontSize: "12px",
+        fontSize: "10px",
         color: "#000",
         boxSizing: "border-box",
-        lineHeight: "1.4",
+        lineHeight: "1.35",
       }}
     >
       {/* ── HEADER RESI ── */}
@@ -80,7 +75,7 @@ export default function POOrderReceiptA6({
           <>
             <h2
               style={{
-                fontSize: "20px",
+                fontSize: "16px",
                 margin: "0 0 4px 0",
                 fontWeight: "900",
                 textTransform: "uppercase",
@@ -90,12 +85,12 @@ export default function POOrderReceiptA6({
               {storeName}
             </h2>
             {storeAddress && (
-              <p style={{ margin: "0 0 4px 0", fontSize: "10px" }}>
+              <p style={{ margin: "0 0 4px 0", fontSize: "9px" }}>
                 {storeAddress}
               </p>
             )}
             {adminPhone && (
-              <p style={{ margin: 0, fontSize: "10px", fontWeight: "bold" }}>
+              <p style={{ margin: 0, fontSize: "9px", fontWeight: "bold" }}>
                 Layanan Pelanggan (WA): {adminPhone}
               </p>
             )}
@@ -104,7 +99,7 @@ export default function POOrderReceiptA6({
       </div>
 
       {/* ── INFO TRANSAKSI ── */}
-      <table style={{ width: "100%", marginBottom: "12px", fontSize: "12px" }}>
+      <table style={{ width: "100%", marginBottom: "10px", fontSize: "10px" }}>
         <tbody>
           <tr>
             <td style={{ verticalAlign: "top", width: "50%" }}>
@@ -145,11 +140,11 @@ export default function POOrderReceiptA6({
         style={{
           border: "2px solid #000",
           borderRadius: "8px",
-          padding: "10px",
-          marginBottom: "15px",
+          padding: "8px",
+          marginBottom: "12px",
         }}
       >
-        <table style={{ width: "100%", fontSize: "11px" }}>
+        <table style={{ width: "100%", fontSize: "9px" }}>
           <tbody>
             <tr>
               <td
@@ -163,7 +158,7 @@ export default function POOrderReceiptA6({
                 <p
                   style={{
                     margin: "0 0 4px 0",
-                    fontSize: "10px",
+                    fontSize: "8px",
                     color: "#555",
                     fontWeight: "bold",
                   }}
@@ -174,7 +169,7 @@ export default function POOrderReceiptA6({
                   style={{
                     margin: "0 0 2px 0",
                     fontWeight: "bold",
-                    fontSize: "12px",
+                    fontSize: "10px",
                   }}
                 >
                   {storeName}
@@ -196,7 +191,7 @@ export default function POOrderReceiptA6({
                   <p
                     style={{
                       margin: "0 0 4px 0",
-                      fontSize: "10px",
+                      fontSize: "8px",
                       color: "#555",
                       fontWeight: "bold",
                     }}
@@ -207,7 +202,7 @@ export default function POOrderReceiptA6({
                     style={{
                       margin: "0 0 2px 0",
                       fontWeight: "bold",
-                      fontSize: "12px",
+                      fontSize: "10px",
                     }}
                   >
                     {order.customer_name}
@@ -228,7 +223,7 @@ export default function POOrderReceiptA6({
                   <p
                     style={{
                       margin: "0 0 4px 0",
-                      fontSize: "10px",
+                      fontSize: "8px",
                       color: "#555",
                       fontWeight: "bold",
                     }}
@@ -239,7 +234,7 @@ export default function POOrderReceiptA6({
                     style={{
                       margin: "0 0 2px 0",
                       fontWeight: "bold",
-                      fontSize: "12px",
+                      fontSize: "10px",
                     }}
                   >
                     {order.customer_name}
@@ -257,7 +252,8 @@ export default function POOrderReceiptA6({
         style={{
           width: "100%",
           borderCollapse: "collapse",
-          marginBottom: "12px",
+          marginBottom: "10px",
+          fontSize: "9px",
         }}
       >
         <thead>
@@ -267,120 +263,47 @@ export default function POOrderReceiptA6({
               borderTop: "2px solid #000",
             }}
           >
-            <th style={{ textAlign: "left", padding: "6px 0", width: "50%" }}>
+            <th style={{ textAlign: "left", padding: "5px 0", width: "80%" }}>
               Item
             </th>
-            <th style={{ textAlign: "center", padding: "6px 0", width: "15%" }}>
+            <th style={{ textAlign: "center", padding: "5px 0", width: "20%" }}>
               Qty
-            </th>
-            <th style={{ textAlign: "right", padding: "6px 0", width: "35%" }}>
-              Subtotal
             </th>
           </tr>
         </thead>
         <tbody>
           {order.order_items.map((item, i) => (
             <tr key={i} style={{ borderBottom: "1px dotted #888" }}>
-              <td style={{ padding: "6px 0" }}>
-                <div style={{ fontWeight: "bold" }}>{item.product_name}</div>
-                <div
-                  style={{ fontSize: "10px", color: "#444", marginTop: "2px" }}
-                >
-                  {item.ukuran} | {item.lengan} | {item.warna}
-                </div>
+              <td style={{ padding: "5px 0" }}>
+                <span style={{ fontWeight: "bold" }}>{item.product_name}</span>
+                <span style={{ fontSize: "8px", color: "#444" }}>
+                  {" "}
+                  — {item.ukuran} | {item.lengan} | {item.warna}
+                </span>
               </td>
               <td
                 style={{
                   textAlign: "center",
-                  padding: "6px 0",
+                  padding: "5px 0",
                   verticalAlign: "top",
                   fontWeight: "bold",
                 }}
               >
                 {item.qty}
               </td>
-              <td
-                style={{
-                  textAlign: "right",
-                  padding: "6px 0",
-                  verticalAlign: "top",
-                }}
-              >
-                {formatRupiah(item.subtotal)}
-              </td>
             </tr>
           ))}
         </tbody>
       </table>
-
-      {/* ── RINGKASAN BIAYA ── */}
-      <div style={{ width: "100%", textAlign: "right", marginBottom: "15px" }}>
-        <table style={{ width: "100%", borderCollapse: "collapse" }}>
-          <tbody>
-            <tr>
-              <td style={{ textAlign: "right", padding: "3px 0" }}>
-                Total Keseluruhan:
-              </td>
-              <td
-                style={{
-                  textAlign: "right",
-                  padding: "3px 0",
-                  width: "40%",
-                  fontWeight: "bold",
-                  fontSize: "13px",
-                }}
-              >
-                {formatRupiah(order.total_amount)}
-              </td>
-            </tr>
-            {order.payment_status !== "BELUM_BAYAR" && (
-              <tr>
-                <td style={{ textAlign: "right", padding: "3px 0" }}>
-                  Sudah Dibayar:
-                </td>
-                <td style={{ textAlign: "right", padding: "3px 0" }}>
-                  {formatRupiah(order.paid_amount || 0)}
-                </td>
-              </tr>
-            )}
-            {sisaTagihan > 0 && (
-              <tr>
-                <td
-                  style={{
-                    textAlign: "right",
-                    padding: "5px 0",
-                    borderTop: "1px solid #ccc",
-                    marginTop: "3px",
-                  }}
-                >
-                  <strong>Sisa Tagihan:</strong>
-                </td>
-                <td
-                  style={{
-                    textAlign: "right",
-                    padding: "5px 0",
-                    borderTop: "1px solid #ccc",
-                    marginTop: "3px",
-                    fontWeight: "bold",
-                    fontSize: "13px",
-                  }}
-                >
-                  {formatRupiah(sisaTagihan)}
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-      </div>
 
       {/* ── CATATAN PEMBELI ── */}
       {order.notes && (
         <div
           style={{
             border: "1px dashed #000",
-            padding: "8px",
-            marginBottom: "15px",
-            fontSize: "11px",
+            padding: "6px",
+            marginBottom: "12px",
+            fontSize: "9px",
             backgroundColor: "#f9f9f9",
           }}
         >
@@ -395,21 +318,21 @@ export default function POOrderReceiptA6({
       <div
         style={{
           textAlign: "center",
-          fontSize: "10px",
-          marginTop: "20px",
+          fontSize: "9px",
+          marginTop: "16px",
           borderTop: "1px dashed #000",
-          paddingTop: "12px",
+          paddingTop: "10px",
         }}
       >
         <p
-          style={{ margin: "0 0 3px 0", fontWeight: "bold", fontSize: "12px" }}
+          style={{ margin: "0 0 3px 0", fontWeight: "bold", fontSize: "10px" }}
         >
           Terima Kasih!
         </p>
         <p style={{ margin: "0 0 4px 0" }}>
-          Pesanan yang sudah diproses tidak dapat ditukar/dikembalikan.
+          Harap melakukan video unboxing disaat membuka paket.
         </p>
-        <p style={{ margin: "0", color: "#666", fontSize: "9px" }}>
+        <p style={{ margin: "0", color: "#666", fontSize: "8px" }}>
           Dicetak: {printedAt}
         </p>
       </div>
