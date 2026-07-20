@@ -81,27 +81,30 @@ export default function POOrderPrintSlip({
       {/* ── Header toko ─────────────────────────────────────── */}
       <div
         style={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "flex-start",
-          borderBottom: "2px solid #1a1a1a",
-          padding: "15mm 15mm 14px",
+          borderBottom: logoUrl ? "none" : "2px solid #1a1a1a",
         }}
       >
-        <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-          {logoUrl ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={logoUrl}
-              alt={storeName}
-              style={{
-                width: "48px",
-                height: "48px",
-                objectFit: "contain",
-                borderRadius: "10px",
-              }}
-            />
-          ) : (
+        {logoUrl ? (
+          // Gambar kop/header custom, selebar penuh kertas (edge-to-edge) —
+          // dianggap sudah lengkap dengan nama, alamat, kontak di dalam
+          // desainnya sendiri, jadi tidak perlu elemen teks tambahan di sini.
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={logoUrl}
+            alt={storeName}
+            style={{ width: "100%", height: "auto", display: "block" }}
+          />
+        ) : (
+          // Fallback: avatar inisial + nama toko, dipakai hanya kalau
+          // logo/kop belum diupload.
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: "12px",
+              padding: "15mm 15mm 14px",
+            }}
+          >
             <div
               style={{
                 width: "48px",
@@ -119,19 +122,36 @@ export default function POOrderPrintSlip({
             >
               {storeInitials || "T"}
             </div>
-          )}
-          <div>
-            <p style={{ fontSize: "16px", fontWeight: 700, margin: 0 }}>
-              {storeName}
-            </p>
-            {storeAddress && (
-              <p style={{ fontSize: "10px", color: "#666", margin: "3px 0 0" }}>
-                {storeAddress}
+            <div>
+              <p style={{ fontSize: "16px", fontWeight: 700, margin: 0 }}>
+                {storeName}
               </p>
-            )}
+              {storeAddress && (
+                <p
+                  style={{ fontSize: "10px", color: "#666", margin: "3px 0 0" }}
+                >
+                  {storeAddress}
+                </p>
+              )}
+            </div>
           </div>
-        </div>
-        <div style={{ textAlign: "right" }}>
+        )}
+      </div>
+
+      {/* ── Bar detail pesanan (dulunya di header, sekarang di bawah kop) ── */}
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          flexWrap: "wrap",
+          gap: "16px",
+          background: "#f4f3f0",
+          padding: "14px 15mm",
+          borderBottom: "1px solid #e5e5e5",
+        }}
+      >
+        <div>
           <p
             style={{
               fontSize: "9px",
@@ -144,7 +164,7 @@ export default function POOrderPrintSlip({
           </p>
           <p
             style={{
-              fontSize: "18px",
+              fontSize: "16px",
               fontWeight: 700,
               margin: "4px 0 0",
               fontFamily: "monospace",
@@ -152,8 +172,51 @@ export default function POOrderPrintSlip({
           >
             {order.po_number}
           </p>
-          <p style={{ fontSize: "10px", color: "#666", margin: "4px 0 8px" }}>
+        </div>
+        <div>
+          <p
+            style={{
+              fontSize: "9px",
+              letterSpacing: "0.06em",
+              color: "#999",
+              margin: 0,
+            }}
+          >
+            TIPE CUSTOMER
+          </p>
+          <p style={{ fontSize: "13px", fontWeight: 700, margin: "4px 0 0" }}>
             {order.customer_type}
+          </p>
+        </div>
+        <div>
+          <p
+            style={{
+              fontSize: "9px",
+              letterSpacing: "0.06em",
+              color: "#999",
+              margin: 0,
+            }}
+          >
+            TANGGAL
+          </p>
+          <p style={{ fontSize: "13px", fontWeight: 700, margin: "4px 0 0" }}>
+            {new Date(order.created_at).toLocaleDateString("id-ID", {
+              day: "numeric",
+              month: "long",
+              year: "numeric",
+            })}
+          </p>
+        </div>
+        <div style={{ textAlign: "right" }}>
+          <p
+            style={{
+              fontSize: "9px",
+              letterSpacing: "0.06em",
+              color: "#999",
+              margin: "0 0 6px",
+            }}
+          >
+            STATUS BAYAR
           </p>
           <span
             style={{
@@ -219,19 +282,6 @@ export default function POOrderPrintSlip({
                     {order.shipping_address}
                   </p>
                 )}
-                <p
-                  style={{
-                    margin: "10px 0 0",
-                    color: "#999",
-                    fontSize: "10px",
-                  }}
-                >
-                  {new Date(order.created_at).toLocaleDateString("id-ID", {
-                    day: "numeric",
-                    month: "long",
-                    year: "numeric",
-                  })}
-                </p>
               </td>
             </tr>
           </tbody>

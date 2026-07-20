@@ -7,6 +7,7 @@ import POProductList from "./POProductList";
 import POResellerList from "./POResellerList";
 import POSettings from "./POSettings";
 import PORekapList from "./PORekapList";
+import POShippingList from "./POShippingList"; // <-- IMPORT BARU
 import {
   LayoutDashboard,
   ShoppingBag,
@@ -15,6 +16,7 @@ import {
   Settings2,
   ClipboardPaste,
   ArrowLeft,
+  Truck, // <-- IKON BARU
 } from "lucide-react";
 
 type POTab =
@@ -23,15 +25,17 @@ type POTab =
   | "products"
   | "resellers"
   | "settings"
-  | "rekap";
+  | "rekap"
+  | "shipping"; // <-- TAB BARU
 
 const tabs: { id: POTab; label: string; icon: React.ElementType }[] = [
   { id: "overview", label: "Overview", icon: LayoutDashboard },
   { id: "orders", label: "Pesanan", icon: ShoppingBag },
   { id: "products", label: "Produk", icon: Package },
   { id: "resellers", label: "Reseller", icon: Users },
-  { id: "settings", label: "Pengaturan", icon: Settings2 },
+  { id: "shipping", label: "Pengiriman", icon: Truck }, // <-- MENU BARU
   { id: "rekap", label: "Rekap", icon: ClipboardPaste },
+  { id: "settings", label: "Pengaturan", icon: Settings2 },
 ];
 
 interface POManagementViewProps {
@@ -106,12 +110,12 @@ export default function POManagementView({
       </div>
 
       <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 min-h-[420px]">
-        {/* Catatan: Bagian di bawah ini akan tetap ada garis merah (error TypeScript) 
-            sampai kita menambahkan props 'poId' ke dalam file sub-komponennya masing-masing */}
         {activeTab === "overview" && <POOverview poId={poId} />}
         {activeTab === "orders" && <POOrderList poId={poId} />}
         {activeTab === "products" && <POProductList poId={poId} />}
         {activeTab === "resellers" && <POResellerList poId={poId} />}
+        {activeTab === "shipping" && <POShippingList poId={poId} />}{" "}
+        {/* <-- RENDER BARU */}
         {activeTab === "settings" && <POSettings poId={poId} />}
         {activeTab === "rekap" && <PORekapList poId={poId} />}
       </div>

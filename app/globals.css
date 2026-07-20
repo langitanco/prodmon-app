@@ -48,21 +48,12 @@ button, .cursor-pointer {
   top: 0;
 }
 
-@media print {
-  /* Sembunyikan semua isi halaman kecuali area cetak */
-  body * {
-    visibility: hidden;
-  }
-  .print-only,
-  .print-only * {
-    visibility: visible;
-  }
-  .print-only {
-    position: static;
-    left: 0;
-  }
-  @page {
-    size: A4;
-    margin: 0;
-  }
-}
+/* ============================================================
+   CATATAN: Cetak resi A6 massal (menu Pengiriman) TIDAK LAGI
+   memakai CSS global apa pun. Prosesnya sekarang membangun dokumen
+   HTML+CSS-nya sendiri di dalam iframe tersembunyi yang terpisah
+   total dari halaman ini (lihat handlePrintMassal di
+   POShippingList.tsx). Jadi tidak ada lagi aturan #print-receipt-a6
+   / @media print / @page di sini — sengaja dihapus supaya tidak ada
+   dua sumber CSS print yang bisa bentrok lagi seperti sebelumnya.
+   ============================================================ */

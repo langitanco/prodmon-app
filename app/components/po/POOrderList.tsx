@@ -31,7 +31,6 @@ import {
   XCircle,
   Pencil,
   ChevronDown,
-  Printer,
 } from "lucide-react";
 
 /* ── Konfigurasi tampilan status pembayaran ─────────────────── */
@@ -195,10 +194,6 @@ export default function POOrderList({ poId }: POOrderListProps) {
   const [exporting, setExporting] = useState(false);
   const printRef = useRef<HTMLDivElement>(null);
   const [downloadingPdf, setDownloadingPdf] = useState(false);
-
-  function handlePrint() {
-    window.print();
-  }
 
   async function handleDownloadPdf(order: POOrder) {
     setDownloadingPdf(true);
@@ -855,13 +850,9 @@ export default function POOrderList({ poId }: POOrderListProps) {
               Edit Pesanan
             </button>
 
-            {/* ── Tombol baru ── */}
-            <button
-              onClick={handlePrint}
-              className="w-full sm:w-auto flex items-center justify-center gap-2 px-6 text-sm border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 py-3 rounded-xl font-semibold hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors"
-            >
-              <Printer size={15} /> Print
-            </button>
+            {/* Cetak resi A6 satu-satuan sudah dipindah & ditangani penuh
+                di tab "Pengiriman" (cetak massal), jadi tombol Print di
+                sini sengaja dihapus supaya tidak ada dua jalur cetak. */}
             <button
               onClick={() => handleDownloadPdf(selected)}
               disabled={downloadingPdf}
@@ -893,13 +884,16 @@ export default function POOrderList({ poId }: POOrderListProps) {
             </button>
           </div>
         </div>
-        {/* Area cetak — tersembunyi di layar, muncul saat print/PDF */}
-        <div className="print-only" ref={printRef}>
+        {/* Area A4 KHUSUS untuk Download PDF (html2canvas) */}
+        <div
+          style={{ position: "absolute", left: "-9999px", top: 0 }}
+          ref={printRef}
+        >
           <POOrderPrintSlip
             order={selected}
             storeName="Langitan.co"
             storeAddress="Mandungan, Widang, Tuban, Jawa Timur"
-            // logoUrl="/logo.png"
+            logoUrl={setting?.logo_image_url || undefined}
           />
         </div>
       </div>

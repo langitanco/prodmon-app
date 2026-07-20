@@ -75,6 +75,8 @@ export default function POSettings({ poId }: POSettingsProps) {
   const [saving, setSaving] = useState(false);
   const [uploadingQris, setUploadingQris] = useState(false);
   const [qrisPreview, setQrisPreview] = useState<string | null>(null);
+  const [uploadingLogo, setUploadingLogo] = useState(false);
+  const [logoPreview, setLogoPreview] = useState<string | null>(null);
 
   const [form, setForm] = useState({
     is_active: false,
@@ -110,6 +112,9 @@ export default function POSettings({ poId }: POSettingsProps) {
         // ✅ Set preview QRIS langsung di sini, tidak perlu useEffect terpisah
         if (data.qris_image_url) {
           setQrisPreview(data.qris_image_url);
+        }
+        if (data.logo_image_url) {
+          setLogoPreview(data.logo_image_url);
         }
       }
       setLoading(false);
@@ -216,6 +221,85 @@ export default function POSettings({ poId }: POSettingsProps) {
     setSetting({ ...setting, qris_image_url: null });
   }
 
+  async function handleLogoUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file || !setting) return;
+
+    if (!file.type.startsWith("image/")) {
+      alert("Hanya file gambar yang diizinkan.");
+      return;
+    }
+    if (file.size > 2 * 1024 * 1024) {
+      alert("Ukuran file maksimal 2MB.");
+      return;
+    }
+
+    setUploadingLogo(true);
+    const supabase = createClient();
+
+    // Hapus logo lama jika ada
+    if (setting.logo_image_url) {
+      const oldPath = setting.logo_image_url.split("/po_assets/")[1];
+      if (oldPath) {
+        await supabase.storage.from("po_assets").remove([oldPath]);
+      }
+    }
+
+    // Upload logo baru
+    const ext = file.name.split(".").pop();
+    const filePath = `logo/logo-${setting.id}.${ext}`;
+
+    const { error: uploadError } = await supabase.storage
+      .from("po_assets")
+      .upload(filePath, file, { upsert: true });
+
+    if (uploadError) {
+      alert("Gagal upload: " + uploadError.message);
+      setUploadingLogo(false);
+      return;
+    }
+
+    const { data: urlData } = supabase.storage
+      .from("po_assets")
+      .getPublicUrl(filePath);
+
+    const publicUrl = urlData.publicUrl;
+
+    const { error: dbError } = await supabase
+      .from("po_setting")
+      .update({ logo_image_url: publicUrl })
+      .eq("id", setting.id);
+
+    if (dbError) {
+      alert("Gagal simpan URL: " + dbError.message);
+    } else {
+      setLogoPreview(publicUrl);
+      setSetting({ ...setting, logo_image_url: publicUrl });
+    }
+
+    setUploadingLogo(false);
+  }
+
+  async function handleLogoDelete() {
+    if (!setting?.logo_image_url) return;
+    if (!confirm("Hapus logo toko?")) return;
+
+    const supabase = createClient();
+    const oldPath = setting.logo_image_url.split("/po_assets/")[1];
+
+    if (oldPath) {
+      await supabase.storage.from("po_assets").remove([oldPath]);
+    }
+
+    await supabase
+      .from("po_setting")
+      .update({ logo_image_url: null })
+      .eq("id", setting.id);
+
+    setLogoPreview(null);
+    setSetting({ ...setting, logo_image_url: null });
+  }
+
   // ✅ Early return SETELAH semua hooks
   if (loading) {
     return (
@@ -243,10 +327,7 @@ export default function POSettings({ poId }: POSettingsProps) {
       >
         <div className="flex items-center gap-3">
           {form.is_active ? (
-            <CheckCircle2
-              size={18}
-              className="text-emerald-500 shrink-0"
-            />
+            <CheckCircle2 size={18} className="text-emerald-500 shrink-0" />
           ) : (
             <XCircle size={18} className="text-slate-400 shrink-0" />
           )}
@@ -276,6 +357,77 @@ export default function POSettings({ poId }: POSettingsProps) {
           )}
         </button>
       </div>
+
+      <SectionHeading>Identitas Toko</SectionHeading>
+      <Field
+        label="Logo Toko"
+        icon={ImageIcon}
+        hint="Dipakai di header resi cetak (A6 & A4/PDF). Format persegi/landscape lebih rapi. Maks. 2MB."
+      >
+        <div className="flex flex-col sm:flex-row gap-4 items-start">
+          {/* Preview */}
+          <div className="w-40 h-40 rounded-xl border-2 border-dashed border-slate-200 dark:border-slate-700 flex items-center justify-center overflow-hidden bg-slate-50 dark:bg-slate-800/50 shrink-0">
+            {logoPreview ? (
+              <img
+                src={logoPreview}
+                alt="Logo Toko"
+                className="w-full h-full object-contain p-2"
+              />
+            ) : (
+              <div className="text-center text-slate-400">
+                <ImageIcon size={28} className="mx-auto mb-1" />
+                <p className="text-[11px]">Belum ada logo</p>
+              </div>
+            )}
+          </div>
+
+          {/* Tombol aksi */}
+          <div className="flex flex-col gap-2">
+            <label className="cursor-pointer">
+              <input
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={handleLogoUpload}
+                disabled={uploadingLogo}
+              />
+              <span
+                className={`inline-flex items-center gap-2 px-4 py-2.5 rounded-xl border text-sm font-semibold transition-all ${
+                  uploadingLogo
+                    ? "bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed"
+                    : "bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:border-blue-400 hover:text-blue-600 cursor-pointer"
+                }`}
+              >
+                {uploadingLogo ? (
+                  <>
+                    <Loader2 size={14} className="animate-spin" />
+                    Mengupload...
+                  </>
+                ) : (
+                  <>
+                    <Upload size={14} />
+                    {logoPreview ? "Ganti Logo" : "Upload Logo"}
+                  </>
+                )}
+              </span>
+            </label>
+
+            {logoPreview && (
+              <button
+                onClick={handleLogoDelete}
+                className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl border border-red-200 text-red-500 text-sm font-semibold hover:bg-red-50 transition-colors"
+              >
+                <Trash2 size={14} />
+                Hapus Logo
+              </button>
+            )}
+
+            <p className="text-[11px] text-slate-400 max-w-[200px]">
+              Format: JPG, PNG, atau WebP. Upload langsung tersimpan otomatis.
+            </p>
+          </div>
+        </div>
+      </Field>
 
       <SectionHeading>Informasi Kampanye</SectionHeading>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 md:gap-5">
