@@ -469,3 +469,79 @@ export async function createPOSetting(
   if (error) return { success: false, error: error.message };
   return { success: true, id: data.id };
 }
+
+/**
+ * Hapus SATU PO secara total: semua produk, semua order, setting-nya
+ * sendiri, DAN semua file gambar terkait (foto produk, logo toko, QRIS)
+ * dari storage — supaya benar-benar bersih, tidak menimbun di database.
+ *
+ * SENGAJA TIDAK menghapus `po_resellers` — data reseller bersifat
+ * global/lintas-PO (dipakai berulang di PO lain), jadi hanya ORDER-nya
+ * yang ikut terhapus, reseller-nya sendiri tetap ada.
+ *
+ * Urutan hapus (anak dulu baru induk) untuk menghindari konflik FK:
+ * 1) baca image_urls produk + logo/qris setting (butuh sebelum row hilang)
+ * 2) hapus po_orders
+ * 3) hapus po_products
+ * 4) hapus po_setting
+ * 5) baru bersihkan file-file di storage (pola sama seperti deletePOProduct)
+ */
+export async function deletePOSetting(
+  poId: string
+): Promise<{ success: boolean; error?: string }> {
+  const supabase = createClient();
+
+  try {
+    // 1. Ambil data yang dibutuhkan untuk pembersihan storage SEBELUM
+    // baris-barisnya dihapus dari database.
+    const { data: setting } = await supabase
+      .from('po_setting')
+      .select('logo_image_url, qris_image_url')
+      .eq('id', poId)
+      .single();
+
+    const { data: products } = await supabase
+      .from('po_products')
+      .select('image_urls')
+      .eq('po_setting_id', poId);
+
+    const allImageUrls: string[] = [
+      ...(products || []).flatMap((p) => p.image_urls || []),
+      ...(setting?.logo_image_url ? [setting.logo_image_url] : []),
+      ...(setting?.qris_image_url ? [setting.qris_image_url] : []),
+    ];
+
+    // 2. Hapus semua order milik PO ini (reseller-nya TIDAK ikut dihapus).
+    const { error: orderErr } = await supabase
+      .from('po_orders')
+      .delete()
+      .eq('po_setting_id', poId);
+    if (orderErr) return { success: false, error: orderErr.message };
+
+    // 3. Hapus semua produk milik PO ini.
+    const { error: productErr } = await supabase
+      .from('po_products')
+      .delete()
+      .eq('po_setting_id', poId);
+    if (productErr) return { success: false, error: productErr.message };
+
+    // 4. Hapus setting PO itu sendiri.
+    const { error: settingErr } = await supabase
+      .from('po_setting')
+      .delete()
+      .eq('id', poId);
+    if (settingErr) return { success: false, error: settingErr.message };
+
+    // 5. Baru bersihkan file-file di storage. Sengaja paling akhir &
+    // tidak boleh menggagalkan proses di atas kalau ada file yang gagal
+    // terhapus (mis. sudah hilang manual sebelumnya) — sama seperti pola
+    // di deletePOProduct/deleteProductImages.
+    if (allImageUrls.length > 0) {
+      await deleteProductImages(allImageUrls);
+    }
+
+    return { success: true };
+  } catch (err: any) {
+    return { success: false, error: err.message || 'Gagal menghapus PO' };
+  }
+}
