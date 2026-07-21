@@ -61,6 +61,11 @@ export interface POOrderItem {
   qty: number;
   harga_satuan: number;
   subtotal: number;
+  // Ditandai admin di tab Pengemasan saat stok fisik tidak mencukupi.
+  // 0 = stok lengkap. >0 = kurang sekian pcs dari qty yang dipesan.
+  // Optional supaya pesanan lama (sebelum fitur ini ada) tetap valid
+  // tanpa migration data — kode selalu baca dengan fallback `|| 0`.
+  shortage_qty?: number;
 }
 
 export interface POOrderPayload {

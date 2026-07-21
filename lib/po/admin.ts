@@ -340,6 +340,60 @@ export async function updatePOOrderFull(
  
   return { success: true };
 }
+
+/**
+ * Tandai status stok satu item pesanan saat pengemasan (tab Pengemasan).
+ * shortageQty = 0 artinya stok lengkap/reset, >0 artinya kurang sekian pcs
+ * dari qty yang dipesan pada item tersebut.
+ *
+ * order_items disimpan sebagai satu kolom JSONB di po_orders (bukan tabel
+ * terpisah), jadi alurnya: ambil array order_items terkini, ubah 1 index,
+ * lalu update kembali seluruh kolomnya — sama seperti pola updatePOOrderFull.
+ */
+export async function updateItemShortage(
+  orderId: string,
+  itemIndex: number,
+  shortageQty: number
+): Promise<{ success: boolean; error?: string }> {
+  const supabase = createClient();
+
+  const { data: order, error: fetchError } = await supabase
+    .from('po_orders')
+    .select('order_items')
+    .eq('id', orderId)
+    .single();
+
+  if (fetchError || !order) {
+    return { success: false, error: fetchError?.message || 'Pesanan tidak ditemukan.' };
+  }
+
+  const items: POOrderItem[] = [...(order.order_items || [])];
+  if (!items[itemIndex]) {
+    return { success: false, error: 'Item pesanan tidak ditemukan.' };
+  }
+
+  items[itemIndex] = { ...items[itemIndex], shortage_qty: shortageQty };
+
+  const { data, error } = await supabase
+    .from('po_orders')
+    .update({ order_items: items })
+    .eq('id', orderId)
+    .select('id'); // wajib, supaya bisa deteksi RLS silent failure
+
+  if (error) {
+    return { success: false, error: error.message };
+  }
+
+  if (!data || data.length === 0) {
+    return {
+      success: false,
+      error: 'Update tidak diterapkan (kemungkinan diblokir oleh RLS policy, atau ID tidak ditemukan).',
+    };
+  }
+
+  return { success: true };
+}
+
 // ─────────────────────────────────────────────
 // STATISTIK
 // ─────────────────────────────────────────────

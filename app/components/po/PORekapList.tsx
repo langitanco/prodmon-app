@@ -16,6 +16,8 @@ import {
   Shirt,
   Baby,
   Snowflake,
+  PackageX,
+  PackageCheck,
 } from "lucide-react";
 
 /* ── Tipe bantu untuk hasil rekap ── */
@@ -47,6 +49,7 @@ export default function PORekapList({ poId }: PORekapListProps) {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [exporting, setExporting] = useState(false);
+  const [subTab, setSubTab] = useState<"produksi" | "kekurangan">("produksi");
 
   useEffect(() => {
     load();
@@ -302,6 +305,92 @@ export default function PORekapList({ poId }: PORekapListProps) {
     return sections;
   }, [orders, products]);
 
+  /* ── Rekap Kekurangan Stok: independen dari rekapList di atas.
+     Sumbernya sama (orders) tapi hanya memproses item yang shortage_qty > 0,
+     jadi tidak pernah mengubah/mengganggu perhitungan Rekap Produksi. ── */
+  type ShortageDetail = {
+    po_number: string;
+    customer_name: string;
+    qty: number;
+  };
+  type ShortageRow = {
+    jenis: string;
+    ukuran: string;
+    totalKurang: number;
+    details: ShortageDetail[];
+  };
+  type ShortageProduk = {
+    product_id: string;
+    product_code: string;
+    product_name: string;
+    rows: ShortageRow[];
+    totalKurang: number;
+  };
+
+  const shortageList: ShortageProduk[] = useMemo(() => {
+    const productMap = new Map(products.map((p) => [p.id, p]));
+    const byProduct = new Map<string, ShortageProduk>();
+
+    orders.forEach((order) => {
+      order.order_items.forEach((item) => {
+        const shortage = item.shortage_qty || 0;
+        if (shortage <= 0) return; // hanya proses item yang ditandai kurang
+
+        const master = productMap.get(item.product_id);
+        const productCode = master?.product_code || "—";
+        const productName =
+          master?.name || item.product_name || "Produk Tidak Dikenal";
+        const jenisLabel = `${item.warna} ${item.lengan}`.trim() || "-";
+
+        if (!byProduct.has(item.product_id)) {
+          byProduct.set(item.product_id, {
+            product_id: item.product_id,
+            product_code: productCode,
+            product_name: productName,
+            rows: [],
+            totalKurang: 0,
+          });
+        }
+        const produk = byProduct.get(item.product_id)!;
+
+        let row = produk.rows.find(
+          (r) => r.jenis === jenisLabel && r.ukuran === item.ukuran,
+        );
+        if (!row) {
+          row = {
+            jenis: jenisLabel,
+            ukuran: item.ukuran,
+            totalKurang: 0,
+            details: [],
+          };
+          produk.rows.push(row);
+        }
+        row.totalKurang += shortage;
+        row.details.push({
+          po_number: order.po_number,
+          customer_name: order.customer_name,
+          qty: shortage,
+        });
+        produk.totalKurang += shortage;
+      });
+    });
+
+    const result = Array.from(byProduct.values());
+    result.sort((a, b) => a.product_name.localeCompare(b.product_name));
+    result.forEach((p) =>
+      p.rows.sort(
+        (a, b) =>
+          a.jenis.localeCompare(b.jenis) || a.ukuran.localeCompare(b.ukuran),
+      ),
+    );
+    return result;
+  }, [orders, products]);
+
+  const totalShortageUnits = shortageList.reduce(
+    (s, p) => s + p.totalKurang,
+    0,
+  );
+
   /* ── Export Excel: gabung jadi 2 sheet (Belanja & Produksi) ── */
   async function handleExportExcel() {
     if (rekapList.length === 0) {
@@ -441,55 +530,190 @@ export default function PORekapList({ poId }: PORekapListProps) {
         </div>
       </div>
 
-      {/* ── Rekap Belanja Bahan (per Jenis Garmen) ── */}
-      {belanjaSections.length > 0 && (
-        <div className="space-y-5">
-          <div className="flex items-center gap-2">
-            <ShoppingBag size={16} className="text-slate-400" />
-            <h2 className="text-sm font-extrabold text-slate-700 dark:text-slate-200">
-              Rekap Belanja Bahan
-            </h2>
-            <span className="text-xs text-slate-400 font-medium">
-              — per warna & lengan, lintas semua produk
+      {/* ── Switcher Sub-Tab: Rekap Produksi vs Rekap Kekurangan ── */}
+      <div className="flex bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-xl p-1.5 w-fit">
+        <button
+          onClick={() => setSubTab("produksi")}
+          className={`text-xs font-bold px-4 py-2 rounded-lg transition-all ${
+            subTab === "produksi"
+              ? "bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-sm"
+              : "text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300"
+          }`}
+        >
+          Rekap Produksi
+        </button>
+        <button
+          onClick={() => setSubTab("kekurangan")}
+          className={`flex items-center gap-1.5 text-xs font-bold px-4 py-2 rounded-lg transition-all ${
+            subTab === "kekurangan"
+              ? "bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-sm"
+              : "text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300"
+          }`}
+        >
+          Rekap Kekurangan
+          {totalShortageUnits > 0 && (
+            <span className="bg-red-500 text-white text-[10px] font-extrabold px-1.5 py-0.5 rounded-full leading-none">
+              {totalShortageUnits}
             </span>
-          </div>
+          )}
+        </button>
+      </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-            {belanjaSections.map((section) => {
-              const Icon =
-                section.key === "kaos_kids"
-                  ? Baby
-                  : section.key === "sweater" || section.key === "hoodie"
-                    ? Snowflake
-                    : Shirt;
-              return (
+      {subTab === "produksi" && (
+        <>
+          {/* ── Rekap Belanja Bahan (per Jenis Garmen) ── */}
+          {belanjaSections.length > 0 && (
+            <div className="space-y-5">
+              <div className="flex items-center gap-2">
+                <ShoppingBag size={16} className="text-slate-400" />
+                <h2 className="text-sm font-extrabold text-slate-700 dark:text-slate-200">
+                  Rekap Belanja Bahan
+                </h2>
+                <span className="text-xs text-slate-400 font-medium">
+                  — per warna & lengan, lintas semua produk
+                </span>
+              </div>
+
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+                {belanjaSections.map((section) => {
+                  const Icon =
+                    section.key === "kaos_kids"
+                      ? Baby
+                      : section.key === "sweater" || section.key === "hoodie"
+                        ? Snowflake
+                        : Shirt;
+                  return (
+                    <div
+                      key={section.key}
+                      className="border border-slate-200 dark:border-slate-700 rounded-2xl overflow-hidden"
+                    >
+                      <div className="bg-slate-50 dark:bg-slate-800/60 px-4 sm:px-5 py-3.5 border-b border-slate-200 dark:border-slate-700 flex items-center justify-between gap-3">
+                        <div className="flex items-center gap-2.5">
+                          <Icon
+                            size={16}
+                            className="text-slate-500 dark:text-slate-400"
+                          />
+                          <h3 className="font-bold text-sm text-slate-800 dark:text-slate-200">
+                            {section.label}
+                          </h3>
+                        </div>
+                        <span className="text-xs font-extrabold text-emerald-600 dark:text-emerald-400 shrink-0">
+                          {section.totalJumlah} pcs
+                        </span>
+                      </div>
+
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-xs sm:text-sm min-w-[420px]">
+                          <thead>
+                            <tr className="bg-white dark:bg-slate-900/40 border-b border-slate-200 dark:border-slate-700">
+                              <th className="text-left px-4 py-2.5 font-extrabold text-slate-600 dark:text-slate-300 whitespace-nowrap">
+                                WARNA / LENGAN
+                              </th>
+                              {section.columns.map((ukuran) => (
+                                <th
+                                  key={ukuran}
+                                  className="text-center px-3 py-2.5 font-extrabold text-slate-600 dark:text-slate-300 whitespace-nowrap"
+                                >
+                                  {ukuran}
+                                </th>
+                              ))}
+                              <th className="text-center px-4 py-2.5 font-extrabold text-slate-600 dark:text-slate-300 whitespace-nowrap">
+                                JML
+                              </th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {section.rows.map((row) => (
+                              <tr
+                                key={row.label}
+                                className="border-b border-slate-100 dark:border-slate-800 last:border-0"
+                              >
+                                <td className="px-4 py-2.5 font-semibold text-slate-700 dark:text-slate-300 whitespace-nowrap">
+                                  {row.label}
+                                </td>
+                                {section.columns.map((ukuran) => (
+                                  <td
+                                    key={ukuran}
+                                    className="text-center px-3 py-2.5 text-slate-600 dark:text-slate-400"
+                                  >
+                                    {row.perUkuran[ukuran] > 0
+                                      ? row.perUkuran[ukuran]
+                                      : ""}
+                                  </td>
+                                ))}
+                                <td className="text-center px-4 py-2.5 font-bold text-slate-800 dark:text-slate-200">
+                                  {row.jumlah}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                          <tfoot>
+                            <tr className="bg-slate-50 dark:bg-slate-800/60 border-t-2 border-slate-300 dark:border-slate-600">
+                              <td className="px-4 py-3 font-extrabold text-slate-800 dark:text-slate-100">
+                                TOTAL
+                              </td>
+                              {section.columns.map((ukuran) => (
+                                <td
+                                  key={ukuran}
+                                  className="text-center px-3 py-3 font-extrabold text-slate-800 dark:text-slate-100"
+                                >
+                                  {section.totalPerUkuran[ukuran] || 0}
+                                </td>
+                              ))}
+                              <td className="text-center px-4 py-3 font-extrabold text-emerald-600 dark:text-emerald-400">
+                                {section.totalJumlah}
+                              </td>
+                            </tr>
+                          </tfoot>
+                        </table>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* Empty State */}
+          {rekapList.length === 0 ? (
+            <div className="py-16 flex flex-col items-center gap-3 text-slate-400 dark:text-slate-500 border border-slate-200 dark:border-slate-800 border-dashed rounded-2xl">
+              <ClipboardList size={32} strokeWidth={1.2} />
+              <p className="text-sm font-semibold">Belum ada data rekap</p>
+              <p className="text-xs">
+                Rekap akan muncul setelah ada pesanan masuk
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-8">
+              {rekapList.map((rekap) => (
                 <div
-                  key={section.key}
+                  key={rekap.product_id}
                   className="border border-slate-200 dark:border-slate-700 rounded-2xl overflow-hidden"
                 >
+                  {/* Header produk */}
                   <div className="bg-slate-50 dark:bg-slate-800/60 px-4 sm:px-5 py-3.5 border-b border-slate-200 dark:border-slate-700 flex items-center justify-between gap-3">
-                    <div className="flex items-center gap-2.5">
-                      <Icon
-                        size={16}
-                        className="text-slate-500 dark:text-slate-400"
-                      />
-                      <h3 className="font-bold text-sm text-slate-800 dark:text-slate-200">
-                        {section.label}
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <span className="text-[10px] font-mono font-bold text-slate-500 dark:text-slate-400 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 px-2 py-1 rounded-md shrink-0">
+                        {rekap.product_code}
+                      </span>
+                      <h3 className="font-bold text-sm sm:text-[15px] text-slate-800 dark:text-slate-200 truncate">
+                        {rekap.product_name}
                       </h3>
                     </div>
                     <span className="text-xs font-extrabold text-emerald-600 dark:text-emerald-400 shrink-0">
-                      {section.totalJumlah} pcs
+                      {rekap.totalJumlah} pcs
                     </span>
                   </div>
 
+                  {/* Tabel rekap */}
                   <div className="overflow-x-auto">
-                    <table className="w-full text-xs sm:text-sm min-w-[420px]">
+                    <table className="w-full text-xs sm:text-sm min-w-[480px]">
                       <thead>
                         <tr className="bg-white dark:bg-slate-900/40 border-b border-slate-200 dark:border-slate-700">
                           <th className="text-left px-4 py-2.5 font-extrabold text-slate-600 dark:text-slate-300 whitespace-nowrap">
-                            WARNA / LENGAN
+                            JENIS
                           </th>
-                          {section.columns.map((ukuran) => (
+                          {rekap.ukuranList.map((ukuran) => (
                             <th
                               key={ukuran}
                               className="text-center px-3 py-2.5 font-extrabold text-slate-600 dark:text-slate-300 whitespace-nowrap"
@@ -498,20 +722,30 @@ export default function PORekapList({ poId }: PORekapListProps) {
                             </th>
                           ))}
                           <th className="text-center px-4 py-2.5 font-extrabold text-slate-600 dark:text-slate-300 whitespace-nowrap">
-                            JML
+                            JUMLAH
                           </th>
                         </tr>
                       </thead>
                       <tbody>
-                        {section.rows.map((row) => (
+                        {rekap.rows.map((row) => (
                           <tr
-                            key={row.label}
+                            key={row.jenis}
                             className="border-b border-slate-100 dark:border-slate-800 last:border-0"
                           >
                             <td className="px-4 py-2.5 font-semibold text-slate-700 dark:text-slate-300 whitespace-nowrap">
-                              {row.label}
+                              <span className="inline-flex items-center gap-1.5">
+                                {row.jenis}
+                                {row.isExtra && (
+                                  <span title="Kombinasi ini tidak terdaftar di master produk saat ini">
+                                    <AlertTriangle
+                                      size={12}
+                                      className="text-amber-500"
+                                    />
+                                  </span>
+                                )}
+                              </span>
                             </td>
-                            {section.columns.map((ukuran) => (
+                            {rekap.ukuranList.map((ukuran) => (
                               <td
                                 key={ukuran}
                                 className="text-center px-3 py-2.5 text-slate-600 dark:text-slate-400"
@@ -532,137 +766,105 @@ export default function PORekapList({ poId }: PORekapListProps) {
                           <td className="px-4 py-3 font-extrabold text-slate-800 dark:text-slate-100">
                             TOTAL
                           </td>
-                          {section.columns.map((ukuran) => (
+                          {rekap.ukuranList.map((ukuran) => (
                             <td
                               key={ukuran}
                               className="text-center px-3 py-3 font-extrabold text-slate-800 dark:text-slate-100"
                             >
-                              {section.totalPerUkuran[ukuran] || 0}
+                              {rekap.totalPerUkuran[ukuran] || 0}
                             </td>
                           ))}
                           <td className="text-center px-4 py-3 font-extrabold text-emerald-600 dark:text-emerald-400">
-                            {section.totalJumlah}
+                            {rekap.totalJumlah}
                           </td>
                         </tr>
                       </tfoot>
                     </table>
                   </div>
                 </div>
-              );
-            })}
-          </div>
-        </div>
-      )}
-
-      {/* Empty State */}
-      {rekapList.length === 0 ? (
-        <div className="py-16 flex flex-col items-center gap-3 text-slate-400 dark:text-slate-500 border border-slate-200 dark:border-slate-800 border-dashed rounded-2xl">
-          <ClipboardList size={32} strokeWidth={1.2} />
-          <p className="text-sm font-semibold">Belum ada data rekap</p>
-          <p className="text-xs">Rekap akan muncul setelah ada pesanan masuk</p>
-        </div>
-      ) : (
-        <div className="space-y-8">
-          {rekapList.map((rekap) => (
-            <div
-              key={rekap.product_id}
-              className="border border-slate-200 dark:border-slate-700 rounded-2xl overflow-hidden"
-            >
-              {/* Header produk */}
-              <div className="bg-slate-50 dark:bg-slate-800/60 px-4 sm:px-5 py-3.5 border-b border-slate-200 dark:border-slate-700 flex items-center justify-between gap-3">
-                <div className="flex items-center gap-2.5 min-w-0">
-                  <span className="text-[10px] font-mono font-bold text-slate-500 dark:text-slate-400 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 px-2 py-1 rounded-md shrink-0">
-                    {rekap.product_code}
-                  </span>
-                  <h3 className="font-bold text-sm sm:text-[15px] text-slate-800 dark:text-slate-200 truncate">
-                    {rekap.product_name}
-                  </h3>
-                </div>
-                <span className="text-xs font-extrabold text-emerald-600 dark:text-emerald-400 shrink-0">
-                  {rekap.totalJumlah} pcs
-                </span>
-              </div>
-
-              {/* Tabel rekap */}
-              <div className="overflow-x-auto">
-                <table className="w-full text-xs sm:text-sm min-w-[480px]">
-                  <thead>
-                    <tr className="bg-white dark:bg-slate-900/40 border-b border-slate-200 dark:border-slate-700">
-                      <th className="text-left px-4 py-2.5 font-extrabold text-slate-600 dark:text-slate-300 whitespace-nowrap">
-                        JENIS
-                      </th>
-                      {rekap.ukuranList.map((ukuran) => (
-                        <th
-                          key={ukuran}
-                          className="text-center px-3 py-2.5 font-extrabold text-slate-600 dark:text-slate-300 whitespace-nowrap"
-                        >
-                          {ukuran}
-                        </th>
-                      ))}
-                      <th className="text-center px-4 py-2.5 font-extrabold text-slate-600 dark:text-slate-300 whitespace-nowrap">
-                        JUMLAH
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {rekap.rows.map((row) => (
-                      <tr
-                        key={row.jenis}
-                        className="border-b border-slate-100 dark:border-slate-800 last:border-0"
-                      >
-                        <td className="px-4 py-2.5 font-semibold text-slate-700 dark:text-slate-300 whitespace-nowrap">
-                          <span className="inline-flex items-center gap-1.5">
-                            {row.jenis}
-                            {row.isExtra && (
-                              <span title="Kombinasi ini tidak terdaftar di master produk saat ini">
-                                <AlertTriangle
-                                  size={12}
-                                  className="text-amber-500"
-                                />
-                              </span>
-                            )}
-                          </span>
-                        </td>
-                        {rekap.ukuranList.map((ukuran) => (
-                          <td
-                            key={ukuran}
-                            className="text-center px-3 py-2.5 text-slate-600 dark:text-slate-400"
-                          >
-                            {row.perUkuran[ukuran] > 0
-                              ? row.perUkuran[ukuran]
-                              : ""}
-                          </td>
-                        ))}
-                        <td className="text-center px-4 py-2.5 font-bold text-slate-800 dark:text-slate-200">
-                          {row.jumlah}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                  <tfoot>
-                    <tr className="bg-slate-50 dark:bg-slate-800/60 border-t-2 border-slate-300 dark:border-slate-600">
-                      <td className="px-4 py-3 font-extrabold text-slate-800 dark:text-slate-100">
-                        TOTAL
-                      </td>
-                      {rekap.ukuranList.map((ukuran) => (
-                        <td
-                          key={ukuran}
-                          className="text-center px-3 py-3 font-extrabold text-slate-800 dark:text-slate-100"
-                        >
-                          {rekap.totalPerUkuran[ukuran] || 0}
-                        </td>
-                      ))}
-                      <td className="text-center px-4 py-3 font-extrabold text-emerald-600 dark:text-emerald-400">
-                        {rekap.totalJumlah}
-                      </td>
-                    </tr>
-                  </tfoot>
-                </table>
-              </div>
+              ))}
             </div>
-          ))}
-        </div>
+          )}
+        </>
       )}
+
+      {/* ── Sub-Tab: Rekap Kekurangan Stok ── */}
+      {subTab === "kekurangan" &&
+        (shortageList.length === 0 ? (
+          <div className="py-16 flex flex-col items-center gap-3 text-slate-400 dark:text-slate-500 border border-slate-200 dark:border-slate-800 border-dashed rounded-2xl">
+            <PackageCheck
+              size={32}
+              strokeWidth={1.2}
+              className="text-emerald-400"
+            />
+            <p className="text-sm font-semibold">Tidak ada kekurangan stok</p>
+            <p className="text-xs">
+              Semua item sudah lengkap saat dikemas di tab Pengemasan
+            </p>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            <div className="flex items-center gap-2">
+              <PackageX size={16} className="text-red-500" />
+              <h2 className="text-sm font-extrabold text-slate-700 dark:text-slate-200">
+                Rekap Kekurangan Stok
+              </h2>
+              <span className="text-xs text-slate-400 font-medium">
+                — total {totalShortageUnits} pcs kurang, dikelompokkan per kode
+                produk
+              </span>
+            </div>
+
+            {shortageList.map((produk) => (
+              <div
+                key={produk.product_id}
+                className="border border-red-200 dark:border-red-900/50 rounded-2xl overflow-hidden"
+              >
+                <div className="bg-red-50 dark:bg-red-950/30 px-4 sm:px-5 py-3.5 border-b border-red-200 dark:border-red-900/50 flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <span className="text-[10px] font-mono font-bold text-red-600 dark:text-red-400 bg-white dark:bg-slate-900 border border-red-200 dark:border-red-900/50 px-2 py-1 rounded-md shrink-0">
+                      {produk.product_code}
+                    </span>
+                    <h3 className="font-bold text-sm sm:text-[15px] text-slate-800 dark:text-slate-200 truncate">
+                      {produk.product_name}
+                    </h3>
+                  </div>
+                  <span className="text-xs font-extrabold text-red-600 dark:text-red-400 shrink-0">
+                    {produk.totalKurang} pcs kurang
+                  </span>
+                </div>
+
+                <div className="divide-y divide-slate-100 dark:divide-slate-800">
+                  {produk.rows.map((row) => (
+                    <div
+                      key={`${row.jenis}::${row.ukuran}`}
+                      className="px-4 sm:px-5 py-3"
+                    >
+                      <div className="flex items-center justify-between gap-3">
+                        <p className="text-sm font-semibold text-slate-700 dark:text-slate-300">
+                          {row.jenis} · Ukuran {row.ukuran}
+                        </p>
+                        <span className="text-xs font-extrabold text-red-600 dark:text-red-400 shrink-0">
+                          Kurang {row.totalKurang}
+                        </span>
+                      </div>
+                      <div className="mt-1.5 flex flex-wrap gap-1.5">
+                        {row.details.map((d, i) => (
+                          <span
+                            key={i}
+                            className="text-[10px] font-medium text-slate-500 dark:text-slate-400 bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 px-2 py-1 rounded-lg"
+                          >
+                            {d.po_number} · {d.customer_name} ({d.qty})
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        ))}
     </div>
   );
 }

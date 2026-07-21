@@ -2,8 +2,12 @@
 
 import { useEffect, useState } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { getAllPOOrders, getPOSettingAdmin } from "@/lib/po/admin";
-import { POOrder, POSetting } from "@/types/po";
+import {
+  getAllPOOrders,
+  getPOSettingAdmin,
+  updateItemShortage,
+} from "@/lib/po/admin";
+import { POOrder, POOrderItem, POSetting } from "@/types/po";
 import POOrderPrintSlip from "./POOrderPrintSlip";
 import {
   Search,
@@ -12,7 +16,195 @@ import {
   Users,
   Globe,
   Loader2,
+  PackageX,
+  PackageCheck,
+  RotateCcw,
+  ClipboardList,
+  X,
 } from "lucide-react";
+
+/* ── Modal detail packing: kemas item satu-satu, tandai stok kurang ── */
+function PackingDetailModal({
+  order,
+  onClose,
+  onOrderUpdated,
+}: {
+  order: POOrder;
+  onClose: () => void;
+  onOrderUpdated: (updated: POOrder) => void;
+}) {
+  const [items, setItems] = useState<POOrderItem[]>([...order.order_items]);
+  const [savingIndex, setSavingIndex] = useState<number | null>(null);
+  const [editingIndex, setEditingIndex] = useState<number | null>(null);
+  const [editValue, setEditValue] = useState<number>(0);
+
+  // Klik "Stok Tidak Ada" -> defaultnya dianggap kurang SEMUA (= qty item).
+  // Admin cukup klik Simpan kalau memang kurang semua, atau ubah angkanya
+  // dulu kalau cuma kurang sebagian.
+  function startShortage(index: number) {
+    setEditingIndex(index);
+    setEditValue(items[index].qty);
+  }
+
+  function startEditExisting(index: number) {
+    setEditingIndex(index);
+    setEditValue(items[index].shortage_qty || 0);
+  }
+
+  async function confirmShortage(index: number) {
+    const qty = items[index].qty;
+    const clamped = Math.max(0, Math.min(editValue, qty));
+    setSavingIndex(index);
+    const result = await updateItemShortage(order.id, index, clamped);
+    setSavingIndex(null);
+    if (!result.success) {
+      alert("Gagal menyimpan status stok: " + result.error);
+      return;
+    }
+    const updatedItems = items.map((it, i) =>
+      i === index ? { ...it, shortage_qty: clamped } : it,
+    );
+    setItems(updatedItems);
+    setEditingIndex(null);
+    onOrderUpdated({ ...order, order_items: updatedItems });
+  }
+
+  async function resetShortage(index: number) {
+    setSavingIndex(index);
+    const result = await updateItemShortage(order.id, index, 0);
+    setSavingIndex(null);
+    if (!result.success) {
+      alert("Gagal reset status stok: " + result.error);
+      return;
+    }
+    const updatedItems = items.map((it, i) =>
+      i === index ? { ...it, shortage_qty: 0 } : it,
+    );
+    setItems(updatedItems);
+    setEditingIndex(null);
+    onOrderUpdated({ ...order, order_items: updatedItems });
+  }
+
+  const totalKurang = items.reduce((s, it) => s + (it.shortage_qty || 0), 0);
+
+  return (
+    <div
+      className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-3 sm:p-4"
+      onClick={onClose}
+    >
+      <div
+        className="bg-white dark:bg-slate-900 rounded-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="sticky top-0 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-700 px-5 py-4 flex items-center justify-between z-10">
+          <div className="min-w-0">
+            <p className="text-[10px] font-extrabold uppercase tracking-widest text-slate-400 dark:text-slate-500">
+              Kemas Pesanan
+            </p>
+            <h3 className="font-mono font-extrabold text-slate-900 dark:text-white truncate">
+              {order.po_number}
+            </h3>
+            <p className="text-xs text-slate-500 dark:text-slate-400 truncate">
+              {order.customer_name}
+              {totalKurang > 0 && (
+                <span className="ml-2 text-red-600 dark:text-red-400 font-bold">
+                  · {totalKurang} pcs kurang
+                </span>
+              )}
+            </p>
+          </div>
+          <button
+            onClick={onClose}
+            className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 shrink-0"
+          >
+            <X size={20} />
+          </button>
+        </div>
+
+        <div className="p-5 space-y-2.5">
+          {items.map((item, i) => {
+            const isEditing = editingIndex === i;
+            const isSaving = savingIndex === i;
+            const hasShortage = (item.shortage_qty || 0) > 0;
+            return (
+              <div
+                key={i}
+                className={`border rounded-xl p-3.5 transition-colors ${
+                  hasShortage
+                    ? "border-red-200 dark:border-red-900/50 bg-red-50/50 dark:bg-red-950/20"
+                    : "border-slate-200 dark:border-slate-700"
+                }`}
+              >
+                <p className="font-bold text-sm text-slate-800 dark:text-slate-200 truncate">
+                  {item.product_name}
+                </p>
+                <p className="text-xs text-slate-500 dark:text-slate-400 mb-3">
+                  {item.ukuran} · {item.lengan} · {item.warna} · Qty {item.qty}
+                </p>
+
+                {isEditing ? (
+                  <div className="flex flex-wrap items-center gap-2">
+                    <input
+                      type="number"
+                      min={0}
+                      max={item.qty}
+                      value={editValue}
+                      onChange={(e) => setEditValue(Number(e.target.value))}
+                      autoFocus
+                      className="w-20 text-sm text-center bg-white dark:bg-slate-800 border border-red-300 dark:border-red-700 rounded-lg px-2 py-1.5"
+                    />
+                    <span className="text-xs text-slate-400">
+                      / {item.qty} pcs kurang
+                    </span>
+                    <button
+                      onClick={() => confirmShortage(i)}
+                      disabled={isSaving}
+                      className="text-xs font-bold px-3 py-1.5 bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white rounded-lg"
+                    >
+                      {isSaving ? "..." : "Simpan"}
+                    </button>
+                    <button
+                      onClick={() => setEditingIndex(null)}
+                      className="text-xs font-bold px-3 py-1.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300"
+                    >
+                      Batal
+                    </button>
+                  </div>
+                ) : hasShortage ? (
+                  <div className="flex flex-wrap items-center gap-3">
+                    <span className="inline-flex items-center gap-1.5 text-xs font-extrabold px-2.5 py-1 rounded-lg bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400">
+                      <PackageX size={12} /> Kurang {item.shortage_qty} pcs
+                    </span>
+                    <button
+                      onClick={() => startEditExisting(i)}
+                      className="text-xs font-semibold text-slate-500 hover:text-slate-700 dark:hover:text-slate-300"
+                    >
+                      Ubah
+                    </button>
+                    <button
+                      onClick={() => resetShortage(i)}
+                      disabled={isSaving}
+                      className="text-xs font-semibold text-emerald-600 hover:text-emerald-700 dark:text-emerald-400 flex items-center gap-1 disabled:opacity-50"
+                    >
+                      <RotateCcw size={11} /> Stok Lengkap
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    onClick={() => startShortage(i)}
+                    className="text-xs font-bold px-3 py-1.5 border border-red-200 dark:border-red-900/50 text-red-600 dark:text-red-400 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
+                  >
+                    Stok Tidak Ada
+                  </button>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
+}
 
 interface POPackingListProps {
   poId: string;
@@ -31,6 +223,15 @@ export default function POPackingList({ poId }: POPackingListProps) {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   // State loading saat menyiapkan dokumen cetak
   const [printing, setPrinting] = useState(false);
+  // Pesanan yang sedang dibuka detail packing-nya (modal)
+  const [detailOrder, setDetailOrder] = useState<POOrder | null>(null);
+
+  // Update satu order di state lokal setelah status stok item berubah,
+  // supaya badge di tabel & modal langsung sinkron tanpa perlu refetch.
+  function handleOrderUpdated(updated: POOrder) {
+    setOrders((prev) => prev.map((o) => (o.id === updated.id ? updated : o)));
+    setDetailOrder(updated);
+  }
 
   useEffect(() => {
     async function loadData() {
@@ -243,7 +444,7 @@ export default function POPackingList({ poId }: POPackingListProps) {
 
       {/* ── TABEL DATA PENGEMASAN ── */}
       <div className="border border-slate-200 dark:border-slate-700 rounded-2xl overflow-hidden overflow-x-auto bg-white dark:bg-slate-900/20">
-        <table className="w-full text-sm min-w-[650px]">
+        <table className="w-full text-sm min-w-[850px]">
           <thead>
             <tr className="bg-slate-50 dark:bg-slate-800/60 border-b border-slate-200 dark:border-slate-700 text-xs text-slate-500">
               <th className="px-5 py-3.5 text-left w-12">
@@ -274,12 +475,18 @@ export default function POPackingList({ poId }: POPackingListProps) {
               <th className="text-left px-5 py-3.5 font-bold uppercase">
                 Jumlah Item
               </th>
+              <th className="text-left px-5 py-3.5 font-bold uppercase">
+                Status Stok
+              </th>
+              <th className="text-right px-5 py-3.5 font-bold uppercase">
+                Aksi
+              </th>
             </tr>
           </thead>
           <tbody>
             {filtered.length === 0 ? (
               <tr>
-                <td colSpan={5} className="text-center py-8 text-slate-400">
+                <td colSpan={7} className="text-center py-8 text-slate-400">
                   Tidak ada data yang cocok dengan filter.
                 </td>
               </tr>
@@ -336,6 +543,37 @@ export default function POPackingList({ poId }: POPackingListProps) {
                     <td className="px-5 py-4 text-xs font-bold text-slate-600 dark:text-slate-400">
                       {totalQty} pcs · {order.order_items.length} item
                     </td>
+                    <td className="px-5 py-4">
+                      {(() => {
+                        const totalKurang = order.order_items.reduce(
+                          (s, it) => s + (it.shortage_qty || 0),
+                          0,
+                        );
+                        if (totalKurang === 0) {
+                          return (
+                            <span className="inline-flex items-center gap-1 text-[10px] font-bold text-slate-400 dark:text-slate-500">
+                              <PackageCheck size={12} /> Lengkap
+                            </span>
+                          );
+                        }
+                        return (
+                          <span className="inline-flex items-center gap-1 text-[10px] font-extrabold px-2 py-1 rounded-lg bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400">
+                            <PackageX size={12} /> Kurang {totalKurang}
+                          </span>
+                        );
+                      })()}
+                    </td>
+                    <td className="px-5 py-4 text-right">
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setDetailOrder(order);
+                        }}
+                        className="inline-flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
+                      >
+                        <ClipboardList size={13} /> Kemas
+                      </button>
+                    </td>
                   </tr>
                 );
               })
@@ -343,6 +581,14 @@ export default function POPackingList({ poId }: POPackingListProps) {
           </tbody>
         </table>
       </div>
+
+      {detailOrder && (
+        <PackingDetailModal
+          order={detailOrder}
+          onClose={() => setDetailOrder(null)}
+          onOrderUpdated={handleOrderUpdated}
+        />
+      )}
 
       {/* Area cetak invoice TIDAK dirender di sini. Saat tombol "Cetak
           Invoice" diklik, dokumen dibuat langsung di dalam iframe
