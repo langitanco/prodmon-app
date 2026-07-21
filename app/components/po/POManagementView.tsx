@@ -116,7 +116,7 @@ export default function POManagementView({
 
   return (
     <div className="space-y-4 animate-in fade-in duration-300">
-      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6">
+      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 sm:p-6">
         {onBack && (
           <button
             onClick={onBack}
@@ -129,44 +129,52 @@ export default function POManagementView({
             Kembali ke daftar PO
           </button>
         )}
-        <div className="flex items-center gap-4">
-          <div className="p-3 bg-blue-50 dark:bg-blue-950/50 text-blue-600 dark:text-blue-400 rounded-xl border border-blue-100 dark:border-blue-900/50 shadow-sm shrink-0">
-            <ActiveIcon size={24} />
+        <div className="flex flex-col sm:flex-row sm:items-center gap-4">
+          <div className="flex items-center gap-3 sm:gap-4 min-w-0">
+            <div className="p-2.5 sm:p-3 bg-blue-50 dark:bg-blue-950/50 text-blue-600 dark:text-blue-400 rounded-xl border border-blue-100 dark:border-blue-900/50 shadow-sm shrink-0">
+              <ActiveIcon size={22} className="sm:w-6 sm:h-6" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="text-[10px] font-extrabold uppercase tracking-[0.18em] text-blue-500 mb-1">
+                Pre-Order System
+              </p>
+              <h1 className="text-lg sm:text-2xl font-extrabold text-slate-900 dark:text-white tracking-tight leading-tight sm:leading-none truncate">
+                PO Management{" "}
+                <span className="text-blue-600 font-mono text-base sm:text-xl ml-1">
+                  #{poId.slice(0, 8)}
+                </span>
+              </h1>
+              <p className="text-[11px] sm:text-xs text-slate-400 dark:text-slate-500 mt-1 sm:mt-1.5 font-medium truncate">
+                Mengelola data terisolasi untuk ID Campaign: {poId}
+              </p>
+            </div>
           </div>
-          <div className="min-w-0 flex-1">
-            <p className="text-[10px] font-extrabold uppercase tracking-[0.18em] text-blue-500 mb-1">
-              Pre-Order System
-            </p>
-            <h1 className="text-2xl font-extrabold text-slate-900 dark:text-white tracking-tight leading-none truncate">
-              PO Management{" "}
-              <span className="text-blue-600 font-mono text-xl ml-1">
-                #{poId.slice(0, 8)}
+          <div className="flex gap-2 w-full sm:w-auto shrink-0">
+            <button
+              onClick={handleArchive}
+              disabled={archiving}
+              className="flex-1 sm:flex-none flex items-center justify-center gap-2 text-xs font-bold text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-900/50 bg-blue-50 dark:bg-blue-950/30 hover:bg-blue-100 dark:hover:bg-blue-900/40 disabled:opacity-60 px-3 sm:px-3.5 py-2.5 rounded-xl transition-colors whitespace-nowrap"
+              title="Unduh semua data & gambar PO ini sebagai arsip ZIP"
+            >
+              {archiving ? (
+                <Loader2 size={14} className="animate-spin shrink-0" />
+              ) : (
+                <Archive size={14} className="shrink-0" />
+              )}
+              <span className="truncate">
+                {archiving
+                  ? archiveProgress || "Mengarsipkan..."
+                  : "Arsipkan Data"}
               </span>
-            </h1>
-            <p className="text-xs text-slate-400 dark:text-slate-500 mt-1.5 font-medium truncate">
-              Mengelola data terisolasi untuk ID Campaign: {poId}
-            </p>
+            </button>
+            <button
+              onClick={openDeleteModal}
+              className="flex-1 sm:flex-none flex items-center justify-center gap-2 text-xs font-bold text-red-600 dark:text-red-400 border border-red-200 dark:border-red-900/50 bg-red-50 dark:bg-red-950/30 hover:bg-red-100 dark:hover:bg-red-900/40 px-3 sm:px-3.5 py-2.5 rounded-xl transition-colors whitespace-nowrap"
+            >
+              <Trash2 size={14} className="shrink-0" />
+              Hapus PO
+            </button>
           </div>
-          <button
-            onClick={handleArchive}
-            disabled={archiving}
-            className="flex items-center gap-2 text-xs font-bold text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-900/50 bg-blue-50 dark:bg-blue-950/30 hover:bg-blue-100 dark:hover:bg-blue-900/40 disabled:opacity-60 px-3.5 py-2.5 rounded-xl transition-colors shrink-0"
-            title="Unduh semua data & gambar PO ini sebagai arsip ZIP"
-          >
-            {archiving ? (
-              <Loader2 size={14} className="animate-spin" />
-            ) : (
-              <Archive size={14} />
-            )}
-            {archiving ? archiveProgress || "Mengarsipkan..." : "Arsipkan Data"}
-          </button>
-          <button
-            onClick={openDeleteModal}
-            className="flex items-center gap-2 text-xs font-bold text-red-600 dark:text-red-400 border border-red-200 dark:border-red-900/50 bg-red-50 dark:bg-red-950/30 hover:bg-red-100 dark:hover:bg-red-900/40 px-3.5 py-2.5 rounded-xl transition-colors shrink-0"
-          >
-            <Trash2 size={14} />
-            Hapus PO
-          </button>
         </div>
       </div>
 
@@ -176,8 +184,8 @@ export default function POManagementView({
             key={id}
             onClick={() => setActiveTab(id)}
             className={`
-              flex items-center gap-2 px-4 py-2.5 text-sm font-bold rounded-xl
-              whitespace-nowrap transition-all duration-200
+              flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 sm:py-2.5 text-xs sm:text-sm font-bold rounded-xl
+              whitespace-nowrap shrink-0 transition-all duration-200
               ${
                 activeTab === id
                   ? "bg-blue-600 text-white shadow-sm"
@@ -185,13 +193,13 @@ export default function POManagementView({
               }
             `}
           >
-            <Icon size={14} />
+            <Icon size={14} className="shrink-0" />
             {label}
           </button>
         ))}
       </div>
 
-      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 min-h-[420px]">
+      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-3 sm:p-6 min-h-[420px] overflow-x-auto">
         {activeTab === "overview" && <POOverview poId={poId} />}
         {activeTab === "orders" && <POOrderList poId={poId} />}
         {activeTab === "products" && <POProductList poId={poId} />}
@@ -205,11 +213,11 @@ export default function POManagementView({
       {/* ── Modal Konfirmasi Hapus PO ── */}
       {showDeleteModal && (
         <div
-          className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4"
+          className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-3 sm:p-4"
           onClick={() => !deleting && setShowDeleteModal(false)}
         >
           <div
-            className="bg-white dark:bg-slate-900 rounded-2xl p-6 w-full max-w-md space-y-4"
+            className="bg-white dark:bg-slate-900 rounded-2xl p-4 sm:p-6 w-full max-w-md space-y-4 max-h-[92vh] overflow-y-auto"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-start justify-between gap-3">
