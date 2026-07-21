@@ -57,6 +57,26 @@ export default function POOrderPrintSlip({
   const paymentColor =
     PAYMENT_COLOR[order.payment_status] ?? PAYMENT_COLOR.BELUM_BAYAR;
 
+  // Urutkan item: kode/nama produk -> lengan -> warna -> ukuran.
+  const sortedItems = [...order.order_items].sort((a, b) => {
+    const kodeA = a.product_name || "";
+    const kodeB = b.product_name || "";
+    if (kodeA !== kodeB)
+      return kodeA.localeCompare(kodeB, undefined, { numeric: true });
+
+    const lenganA = a.lengan || "";
+    const lenganB = b.lengan || "";
+    if (lenganA !== lenganB) return lenganA.localeCompare(lenganB);
+
+    const warnaA = a.warna || "";
+    const warnaB = b.warna || "";
+    if (warnaA !== warnaB) return warnaA.localeCompare(warnaB);
+
+    return (a.ukuran || "").localeCompare(b.ukuran || "", undefined, {
+      numeric: true,
+    });
+  });
+
   const storeInitials = storeName
     .split(" ")
     .filter(Boolean)
@@ -373,7 +393,7 @@ export default function POOrderPrintSlip({
             </tr>
           </thead>
           <tbody>
-            {order.order_items.map((item, i) => (
+            {sortedItems.map((item, i) => (
               <tr
                 key={i}
                 style={{

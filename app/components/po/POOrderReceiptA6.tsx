@@ -33,6 +33,26 @@ export default function POOrderReceiptA6({
 
   const isDikirim = order.delivery_method === "Dikirim";
 
+  // Urutkan item: kode/nama produk -> lengan -> warna -> ukuran.
+  const sortedItems = [...order.order_items].sort((a, b) => {
+    const kodeA = a.product_name || "";
+    const kodeB = b.product_name || "";
+    if (kodeA !== kodeB)
+      return kodeA.localeCompare(kodeB, undefined, { numeric: true });
+
+    const lenganA = a.lengan || "";
+    const lenganB = b.lengan || "";
+    if (lenganA !== lenganB) return lenganA.localeCompare(lenganB);
+
+    const warnaA = a.warna || "";
+    const warnaB = b.warna || "";
+    if (warnaA !== warnaB) return warnaA.localeCompare(warnaB);
+
+    return (a.ukuran || "").localeCompare(b.ukuran || "", undefined, {
+      numeric: true,
+    });
+  });
+
   return (
     <div
       style={{
@@ -272,7 +292,7 @@ export default function POOrderReceiptA6({
           </tr>
         </thead>
         <tbody>
-          {order.order_items.map((item, i) => (
+          {sortedItems.map((item, i) => (
             <tr key={i} style={{ borderBottom: "1px dotted #888" }}>
               <td style={{ padding: "5px 0" }}>
                 <span style={{ fontWeight: "bold" }}>{item.product_name}</span>

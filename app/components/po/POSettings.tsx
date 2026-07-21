@@ -360,13 +360,13 @@ export default function POSettings({ poId }: POSettingsProps) {
 
       <SectionHeading>Identitas Toko</SectionHeading>
       <Field
-        label="Logo Toko"
+        label="Kop Toko"
         icon={ImageIcon}
-        hint="Dipakai di header resi cetak (A6 & A4/PDF). Format persegi/landscape lebih rapi. Maks. 2MB."
+        hint="Dipakai di header resi cetak (A6 & A4/PDF). Rasio gambar 1:15. Maks. 2MB."
       >
         <div className="flex flex-col sm:flex-row gap-4 items-start">
           {/* Preview */}
-          <div className="w-40 h-40 rounded-xl border-2 border-dashed border-slate-200 dark:border-slate-700 flex items-center justify-center overflow-hidden bg-slate-50 dark:bg-slate-800/50 shrink-0">
+          <div className="w-40 h-25 rounded-xl border-2 border-dashed border-slate-200 dark:border-slate-700 flex items-center justify-center overflow-hidden bg-slate-50 dark:bg-slate-800/50 shrink-0">
             {logoPreview ? (
               <img
                 src={logoPreview}
@@ -406,7 +406,7 @@ export default function POSettings({ poId }: POSettingsProps) {
                 ) : (
                   <>
                     <Upload size={14} />
-                    {logoPreview ? "Ganti Logo" : "Upload Logo"}
+                    {logoPreview ? "Ganti Kop" : "Upload Kop"}
                   </>
                 )}
               </span>
@@ -418,7 +418,7 @@ export default function POSettings({ poId }: POSettingsProps) {
                 className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl border border-red-200 text-red-500 text-sm font-semibold hover:bg-red-50 transition-colors"
               >
                 <Trash2 size={14} />
-                Hapus Logo
+                Hapus Kop
               </button>
             )}
 
