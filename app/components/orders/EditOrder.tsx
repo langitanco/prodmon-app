@@ -75,7 +75,7 @@ export default function EditOrder({
     <div className="h-full flex flex-col">
       <div className="flex-1 flex flex-col bg-white dark:bg-slate-900 rounded-2xl border dark:border-slate-800 shadow-sm overflow-hidden min-h-0">
         {/* ── Header (fixed) ── */}
-        <div className="flex-shrink-0 px-5 md:px-8 py-4 border-b border-slate-100 dark:border-slate-800">
+        <div className="shrink-0 px-5 md:px-8 py-4 border-b border-slate-100 dark:border-slate-800">
           <h2 className="font-bold text-lg md:text-xl text-slate-800 dark:text-white">
             Edit Pesanan
           </h2>
@@ -136,7 +136,7 @@ export default function EditOrder({
                 {!form.detail_ukuran ? (
                   <button
                     onClick={() => setShowSizeForm(true)}
-                    className="w-full min-h-[80px] border-2 border-dashed border-slate-300 dark:border-slate-600 rounded-xl text-sm font-bold text-slate-500 dark:text-slate-400 hover:border-blue-400 hover:text-blue-500 dark:hover:text-blue-400 transition"
+                    className="w-full min-h-20 border-2 border-dashed border-slate-300 dark:border-slate-600 rounded-xl text-sm font-bold text-slate-500 dark:text-slate-400 hover:border-blue-400 hover:text-blue-500 dark:hover:text-blue-400 transition"
                   >
                     + Isi Detail Ukuran
                   </button>
@@ -307,7 +307,7 @@ export default function EditOrder({
         </div>
 
         {/* ── Footer tombol (fixed, selalu kelihatan) ── */}
-        <div className="flex-shrink-0 px-4 md:px-6 py-4 border-t border-slate-100 dark:border-slate-800 flex gap-3">
+        <div className="shrink-0 px-4 md:px-6 py-4 border-t border-slate-100 dark:border-slate-800 flex gap-3">
           <button
             onClick={onCancel}
             className="flex-1 border-2 border-slate-200 dark:border-slate-700 py-2 md:py-3 rounded-xl font-bold text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 transition text-sm"

@@ -129,7 +129,7 @@ export default function POManagementView({
             Kembali ke daftar PO
           </button>
         )}
-        <div className="flex flex-col sm:flex-row sm:items-center gap-4">
+        <div className="flex flex-col gap-4">
           <div className="flex items-center gap-3 sm:gap-4 min-w-0">
             <div className="p-2.5 sm:p-3 bg-blue-50 dark:bg-blue-950/50 text-blue-600 dark:text-blue-400 rounded-xl border border-blue-100 dark:border-blue-900/50 shadow-sm shrink-0">
               <ActiveIcon size={22} className="sm:w-6 sm:h-6" />
@@ -149,7 +149,7 @@ export default function POManagementView({
               </p>
             </div>
           </div>
-          <div className="flex gap-2 w-full sm:w-auto shrink-0">
+          <div className="flex gap-2 w-full sm:w-auto sm:self-end sm:justify-end pt-3 border-t border-slate-100 dark:border-slate-800">
             <button
               onClick={handleArchive}
               disabled={archiving}

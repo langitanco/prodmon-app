@@ -540,7 +540,7 @@ export default function NotaView() {
               <div className="h-12 relative flex items-center justify-center">
                 {isLunas && (
                   <div className="transform -rotate-12 opacity-50 pointer-events-none">
-                    <div className="border-[2px] border-red-600 text-red-600 rounded p-1 bg-white/70 backdrop-blur-sm">
+                    <div className="border-2 border-red-600 text-red-600 rounded p-1 bg-white/70 backdrop-blur-sm">
                       <span className="text-xl font-black tracking-widest block text-center">
                         LUNAS
                       </span>

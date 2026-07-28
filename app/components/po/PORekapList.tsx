@@ -49,6 +49,7 @@ export default function PORekapList({ poId }: PORekapListProps) {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [exporting, setExporting] = useState(false);
+  const [exportingShortage, setExportingShortage] = useState(false);
   const [subTab, setSubTab] = useState<"produksi" | "kekurangan">("produksi");
 
   useEffect(() => {
@@ -489,6 +490,94 @@ export default function PORekapList({ poId }: PORekapListProps) {
     }
   }
 
+  /* ── Export Excel: Rekap Kekurangan Stok ── */
+  async function handleExportShortageExcel() {
+    if (shortageList.length === 0) {
+      alert("Tidak ada data kekurangan untuk diexport.");
+      return;
+    }
+    setExportingShortage(true);
+    try {
+      const XLSX = await import("xlsx");
+      const wb = XLSX.utils.book_new();
+
+      // ── Sheet 1: Detail Kekurangan (flat, per PO/customer) ──
+      const detailHeader = [
+        "KODE PRODUK",
+        "NAMA PRODUK",
+        "JENIS",
+        "UKURAN",
+        "NO PO",
+        "CUSTOMER",
+        "QTY KURANG",
+      ];
+      const detailData: (string | number)[][] = [detailHeader];
+
+      shortageList.forEach((produk) => {
+        produk.rows.forEach((row) => {
+          row.details.forEach((d) => {
+            detailData.push([
+              produk.product_code,
+              produk.product_name,
+              row.jenis,
+              row.ukuran,
+              d.po_number,
+              d.customer_name,
+              d.qty,
+            ]);
+          });
+        });
+      });
+
+      detailData.push([]);
+      detailData.push(["", "", "", "", "", "TOTAL", totalShortageUnits]);
+
+      const wsDetail = XLSX.utils.aoa_to_sheet(detailData);
+      wsDetail["!cols"] = [
+        { wch: 14 },
+        { wch: 26 },
+        { wch: 16 },
+        { wch: 8 },
+        { wch: 14 },
+        { wch: 20 },
+        { wch: 12 },
+      ];
+      XLSX.utils.book_append_sheet(wb, wsDetail, "Detail Kekurangan");
+
+      // ── Sheet 2: Ringkasan per Produk & Jenis/Ukuran ──
+      const ringkasanData: (string | number)[][] = [];
+      shortageList.forEach((produk, idx) => {
+        if (idx > 0) ringkasanData.push([]); // baris kosong pemisah antar produk
+
+        ringkasanData.push([`${produk.product_code} - ${produk.product_name}`]);
+        ringkasanData.push(["JENIS", "UKURAN", "QTY KURANG"]);
+
+        produk.rows.forEach((row) => {
+          ringkasanData.push([row.jenis, row.ukuran, row.totalKurang]);
+        });
+
+        ringkasanData.push(["", "TOTAL", produk.totalKurang]);
+      });
+
+      const wsRingkasan = XLSX.utils.aoa_to_sheet(ringkasanData);
+      wsRingkasan["!cols"] = [{ wch: 20 }, { wch: 10 }, { wch: 12 }];
+      XLSX.utils.book_append_sheet(wb, wsRingkasan, "Ringkasan Kekurangan");
+
+      const tanggalFile = new Date().toISOString().slice(0, 10);
+      const namaPO = (setting?.title || "PO")
+        .replace(/[\\/?*[\]:]/g, "") // buang karakter terlarang nama file
+        .trim();
+      XLSX.writeFile(wb, `Kekurangan-${namaPO}-${tanggalFile}.xlsx`);
+    } catch (err) {
+      console.error(err);
+      alert(
+        "Gagal membuat file Excel. Pastikan package 'xlsx' sudah terinstall.",
+      );
+    } finally {
+      setExportingShortage(false);
+    }
+  }
+
   /* ── Loading ── */
   if (loading)
     return (
@@ -520,12 +609,33 @@ export default function PORekapList({ poId }: PORekapListProps) {
             Refresh
           </button>
           <button
-            onClick={handleExportExcel}
-            disabled={exporting || rekapList.length === 0}
+            onClick={
+              subTab === "produksi"
+                ? handleExportExcel
+                : handleExportShortageExcel
+            }
+            disabled={
+              subTab === "produksi"
+                ? exporting || rekapList.length === 0
+                : exportingShortage || shortageList.length === 0
+            }
             className="flex justify-center items-center gap-2 text-sm px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 disabled:bg-emerald-400 text-white rounded-xl font-bold transition-colors"
           >
-            <Download size={14} className={exporting ? "animate-bounce" : ""} />
-            {exporting ? "Membuat..." : "Download Excel"}
+            <Download
+              size={14}
+              className={
+                (subTab === "produksi" ? exporting : exportingShortage)
+                  ? "animate-bounce"
+                  : ""
+              }
+            />
+            {subTab === "produksi"
+              ? exporting
+                ? "Membuat..."
+                : "Download Excel"
+              : exportingShortage
+                ? "Membuat..."
+                : "Download Kekurangan"}
           </button>
         </div>
       </div>

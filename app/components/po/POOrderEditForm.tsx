@@ -439,7 +439,7 @@ export default function POOrderEditForm({
               </span>
               <button
                 onClick={() => removeItem(i)}
-                className="text-red-400 hover:text-red-600 dark:hover:text-red-400 flex-shrink-0"
+                className="text-red-400 hover:text-red-600 dark:hover:text-red-400 shrink-0"
               >
                 <Trash2 size={16} />
               </button>
