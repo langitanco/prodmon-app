@@ -8,7 +8,7 @@ import "./globals.css";
 import { ThemeProvider } from "next-themes";
 
 // ✅ 1. IMPORT KOMPONEN FCM MANAGER DI SINI
-import FCMManager from "@/app/components/misc/FCMManager"; 
+import FCMManager from "@/app/components/misc/FCMManager";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -21,8 +21,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "LCO SuperApps", 
-  description: "Aplikasi Monitoring Produksi Sablon LCO.", 
+  title: "Sabmoon",
+  description: "Aplikasi Sablon Monitoring LCO.",
 };
 
 export default function RootLayout({
@@ -38,12 +38,10 @@ export default function RootLayout({
       >
         {/* ✅ BUNGKUS KONTEN DENGAN THEME PROVIDER */}
         <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
-          
           {/* ✅ 2. PASANG KOMPONEN DI SINI AGAR BERJALAN OTOMATIS */}
           <FCMManager />
-          
+
           {children}
-          
         </ThemeProvider>
       </body>
     </html>
