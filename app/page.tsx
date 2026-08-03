@@ -199,6 +199,18 @@ export default function ProductionApp() {
       createBrowserClient(
         process.env.NEXT_PUBLIC_SUPABASE_URL!,
         process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+        {
+          cookieOptions: {
+            // HARUS SAMA PERSIS dengan cookieOptions di app.langitan.co
+            // (lihat supabaseClients.ts) supaya signOut() di sini benar-benar
+            // menghapus cookie sesi lintas subdomain, bukan cookie host-only
+            // yang berbeda scope.
+            domain: ".langitan.co",
+            path: "/",
+            sameSite: "lax",
+            secure: true,
+          },
+        },
       ),
     [],
   );
@@ -358,8 +370,9 @@ export default function ProductionApp() {
   const handleLogout = useCallback(async () => {
     showConfirm("Logout", "Keluar aplikasi?", async () => {
       await supabase.auth.signOut();
-      window.history.replaceState({}, "", "/");
-      window.location.reload();
+      // Hard redirect (bukan router.push) supaya middleware & cookie
+      // benar-benar re-evaluate dari awal di domain login pusat.
+      window.location.href = "https://app.langitan.co";
     });
   }, [showConfirm, supabase]);
 
