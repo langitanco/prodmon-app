@@ -370,9 +370,10 @@ export default function ProductionApp() {
   const handleLogout = useCallback(async () => {
     showConfirm("Logout", "Keluar aplikasi?", async () => {
       await supabase.auth.signOut();
-      // Hard redirect (bukan router.push) supaya middleware & cookie
-      // benar-benar re-evaluate dari awal di domain login pusat.
-      window.location.href = "https://app.langitan.co";
+      // Reload halaman ini sendiri — otomatis akan menampilkan
+      // <LoginScreen /> lokal karena sesi sudah terhapus (lihat baris
+      // "if (!currentUser) return <LoginScreen />" di bawah).
+      window.location.reload();
     });
   }, [showConfirm, supabase]);
 
