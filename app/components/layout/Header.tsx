@@ -1,9 +1,17 @@
 // app/components/layout/Header.tsx
-'use client';
+"use client";
 
-import React, { useState } from 'react';
-import { Menu, Bell, LogOut, AlertTriangle, Info, CheckCircle } from 'lucide-react';
-import { UserData } from '@/types';
+import React, { useState } from "react";
+import {
+  Menu,
+  Bell,
+  LogOut,
+  AlertTriangle,
+  Info,
+  CheckCircle,
+} from "lucide-react";
+import { UserData } from "@/types";
+import UnitSwitcher from "./UnitSwitcher";
 
 interface Notification {
   id: string;
@@ -12,7 +20,7 @@ interface Notification {
   time: string;
   isRead: boolean;
   orderId?: string;
-  type?: 'warning' | 'info' | 'success'; // opsional, fallback ke 'info'
+  type?: "warning" | "info" | "success"; // opsional, fallback ke 'info'
 }
 
 interface HeaderProps {
@@ -28,15 +36,15 @@ interface HeaderProps {
 
 // ─── Helper: ikon & warna per tipe notifikasi ────────────────────────────────
 
-function NotifIcon({ type }: { type: 'warning' | 'info' | 'success' }) {
-  if (type === 'warning') {
+function NotifIcon({ type }: { type: "warning" | "info" | "success" }) {
+  if (type === "warning") {
     return (
       <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 bg-amber-50 dark:bg-amber-900/30">
         <AlertTriangle className="w-4 h-4 text-amber-600 dark:text-amber-400" />
       </div>
     );
   }
-  if (type === 'success') {
+  if (type === "success") {
     return (
       <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 bg-emerald-50 dark:bg-emerald-900/30">
         <CheckCircle className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
@@ -60,7 +68,12 @@ interface NotifPanelProps {
   onClose: () => void;
 }
 
-function NotifPanel({ notifications, onNotificationClick, onMarkAllRead, onClose }: NotifPanelProps) {
+function NotifPanel({
+  notifications,
+  onNotificationClick,
+  onMarkAllRead,
+  onClose,
+}: NotifPanelProps) {
   const unreadCount = notifications.filter((n) => !n.isRead).length;
   const hasUnread = unreadCount > 0;
 
@@ -73,19 +86,22 @@ function NotifPanel({ notifications, onNotificationClick, onMarkAllRead, onClose
       />
 
       {/* Panel */}
-      <div className="
+      <div
+        className="
         fixed md:absolute right-4 md:right-0 top-24 md:top-full md:mt-2
         w-[calc(100vw-2rem)] md:w-80 max-w-sm
         bg-white dark:bg-slate-800
         rounded-2xl border border-slate-200 dark:border-slate-700
         shadow-xl z-40 overflow-hidden
         animate-in fade-in slide-in-from-top-2 md:slide-in-from-top-0 duration-200
-      ">
-
+      "
+      >
         {/* Header panel */}
         <div className="px-4 py-3 border-b border-slate-100 dark:border-slate-700 flex items-center justify-between sticky top-0 bg-white dark:bg-slate-800 z-10">
           <div className="flex items-center gap-2">
-            <span className="text-sm font-bold text-slate-800 dark:text-slate-100">Notifikasi</span>
+            <span className="text-sm font-bold text-slate-800 dark:text-slate-100">
+              Notifikasi
+            </span>
             {hasUnread && (
               <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-red-50 dark:bg-red-900/30 text-red-700 dark:text-red-300 border border-red-100 dark:border-red-800">
                 {unreadCount} baru
@@ -108,21 +124,23 @@ function NotifPanel({ notifications, onNotificationClick, onMarkAllRead, onClose
             <div className="w-10 h-10 rounded-full bg-slate-100 dark:bg-slate-700 flex items-center justify-center">
               <Bell className="w-5 h-5 text-slate-400 dark:text-slate-500" />
             </div>
-            <p className="text-xs text-slate-400 dark:text-slate-500 font-medium">Semua sudah dibaca</p>
+            <p className="text-xs text-slate-400 dark:text-slate-500 font-medium">
+              Semua sudah dibaca
+            </p>
           </div>
         ) : (
           <div className="max-h-[60vh] md:max-h-96 overflow-y-auto divide-y divide-slate-50 dark:divide-slate-700/50">
             {notifications.map((notif) => {
-              const type = notif.type ?? 'info';
+              const type = notif.type ?? "info";
               return (
                 <div
                   key={notif.id}
                   onClick={() => onNotificationClick(notif)}
-                  style={{ WebkitTapHighlightColor: 'transparent' }}
+                  style={{ WebkitTapHighlightColor: "transparent" }}
                   className={`flex items-start gap-3 px-4 py-3 cursor-pointer transition
                     hover:bg-slate-50 dark:hover:bg-slate-700/50
                     active:bg-slate-100 dark:active:bg-slate-700
-                    ${!notif.isRead ? 'bg-blue-50/40 dark:bg-blue-900/10' : ''}
+                    ${!notif.isRead ? "bg-blue-50/40 dark:bg-blue-900/10" : ""}
                   `}
                 >
                   {/* Ikon tipe */}
@@ -169,7 +187,7 @@ export default function Header({
   onToggleSidebar,
   onLogout,
   sidebarOpen,
-  currentPage = 'dashboard',
+  currentPage = "dashboard",
   notifications = [],
   onNotificationClick,
   onMarkAllRead,
@@ -180,15 +198,15 @@ export default function Header({
   const unreadCount = notifications.filter((n) => !n.isRead).length;
 
   const pageTitles: Record<string, string> = {
-    dashboard: 'Dashboard',
-    orders: 'Daftar Pesanan',
-    completed_orders: 'Arsip Selesai',
-    trash: 'Sampah',
-    settings: 'Pengaturan',
-    kalkulator: 'Kalkulator HPP',
-    config_harga: 'Konfigurasi Harga',
-    about: 'Tentang Aplikasi',
-    default: 'Langitan.co',
+    dashboard: "Dashboard",
+    orders: "Daftar Pesanan",
+    completed_orders: "Arsip Selesai",
+    trash: "Sampah",
+    settings: "Pengaturan",
+    kalkulator: "Kalkulator HPP",
+    config_harga: "Konfigurasi Harga",
+    about: "Tentang Aplikasi",
+    default: "Langitan.co",
   };
 
   const currentTitle = pageTitles[currentPage] ?? pageTitles.default;
@@ -206,28 +224,30 @@ export default function Header({
   };
 
   return (
-    <header className={`
+    <header
+      className={`
       sticky top-0 h-20 px-4 md:px-10 flex items-center justify-between transition-all duration-300
       z-20 border-b border-transparent dark:border-transparent
-      ${sidebarOpen
-        ? 'bg-gray-100/40 backdrop-blur-xl dark:bg-slate-900/80'
-        : 'bg-gray-100 dark:bg-slate-950'
+      ${
+        sidebarOpen
+          ? "bg-gray-100/40 backdrop-blur-xl dark:bg-slate-900/80"
+          : "bg-gray-100 dark:bg-slate-950"
       }
       md:bg-gray-100 md:dark:bg-slate-950 md:backdrop-blur-none
-    `}>
-
+    `}
+    >
       {/* ── KIRI ── */}
       <div className="flex items-center gap-4">
         <button
           onClick={onToggleSidebar}
           className="p-2.5 bg-white dark:bg-slate-800 rounded-2xl text-slate-600 dark:text-slate-200 md:hidden hover:bg-slate-50 dark:hover:bg-slate-700 border border-slate-100 dark:border-slate-700 shadow-sm active:scale-95 transition-transform"
-          style={{ WebkitTapHighlightColor: 'transparent' }}
+          style={{ WebkitTapHighlightColor: "transparent" }}
         >
           <Menu className="w-6 h-6" />
         </button>
 
         <div className="hidden md:block">
-          {currentPage === 'dashboard' && (
+          {currentPage === "dashboard" && (
             <>
               <h2 className="text-xl md:text-2xl font-bold text-slate-800 dark:text-white tracking-tight">
                 Assalamu'alaikum
@@ -248,13 +268,19 @@ export default function Header({
 
       {/* ── KANAN ── */}
       <div className="flex items-center gap-3">
+        {/* Dropdown pindah unit usaha — hanya muncul untuk direksi
+            dengan akses ke lebih dari 1 unit */}
+        <UnitSwitcher userId={currentUser.id} currentUnitCode="sablon" />
 
         {/* Bell notifikasi */}
         <div className="relative">
           <button
-            onClick={() => { setShowNotif(!showNotif); setShowProfile(false); }}
+            onClick={() => {
+              setShowNotif(!showNotif);
+              setShowProfile(false);
+            }}
             className="p-2.5 md:p-3 bg-white dark:bg-slate-800 border border-slate-100 dark:border-slate-700 rounded-2xl text-slate-500 dark:text-slate-200 hover:text-blue-600 dark:hover:text-blue-400 transition relative shadow-sm active:scale-95"
-            style={{ WebkitTapHighlightColor: 'transparent' }}
+            style={{ WebkitTapHighlightColor: "transparent" }}
           >
             <Bell className="w-5 h-5" />
             {unreadCount > 0 && (
@@ -275,12 +301,19 @@ export default function Header({
         {/* Profil user (mobile only) */}
         <div className="relative md:hidden">
           <button
-            onClick={() => { setShowProfile(!showProfile); setShowNotif(false); }}
+            onClick={() => {
+              setShowProfile(!showProfile);
+              setShowNotif(false);
+            }}
             className="w-10 h-10 rounded-2xl bg-white dark:bg-slate-800 border border-slate-100 dark:border-slate-700 flex items-center justify-center shadow-sm overflow-hidden active:scale-95 transition-transform"
-            style={{ WebkitTapHighlightColor: 'transparent' }}
+            style={{ WebkitTapHighlightColor: "transparent" }}
           >
             {currentUser.avatar_url ? (
-              <img src={currentUser.avatar_url} alt="User" className="w-full h-full object-cover" />
+              <img
+                src={currentUser.avatar_url}
+                alt="User"
+                className="w-full h-full object-cover"
+              />
             ) : (
               <div className="font-bold text-slate-700 dark:text-slate-200 bg-slate-100 dark:bg-slate-700 w-full h-full flex items-center justify-center">
                 {currentUser.name.charAt(0).toUpperCase()}
@@ -294,11 +327,13 @@ export default function Header({
                 className="fixed inset-0 z-30 bg-black/10 dark:bg-black/50"
                 onClick={() => setShowProfile(false)}
               />
-              <div className="
+              <div
+                className="
                 fixed md:absolute right-4 md:right-0 top-24 md:top-full md:mt-2
                 w-56 bg-white dark:bg-slate-800 rounded-2xl shadow-xl border border-slate-100 dark:border-slate-700
                 z-40 p-2 animate-in fade-in slide-in-from-top-2 duration-200
-              ">
+              "
+              >
                 <div className="px-4 py-3 border-b border-slate-50 dark:border-slate-700">
                   <p className="text-sm font-bold text-slate-800 dark:text-slate-200 truncate">
                     {currentUser.name}
@@ -308,9 +343,12 @@ export default function Header({
                   </p>
                 </div>
                 <button
-                  onClick={() => { setShowProfile(false); onLogout(); }}
+                  onClick={() => {
+                    setShowProfile(false);
+                    onLogout();
+                  }}
                   className="w-full text-left px-4 py-3 text-sm text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 active:bg-red-100 rounded-xl flex items-center gap-2 font-bold transition mt-1"
-                  style={{ WebkitTapHighlightColor: 'transparent' }}
+                  style={{ WebkitTapHighlightColor: "transparent" }}
                 >
                   <LogOut className="w-4 h-4" /> Logout
                 </button>
